@@ -72,7 +72,7 @@ export default function Home() {
   const [inputRoomCode, setInputRoomCode] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('room')?.trim() || '';
+      return params.get('room')?.trim().replace(/\D/g, '').slice(0, 2) || '';
     }
     return '';
   });
@@ -320,15 +320,15 @@ export default function Home() {
                         <Radio className="w-4 h-4 text-amber-400" /> {t.hostRoomTitle}
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                        {locale === 'ko' ? '방을 개설하고 아내분께 초대 링크를 보내 함께 접속합니다.' : 'Host a new room and share the invite link with Player 2.'}
+                        {locale === 'ko' ? '방을 개설하고 초대 링크를 공유하여 함께 접속합니다.' : 'Host a new room and share the invite link with Player 2.'}
                       </p>
                     </div>
                     <button
                       disabled={isConnecting}
                       onClick={() => createRoom()}
-                      className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors shadow"
+                      className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors shadow disabled:opacity-50"
                     >
-                      {isConnecting ? t.connectingToRoom : t.hostRoomBtn}
+                      {isConnecting && playMode === 'host' ? t.connectingToRoom : t.hostRoomBtn}
                     </button>
                   </div>
 
@@ -339,24 +339,26 @@ export default function Home() {
                         <Smartphone className="w-4 h-4 text-indigo-400" /> {t.joinRoomTitle}
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                        {locale === 'ko' ? '남편분에게 전달받은 4자리 방 코드를 입력합니다.' : 'Enter the 4-digit room code sent by Player 1.'}
+                        {locale === 'ko' ? '전달받은 2자리 방 코드를 입력합니다.' : 'Enter the 2-digit room code sent by Player 1.'}
                       </p>
                     </div>
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        maxLength={6}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={2}
                         value={inputRoomCode}
-                        onChange={e => setInputRoomCode(e.target.value.toUpperCase())}
+                        onChange={e => setInputRoomCode(e.target.value.replace(/\D/g, '').slice(0, 2))}
                         placeholder={t.enterRoomCodePlaceholder}
-                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono text-center tracking-wider uppercase font-bold"
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono text-center tracking-widest font-black"
                       />
                       <button
-                        disabled={!inputRoomCode.trim() || isConnecting}
+                        disabled={inputRoomCode.length !== 2 || isConnecting}
                         onClick={() => joinRoom(inputRoomCode.trim())}
                         className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition-colors disabled:opacity-50"
                       >
-                        {isConnecting ? '...' : t.joinRoomBtn}
+                        {isConnecting && playMode === 'guest' ? t.connectingToRoom : t.joinRoomBtn}
                       </button>
                     </div>
                   </div>

@@ -219,8 +219,8 @@ export const useGameStore = create<GameStore>((set, get) => {
           peerManager.sendMessage({
             type: 'LOBBY_UPDATE',
             payload: {
-              p1Character: get().hostSelectedCharacter,
-              p2Character: get().guestSelectedCharacter,
+              p1Character: get().hostSelectedCharacter || 'suspect_scarlett',
+              p2Character: get().guestSelectedCharacter || 'suspect_mustard',
             },
           });
         }
@@ -260,6 +260,14 @@ export const useGameStore = create<GameStore>((set, get) => {
           myPlayerRole: 'p2',
           isConnecting: false,
           isConnected: true,
+        });
+
+        // Immediately inform host of player 2 presence
+        peerManager.sendMessage({
+          type: 'GUEST_SELECT_CHAR',
+          payload: {
+            characterId: get().guestSelectedCharacter || 'suspect_mustard',
+          },
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to join room';
