@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { 
-  Compass, 
   HelpCircle, 
   ScrollText, 
   Sparkles,
@@ -16,11 +15,9 @@ import {
   Flame,
   Check,
   X,
-  Languages,
-  Dices
+  Languages
 } from 'lucide-react';
 import { SUSPECTS, LOCATIONS, WEAPONS } from '@/engine/data';
-import { ROOM_DISTANCES, SECRET_PASSAGES } from '@/engine/engine';
 import { GameBoard } from '@/components/board/GameBoard';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
@@ -136,9 +133,7 @@ export default function Home() {
 
   // 카드 및 방 다국어 이름 가져오기 헬퍼
   const getCardName = (id: string) => t.cards[id]?.name || id;
-  const getCardDesc = (id: string) => t.cards[id]?.description || '';
   const getRoomName = (id: string) => t.rooms[id]?.name || id;
-  const getRoomDesc = (id: string) => t.rooms[id]?.description || '';
 
   if (!hasStarted) {
     return (

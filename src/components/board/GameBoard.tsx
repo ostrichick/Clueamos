@@ -9,9 +9,9 @@ import {
   BoardCell 
 } from '@/engine/boardGrid';
 import { SECRET_PASSAGES } from '@/engine/engine';
-import { Player, Room } from '@/engine/types';
+import { Player } from '@/engine/types';
 import { TranslationStrings } from '@/i18n/translations';
-import { Sparkles, Dices, Footprints, KeyRound, Lock, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Sparkles, Dices, ArrowRight } from 'lucide-react';
 
 interface GameBoardProps {
   players: Player[];
@@ -57,7 +57,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
     const roll = currentDiceRoll || 0;
     return calculateReachablePaths(currentPlayer.currentRoomId, roll);
-  }, [currentPlayer?.currentRoomId, currentDiceRoll]);
+  }, [currentPlayer, currentDiceRoll]);
 
   // Extract corridor cells (cells that are not room or center)
   const corridorCells = useMemo(() => {

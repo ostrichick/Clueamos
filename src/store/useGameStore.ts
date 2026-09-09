@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, Card, Solution, Suggestion } from '@/engine/types';
+import { GameState, Solution, Suggestion } from '@/engine/types';
 import { 
   initGame, 
   rollDice, 
@@ -75,8 +75,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     try {
       const nextState = movePlayer(gameState, roomId);
       set({ gameState: nextState, selectedRoomId: null });
-    } catch (e: any) {
-      alert(e.message || 'Cannot move to this room.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Cannot move to this room.';
+      alert(msg);
     }
   },
 

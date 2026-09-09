@@ -4,9 +4,7 @@ import {
   rollDice,
   movePlayer, 
   makeSuggestion, 
-  getDisprovableCards, 
   findNextDisprovingPlayer, 
-  resolveDisprove, 
   makeAccusation 
 } from './engine';
 
@@ -57,7 +55,6 @@ describe('Clueamos Core Game Engine', () => {
 
   it('질문(Suggestion) 생성 시 반증 플레이어가 감지되어야 한다', () => {
     const state = initGame();
-    const currentP = state.players[0];
 
     // 질문 가설 생성
     const suggestState = makeSuggestion(state, {

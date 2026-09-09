@@ -4,7 +4,6 @@ import {
   Solution, 
   GameState, 
   Suggestion, 
-  DisproveResponse, 
   LogEntry 
 } from './types';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS } from './data';
