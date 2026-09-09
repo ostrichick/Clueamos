@@ -35,7 +35,9 @@
 - [x] **Phase 4 & 5: 웹 배포 및 연출 고도화**
   - [x] Web Audio API 기반 절차적 사운드 효과 시스템 구현 (`src/utils/sounds.ts`: 발자국, 질문, 단서 공개, 승리/패배 효과음)
   - [x] 최종 고발(Accusation) 전용 모달 및 오답 시 탈락 처리 UI 추가
-  - [x] 원클릭 무료 웹 배포 가이드 문서 작성 ([`DEPLOY.md`](./DEPLOY.md))
+  - [x] **글로벌 다국어 지원 (i18n): 기본 영어(EN), 스페인어(ES), 한국어(KO) 원클릭 전환**
+  - [x] 모든 용의자/장소/도구/동기 카드 및 룰북, 수첩 다국어 번역 사전 구축 (`src/i18n/translations.ts`)
+  - [x] Vercel 배포 완료 (`https://clueamos-seven.vercel.app/`) 및 `.npmrc` 충돌 해결
   - [x] 빌드 안정성 테스트 100% 통과 및 GitHub 동기화 완료
 
 - [ ] **Phase 4: 폴리싱 & 게임 루프 완성**
