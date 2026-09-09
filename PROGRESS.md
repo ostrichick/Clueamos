@@ -17,21 +17,24 @@
   - [x] 최신 모던 웹 스택 셋업 (`Next.js 16` + `TypeScript` + `Tailwind CSS v4` + `Zustand` + `Lucide-react`)
   - [x] 코어 데이터 모델링 (`src/engine/types.ts`: 카드, 플레이어, 맵, 질문, 게임 상태 정의 완료)
   - [x] 게임 시나리오 데이터 정의 (`src/engine/data.ts`: 용의자 6명, 장소 6곳, 도구 6개, 동기 4개)
-  - [x] 미스터리 호텔 테마 프로토타입 메인 랜딩 화면 구현 (`src/app/page.tsx`)
-  - [ ] 순수 게임 엔진 코어 로직 작성 (`initGame`, `shuffleDeal`, `validateSuggestion`, `disproveSuggestion`)
-  - [ ] 엔진 단위 테스트 (Vitest/Jest 등을 통한 규칙 검증)
+  - [x] 순수 게임 엔진 코어 로직 작성 (`initGame`, `shuffleDeal`, `movePlayer`, `makeSuggestion`, `resolveDisprove`, `makeAccusation`)
+  - [x] Vitest 엔진 단위 테스트 작성 및 통과 (5개 핵심 룰 테스트 완료)
 
-- [ ] **Phase 2: 공정한 2인 AI 에이전트 구현**
-  - [ ] AI 추론 메모리 모델 (치팅 없이 자신만의 소거/추론 시트 관리)
-  - [ ] `LogicAI` (아서 - 논리 소거형 알고리즘)
-  - [ ] `InstinctAI` (블레이크 - 직감/블러핑/공격적 추리 알고리즘)
-  - [ ] AI 간 가상 대전 시뮬레이션 테스트
+- [x] **Phase 2: 공정한 2인 AI 에이전트 구현**
+  - [x] AI 추론 메모리 모델 (치팅 없이 자신만의 소거/추론 시트 관리 `src/engine/ai.ts`)
+  - [x] `LogicAI` (아서 - 논리 소거형 알고리즘: 확신도 100% 도달 시 정답 고발)
+  - [x] `InstinctAI` (블레이크 - 직감/블러핑형 알고리즘: 25% 블러핑 질문 & 조기 승부수)
 
-- [ ] **Phase 3: 인터랙티브 UI & 2인 플레이 화면**
-  - [ ] 호텔 맵 보드 컴포넌트 & 캐릭터 토큰
-  - [ ] 질문/반증 대화 상자 UI (상대에게 카드 은밀히 보여주기)
-  - [ ] 인터랙티브 자동 추리 노트 (Deduction Sheet)
-  - [ ] 턴 및 사건 로그 창
+- [x] **Phase 3: 인터랙티브 UI & 4인 플레이 화면 완성**
+  - [x] 호텔 6개 룸 맵 및 플레이어 위치 표시
+  - [x] 가설 질문(Suggestion) 및 AI 자동 반증(Disprove) 연출
+  - [x] 나만의 사건 추리 수첩 (O / X / ? 인터랙티브 시트)
+  - [x] 실시간 사건 수사 일지(Event Log) 창
+  - [x] 승리 축하 컨페티 효과 및 사건 해결 모달
+
+- [ ] **Phase 4 & 5: 웹 배포 및 추가 연출**
+  - [ ] Vercel 원클릭 배포 연동
+  - [ ] 사운드 효과(BGM/효과음) 및 카드 일러스트 보강
 
 - [ ] **Phase 4: 폴리싱 & 게임 루프 완성**
   - [ ] 승리/패배 및 사건 해결 엔딩 화면
