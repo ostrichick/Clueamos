@@ -1,0 +1,85 @@
+// Clueamos 코어 타입 정의
+// 추리 요소 4가지: 용의자(Suspect), 장소(Location), 도구(Weapon), 동기(Motive)
+
+export type CardCategory = 'suspect' | 'location' | 'weapon' | 'motive';
+
+export interface Card {
+  id: string;
+  category: CardCategory;
+  name: string;
+  description: string;
+  iconName?: string;
+}
+
+export type PlayerType = 'human' | 'ai_logic' | 'ai_instinct';
+
+export interface Player {
+  id: string;
+  name: string;
+  type: PlayerType;
+  avatar: string;
+  color: string;
+  currentRoomId: string;
+  hand: Card[];
+  isEliminated: boolean;
+  score: number;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  description: string;
+  adjacentRoomIds: string[];
+  gridCoord: { x: number; y: number };
+}
+
+export interface Solution {
+  suspectId: string;
+  locationId: string;
+  weaponId: string;
+  motiveId: string;
+}
+
+export interface Suggestion {
+  askerId: string;
+  suspectId: string;
+  locationId: string;
+  weaponId: string;
+  motiveId: string;
+}
+
+export interface DisproveResponse {
+  responderId: string;
+  hasCard: boolean;
+  shownCard?: Card; // 오직 질문자(asker)에게만 보임
+}
+
+export interface LogEntry {
+  id: string;
+  turn: number;
+  message: string;
+  type: 'move' | 'suggestion' | 'disprove' | 'accusation' | 'event';
+  timestamp: number;
+}
+
+export type GamePhase = 
+  | 'LOBBY'
+  | 'PLAYING_MOVE'
+  | 'PLAYING_SUGGEST'
+  | 'WAITING_DISPROVE'
+  | 'ACCUSATION_MODAL'
+  | 'GAME_OVER';
+
+export interface GameState {
+  phase: GamePhase;
+  turnCount: number;
+  maxTurns: number;
+  currentPlayerIndex: number;
+  players: Player[];
+  rooms: Room[];
+  allCards: Card[];
+  solution: Solution;
+  currentSuggestion?: Suggestion;
+  logs: LogEntry[];
+  winnerId?: string;
+}

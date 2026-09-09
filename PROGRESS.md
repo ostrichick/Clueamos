@@ -13,11 +13,13 @@
   - [x] 프로젝트 구조 및 AI 인수인계 템플릿 작성 (`README.md`, `PROJECT_CONTEXT.md`, `PROGRESS.md`)
   - [x] 깃허브 원격 저장소(`Clueamos`) 초기화 및 동기화
 
-- [ ] **Phase 1: 프로젝트 기반 구축 & 코어 엔진 설계**
-  - [ ] 모던 웹 프레임워크 셋업 (Next.js 14+ / React + TypeScript + Tailwind CSS)
-  - [ ] 코어 데이터 모델링 (`src/engine/types.ts`: 카드, 플레이어, 맵, 질문, 게임 상태)
-  - [ ] 게임 엔진 코어 로직 작성 (`initGame`, `shuffleDeal`, `validateSuggestion`, `disproveSuggestion`)
-  - [ ] 엔진 단위 테스트 (Vitest 등을 통한 규칙 검증)
+- [x] **Phase 1: 프로젝트 기반 구축 & 코어 엔진 기초**
+  - [x] 최신 모던 웹 스택 셋업 (`Next.js 16` + `TypeScript` + `Tailwind CSS v4` + `Zustand` + `Lucide-react`)
+  - [x] 코어 데이터 모델링 (`src/engine/types.ts`: 카드, 플레이어, 맵, 질문, 게임 상태 정의 완료)
+  - [x] 게임 시나리오 데이터 정의 (`src/engine/data.ts`: 용의자 6명, 장소 6곳, 도구 6개, 동기 4개)
+  - [x] 미스터리 호텔 테마 프로토타입 메인 랜딩 화면 구현 (`src/app/page.tsx`)
+  - [ ] 순수 게임 엔진 코어 로직 작성 (`initGame`, `shuffleDeal`, `validateSuggestion`, `disproveSuggestion`)
+  - [ ] 엔진 단위 테스트 (Vitest/Jest 등을 통한 규칙 검증)
 
 - [ ] **Phase 2: 공정한 2인 AI 에이전트 구현**
   - [ ] AI 추론 메모리 모델 (치팅 없이 자신만의 소거/추론 시트 관리)
