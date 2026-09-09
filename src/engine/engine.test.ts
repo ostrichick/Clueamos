@@ -10,14 +10,22 @@ import {
 
 describe('Clueamos Core Game Engine', () => {
   it('게임 초기화 시 정답 봉투(4요소)와 4인 플레이어에게 카드가 정상 분배되어야 한다', () => {
-    const state = initGame({ player1Name: '남편', player2Name: '아내' });
+    const state = initGame({ 
+      player1CharacterId: 'suspect_scarlett', 
+      player2CharacterId: 'suspect_mustard',
+      locale: 'ko',
+    });
 
     // 1. 4인 플레이어 존재 검증
     expect(state.players).toHaveLength(4);
-    expect(state.players[0].name).toBe('남편');
-    expect(state.players[1].name).toBe('아내');
+    expect(state.players[0].name).toContain('미스 스칼렛');
+    expect(state.players[0].name).toContain('플레이어 1');
+    expect(state.players[1].name).toContain('커널 머스타드');
+    expect(state.players[1].name).toContain('플레이어 2');
     expect(state.players[2].type).toBe('ai_logic');
     expect(state.players[3].type).toBe('ai_instinct');
+    expect(state.players[2].name).toContain('AI 1');
+    expect(state.players[3].name).toContain('AI 2');
 
     // 2. 정답 봉투 검증 (각 카테고리 1장씩 총 3장)
     expect(state.solution.suspectId).toBeDefined();

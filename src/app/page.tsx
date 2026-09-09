@@ -17,10 +17,11 @@ import {
   X,
   Languages
 } from 'lucide-react';
-import { SUSPECTS, LOCATIONS, WEAPONS } from '@/engine/data';
+import { SUSPECTS, LOCATIONS, WEAPONS, CHARACTER_PROFILES } from '@/engine/data';
 import { GameBoard } from '@/components/board/GameBoard';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
+import { getPlayerDisplayName } from '@/engine/engine';
 import confetti from 'canvas-confetti';
 
 export default function Home() {
@@ -39,6 +40,12 @@ export default function Home() {
   const t = translations[locale];
 
   const [hasStarted, setHasStarted] = useState(false);
+  
+  // 1 & 2 플레이어 캐릭터 선택 상태
+  const [p1Character, setP1Character] = useState<string>('suspect_scarlett');
+  const [p2Character, setP2Character] = useState<string>('suspect_mustard');
+  const [activePickerTab, setActivePickerTab] = useState<'p1' | 'p2'>('p1');
+
   const [selectedSuspect, setSelectedSuspect] = useState(SUSPECTS[0].id);
   const [selectedWeapon, setSelectedWeapon] = useState(WEAPONS[0].id);
   const [activeTab, setActiveTab] = useState<'board' | 'notes'>('board');
@@ -80,11 +87,22 @@ export default function Home() {
     }
   }, [gameState.phase, gameState.winnerId]);
 
+  const handleSelectP1 = (charId: string) => {
+    setP1Character(charId);
+    if (p2Character === charId) {
+      const remaining = SUSPECTS.find(s => s.id !== charId);
+      if (remaining) setP2Character(remaining.id);
+    }
+  };
+
+  const handleSelectP2 = (charId: string) => {
+    if (charId === p1Character) return;
+    setP2Character(charId);
+  };
+
   const handleStartGame = () => {
     sounds.playMove();
-    const p1Name = locale === 'ko' ? '플레이어 1 (나)' : locale === 'es' ? 'Jugador 1' : 'Player 1 (Me)';
-    const p2Name = locale === 'ko' ? '플레이어 2 (아내)' : locale === 'es' ? 'Jugadora 2 (Esposa)' : 'Player 2 (Wife)';
-    startNewGame(p1Name, p2Name);
+    startNewGame(p1Character, p2Character, locale);
     setHasStarted(true);
   };
 
@@ -136,10 +154,12 @@ export default function Home() {
   const getRoomName = (id: string) => t.rooms[id]?.name || id;
 
   if (!hasStarted) {
+    const aiCandidates = SUSPECTS.filter(s => s.id !== p1Character && s.id !== p2Character);
+
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 selection:bg-amber-500 relative">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-amber-500 relative">
         {/* 우측 상단 언어 선택 버튼 */}
-        <div className="absolute top-6 right-6 flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 px-3 py-1.5 rounded-2xl backdrop-blur-md shadow-lg">
+        <div className="absolute top-6 right-6 flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 px-3 py-1.5 rounded-2xl backdrop-blur-md shadow-lg z-20">
           <Languages className="w-4 h-4 text-amber-400" />
           <button 
             onClick={() => setLocale('en')}
@@ -161,34 +181,171 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="max-w-xl w-full bg-slate-900/80 border border-amber-500/30 p-8 rounded-3xl backdrop-blur-2xl flex flex-col items-center text-center gap-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute -right-16 -top-16 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-slate-950 font-black text-3xl shadow-xl shadow-amber-500/20">
-            C
-          </div>
-          <div>
-            <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 bg-clip-text text-transparent">
+        <div className="max-w-3xl w-full bg-slate-900/80 border border-amber-500/30 p-6 sm:p-8 rounded-3xl backdrop-blur-2xl flex flex-col items-center text-center gap-6 shadow-2xl relative overflow-hidden my-8">
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-slate-950 font-black text-2xl shadow-xl shadow-amber-500/20 mb-1">
+              C
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 bg-clip-text text-transparent">
               {t.gameTitle}
             </h1>
-            <p className="text-slate-400 text-sm mt-2">
+            <p className="text-slate-400 text-xs sm:text-sm max-w-md">
               {t.gameSubtitle}
             </p>
           </div>
 
-          <div className="bg-slate-800/40 p-5 rounded-2xl border border-slate-700/50 text-left text-xs text-slate-300 flex flex-col gap-2.5 w-full">
-            <div className="flex items-center gap-2 text-amber-400 font-bold">
-              <Sparkles className="w-4 h-4" /> {t.ruleTitle}
+          {/* 규칙 요약 바 */}
+          <div className="bg-slate-800/40 p-3.5 rounded-2xl border border-slate-700/50 text-left text-xs text-slate-300 flex flex-col gap-1.5 w-full">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+              <Sparkles className="w-3.5 h-3.5" /> {t.ruleTitle}
             </div>
-            <p>• {t.rule1}</p>
-            <p>• {t.rule2}</p>
-            <p>• {t.rule3}</p>
+            <p className="text-[11px] text-slate-400">• {t.rule1}</p>
+            <p className="text-[11px] text-slate-400">• {t.rule2}</p>
+            <p className="text-[11px] text-slate-400">• {t.rule3}</p>
+          </div>
+
+          {/* 탐정 캐릭터 선택 영역 */}
+          <div className="w-full flex flex-col gap-4 text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-800 pb-2">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-amber-400 flex items-center gap-2">
+                  🕵️ {t.selectCharacterTitle}
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {t.selectCharacterSubtitle}
+                </p>
+              </div>
+              {/* 플레이어 1 / 플레이어 2 선택 탭 토글 */}
+              <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 self-start sm:self-auto mt-2 sm:mt-0">
+                <button
+                  onClick={() => setActivePickerTab('p1')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    activePickerTab === 'p1'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>{t.player} 1</span>
+                  <span>{CHARACTER_PROFILES[p1Character]?.avatar}</span>
+                </button>
+                <button
+                  onClick={() => setActivePickerTab('p2')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    activePickerTab === 'p2'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>{t.player} 2</span>
+                  <span>{CHARACTER_PROFILES[p2Character]?.avatar}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 현재 선택 중인 플레이어 안내 문구 */}
+            <div className="text-xs font-semibold text-slate-300 flex items-center justify-between px-1">
+              <span>
+                {activePickerTab === 'p1' ? t.player1Choice : t.player2Choice}
+              </span>
+              <span className="text-[11px] text-amber-300/80 font-mono">
+                {activePickerTab === 'p1' 
+                  ? `${t.player} 1: ${getCardName(p1Character)}` 
+                  : `${t.player} 2: ${getCardName(p2Character)}`}
+              </span>
+            </div>
+
+            {/* 6명 용의자 캐릭터 선택 그리드 카드 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {SUSPECTS.map(s => {
+                const profile = CHARACTER_PROFILES[s.id];
+                const isP1 = p1Character === s.id;
+                const isP2 = p2Character === s.id;
+                const isSelected = activePickerTab === 'p1' ? isP1 : isP2;
+                const isDisabledForP2 = activePickerTab === 'p2' && isP1;
+
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => {
+                      if (activePickerTab === 'p1') {
+                        handleSelectP1(s.id);
+                      } else {
+                        if (!isDisabledForP2) handleSelectP2(s.id);
+                      }
+                    }}
+                    style={{
+                      borderColor: isSelected ? profile?.color : undefined,
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
+                      isSelected
+                        ? 'ring-2 bg-slate-800/90 shadow-lg'
+                        : isDisabledForP2
+                          ? 'opacity-40 cursor-not-allowed bg-slate-900/30 border-slate-800'
+                          : 'cursor-pointer hover:bg-slate-800/50 bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{profile?.avatar}</span>
+                          <span className="font-bold text-xs text-slate-200">
+                            {getCardName(s.id)}
+                          </span>
+                        </div>
+                        {isP1 && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500 text-slate-950">
+                            {t.player} 1
+                          </span>
+                        )}
+                        {isP2 && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-pink-500 text-slate-950">
+                            {t.player} 2
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                        {t.cards[s.id]?.description || s.description}
+                      </p>
+                    </div>
+
+                    {isDisabledForP2 && (
+                      <div className="text-[10px] text-amber-400/80 font-semibold mt-1">
+                        🔒 {t.characterAlreadyChosen}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* AI 탐정 자동 배정 미리보기 */}
+            <div className="bg-slate-800/30 border border-slate-700/40 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 text-slate-400 font-medium">
+                <span>🤖</span>
+                <span>{t.aiDetectivesPreview}:</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {aiCandidates.map(c => (
+                  <span 
+                    key={c.id} 
+                    className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 font-mono flex items-center gap-1"
+                  >
+                    <span>{CHARACTER_PROFILES[c.id]?.avatar}</span>
+                    <span>{getCardName(c.id).replace(/^[^\s]+\s+/, '')}</span>
+                  </span>
+                ))}
+                <span className="text-[10px] text-slate-500">(2 randomly assigned)</span>
+              </div>
+            </div>
           </div>
 
           <button
             onClick={handleStartGame}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-lg shadow-lg shadow-amber-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-base sm:text-lg shadow-lg shadow-amber-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            <span>{t.enterScene}</span>
+            <span>{t.startGame}</span>
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -214,7 +371,7 @@ export default function Home() {
             style={{ backgroundColor: currentPlayer.color }} 
           />
           <span className="text-sm font-bold text-slate-200">
-            {currentPlayer.name}{t.turn}
+            {getPlayerDisplayName(currentPlayer, locale)}{t.turn}
           </span>
           <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
             {currentPlayer.type === 'human' ? t.player : t.detective}
@@ -272,7 +429,7 @@ export default function Home() {
           )}
 
           <button 
-            onClick={() => handleStartGame()}
+            onClick={() => setHasStarted(false)}
             title={t.newGame}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400"
           >
@@ -446,7 +603,7 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5 text-amber-400" />
-                {currentPlayer.name}{t.secretHand} ({currentPlayer.hand.length}{t.cardsCount})
+                {getPlayerDisplayName(currentPlayer, locale)}{t.secretHand} ({currentPlayer.hand.length}{t.cardsCount})
               </span>
               <button
                 onClick={() => setShowHand(!showHand)}
@@ -484,7 +641,7 @@ export default function Home() {
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base">{p.avatar}</span>
-                    <span className="font-semibold text-slate-200">{p.name}</span>
+                    <span className="font-semibold text-slate-200">{getPlayerDisplayName(p, locale)}</span>
                   </div>
                   {p.isEliminated ? (
                     <span className="text-[10px] text-rose-400 font-bold">{t.eliminated}</span>
@@ -599,7 +756,7 @@ export default function Home() {
             <h2 className="text-2xl font-black text-slate-100">{t.investigationEnd}</h2>
             <p className="text-sm text-slate-300">
               {gameState.winnerId 
-                ? `${gameState.players.find(p => p.id === gameState.winnerId)?.name} ${t.truthRevealed}`
+                ? `${getPlayerDisplayName(gameState.players.find(p => p.id === gameState.winnerId)!, locale)} ${t.truthRevealed}`
                 : t.mysteryUnsolved}
             </p>
             <div className="bg-slate-800/60 p-4 rounded-xl text-xs text-left w-full flex flex-col gap-1 text-slate-300">
@@ -609,7 +766,7 @@ export default function Home() {
               <div>• {t.solutionWeapon}: {getCardName(gameState.solution.weaponId)}</div>
             </div>
             <button
-              onClick={() => handleStartGame()}
+              onClick={() => setHasStarted(false)}
               className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm transition-colors"
             >
               {t.playAgain}

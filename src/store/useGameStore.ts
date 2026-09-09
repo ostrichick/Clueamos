@@ -17,6 +17,8 @@ import {
   recordShownCard 
 } from '@/engine/ai';
 
+import { SupportedLocale } from '@/i18n/translations';
+
 interface GameStore {
   gameState: GameState;
   aiMemories: Record<string, AIMemory>;
@@ -24,7 +26,7 @@ interface GameStore {
   isRollingDice: boolean;
   
   // 액션
-  startNewGame: (p1Name?: string, p2Name?: string) => void;
+  startNewGame: (p1CharacterId?: string, p2CharacterId?: string, locale?: SupportedLocale) => void;
   selectRoom: (roomId: string) => void;
   performRollDice: () => void;
   performMove: (roomId: string) => void;
@@ -40,16 +42,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedRoomId: null,
   isRollingDice: false,
 
-  startNewGame: (p1Name, p2Name) => {
-    const newState = initGame({ player1Name: p1Name, player2Name: p2Name });
-    const arthurMem = initAIMemory(newState.players.find(p => p.id === 'ai_arthur')!);
-    const blakeMem = initAIMemory(newState.players.find(p => p.id === 'ai_blake')!);
+  startNewGame: (p1CharacterId, p2CharacterId, locale) => {
+    const newState = initGame({ 
+      player1CharacterId: p1CharacterId, 
+      player2CharacterId: p2CharacterId, 
+      locale 
+    });
+    const ai1Player = newState.players.find(p => p.id === 'ai_1');
+    const ai2Player = newState.players.find(p => p.id === 'ai_2');
+    const ai1Mem = ai1Player ? initAIMemory(ai1Player) : ({} as AIMemory);
+    const ai2Mem = ai2Player ? initAIMemory(ai2Player) : ({} as AIMemory);
 
     set({
       gameState: newState,
       aiMemories: {
-        ai_arthur: arthurMem,
-        ai_blake: blakeMem,
+        ai_1: ai1Mem,
+        ai_2: ai2Mem,
       },
       selectedRoomId: null,
       isRollingDice: false,

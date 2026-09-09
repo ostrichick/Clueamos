@@ -6,8 +6,9 @@ import {
   Suggestion, 
   LogEntry 
 } from './types';
-import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS } from './data';
+import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS, CHARACTER_PROFILES } from './data';
 import { calculateReachablePaths } from './boardGrid';
+import { translations, SupportedLocale } from '../i18n/translations';
 
 // 방 간 거리 테이블 (최단 걸음 수 / 복도 칸 수)
 // 클래식 Clue 맵처럼 방 사이의 복도 타일 거리 정의
@@ -82,17 +83,49 @@ export function shuffle<T>(array: T[]): T[] {
 }
 
 export interface InitGameOptions {
+  player1CharacterId?: string;
+  player2CharacterId?: string;
   player1Name?: string;
   player2Name?: string;
+  locale?: SupportedLocale;
   maxTurns?: number;
+}
+
+/**
+ * 플레이어 표시 이름 헬퍼 (로케일별 실시간 포맷팅)
+ * 형식: 캐릭터이름+이모지(player 1), (player 2), (AI 1), (AI 2)
+ */
+export function getPlayerDisplayName(player: Player, locale: SupportedLocale = 'en'): string {
+  const t = translations[locale] || translations.en;
+  const charCard = t.cards[player.characterId];
+  const charName = charCard?.name || player.name;
+
+  if (player.roleType === 'p1') {
+    return `${charName} (${t.player} 1)`;
+  }
+  if (player.roleType === 'p2') {
+    return `${charName} (${t.player} 2)`;
+  }
+  if (player.roleType === 'ai1') {
+    return `${charName} (${t.aiLabel} 1)`;
+  }
+  if (player.roleType === 'ai2') {
+    return `${charName} (${t.aiLabel} 2)`;
+  }
+  return player.name;
 }
 
 /**
  * 게임 초기화 함수
  */
 export function initGame(options?: InitGameOptions): GameState {
-  const p1Name = options?.player1Name || 'Player 1 (Me)';
-  const p2Name = options?.player2Name || 'Player 2 (Wife)';
+  const locale = options?.locale || 'en';
+  const t = translations[locale] || translations.en;
+  const p1CharId = options?.player1CharacterId || 'suspect_scarlett';
+  let p2CharId = options?.player2CharacterId;
+  if (!p2CharId || p2CharId === p1CharId) {
+    p2CharId = p1CharId === 'suspect_mustard' ? 'suspect_scarlett' : 'suspect_mustard';
+  }
   const maxTurns = options?.maxTurns || 16;
 
   // 1. 카테고리별 셔플 (용의자, 장소, 흉기 3대 요소)
@@ -116,53 +149,74 @@ export function initGame(options?: InitGameOptions): GameState {
 
   const shuffledDeck = shuffle(remainingCards);
 
-  // 2. 플레이어 4명 정의
-  const initialPlayers: Player[] = [
+  // 2. 플레이어 캐릭터 및 AI 무작위 캐릭터 할당
+  // 남은 4명의 용의자 중 2명을 AI 1, AI 2로 무작위 선발
+  const remainingSuspects = shuffle(
+    SUSPECTS.filter(s => s.id !== p1CharId && s.id !== p2CharId)
+  );
+  const ai1CharId = remainingSuspects[0].id;
+  const ai2CharId = remainingSuspects[1].id;
+
+  const p1Profile = CHARACTER_PROFILES[p1CharId] || CHARACTER_PROFILES.suspect_scarlett;
+  const p2Profile = CHARACTER_PROFILES[p2CharId] || CHARACTER_PROFILES.suspect_mustard;
+  const ai1Profile = CHARACTER_PROFILES[ai1CharId] || CHARACTER_PROFILES.suspect_green;
+  const ai2Profile = CHARACTER_PROFILES[ai2CharId] || CHARACTER_PROFILES.suspect_peacock;
+
+  const rawPlayers: Omit<Player, 'name'>[] = [
     {
       id: 'p1',
-      name: p1Name,
+      characterId: p1CharId,
+      roleType: 'p1',
       type: 'human',
-      avatar: '🕵️‍♂️',
-      color: '#10b981', // emerald
-      currentRoomId: LOCATIONS[0].id, // 연회장 시작
+      avatar: p1Profile.avatar,
+      color: p1Profile.color,
+      currentRoomId: p1Profile.defaultRoomId,
       hand: [],
       isEliminated: false,
       score: 0,
     },
     {
       id: 'p2',
-      name: p2Name,
+      characterId: p2CharId,
+      roleType: 'p2',
       type: 'human',
-      avatar: '🕵️‍♀️',
-      color: '#ec4899', // pink
-      currentRoomId: LOCATIONS[1].id, // 주방 시작
+      avatar: p2Profile.avatar,
+      color: p2Profile.color,
+      currentRoomId: p2Profile.defaultRoomId,
       hand: [],
       isEliminated: false,
       score: 0,
     },
     {
-      id: 'ai_arthur',
-      name: 'Arthur (Logical AI)',
+      id: 'ai_1',
+      characterId: ai1CharId,
+      roleType: 'ai1',
       type: 'ai_logic',
-      avatar: '🧐',
-      color: '#6366f1', // indigo
-      currentRoomId: LOCATIONS[2].id, // 서재 시작
+      avatar: ai1Profile.avatar,
+      color: ai1Profile.color,
+      currentRoomId: ai1Profile.defaultRoomId,
       hand: [],
       isEliminated: false,
       score: 0,
     },
     {
-      id: 'ai_blake',
-      name: 'Blake (Instinct AI)',
+      id: 'ai_2',
+      characterId: ai2CharId,
+      roleType: 'ai2',
       type: 'ai_instinct',
-      avatar: '🕶️',
-      color: '#f59e0b', // amber
-      currentRoomId: LOCATIONS[3].id, // 와인창고 시작
+      avatar: ai2Profile.avatar,
+      color: ai2Profile.color,
+      currentRoomId: ai2Profile.defaultRoomId,
       hand: [],
       isEliminated: false,
       score: 0,
     },
   ];
+
+  const initialPlayers: Player[] = rawPlayers.map(p => ({
+    ...p,
+    name: getPlayerDisplayName(p as Player, locale),
+  }));
 
   // 18장의 카드를 4명에게 분배
   shuffledDeck.forEach((card, index) => {
@@ -173,7 +227,7 @@ export function initGame(options?: InitGameOptions): GameState {
   const initialLog: LogEntry = {
     id: 'log_0',
     turn: 1,
-    message: 'The murder investigation at Grand Velvet Hotel has begun.',
+    message: t.logMessages?.start || 'The murder investigation at Grand Velvet Hotel has begun.',
     type: 'event',
     timestamp: Date.now(),
   };
@@ -448,7 +502,7 @@ export function nextTurn(state: GameState): GameState {
     nextIndex = (nextIndex + 1) % state.players.length;
   }
 
-  const nextTurnCount = nextIndex === 0 ? state.turnCount + 1 : state.turnCount;
+  const nextTurnCount = nextIndex <= state.currentPlayerIndex ? state.turnCount + 1 : state.turnCount;
 
   if (nextTurnCount > state.maxTurns) {
     return {

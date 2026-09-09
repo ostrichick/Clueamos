@@ -40,6 +40,52 @@ export const SUSPECTS: Card[] = [
   },
 ];
 
+export interface CharacterProfile {
+  id: string;
+  avatar: string;
+  color: string;
+  defaultRoomId: string;
+}
+
+export const CHARACTER_PROFILES: Record<string, CharacterProfile> = {
+  suspect_scarlett: {
+    id: 'suspect_scarlett',
+    avatar: '🔴',
+    color: '#ef4444',
+    defaultRoomId: 'room_ballroom',
+  },
+  suspect_mustard: {
+    id: 'suspect_mustard',
+    avatar: '🟡',
+    color: '#eab308',
+    defaultRoomId: 'room_kitchen',
+  },
+  suspect_white: {
+    id: 'suspect_white',
+    avatar: '⚪',
+    color: '#cbd5e1',
+    defaultRoomId: 'room_library',
+  },
+  suspect_green: {
+    id: 'suspect_green',
+    avatar: '🟢',
+    color: '#22c55e',
+    defaultRoomId: 'room_wine_cellar',
+  },
+  suspect_peacock: {
+    id: 'suspect_peacock',
+    avatar: '🔵',
+    color: '#3b82f6',
+    defaultRoomId: 'room_room304',
+  },
+  suspect_plum: {
+    id: 'suspect_plum',
+    avatar: '🟣',
+    color: '#a855f7',
+    defaultRoomId: 'room_rooftop',
+  },
+};
+
 // 2. 살인이 일어난 현장 장소 6곳 (살인 장소 이모지 부여)
 export const LOCATIONS: Room[] = [
   { 

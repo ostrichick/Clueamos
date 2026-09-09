@@ -8,9 +8,9 @@ import {
   calculateReachablePaths, 
   BoardCell 
 } from '@/engine/boardGrid';
-import { SECRET_PASSAGES } from '@/engine/engine';
+import { SECRET_PASSAGES, getPlayerDisplayName } from '@/engine/engine';
 import { Player } from '@/engine/types';
-import { TranslationStrings } from '@/i18n/translations';
+import { TranslationStrings, SupportedLocale } from '@/i18n/translations';
 import { Sparkles, Dices, ArrowRight } from 'lucide-react';
 
 interface GameBoardProps {
@@ -21,7 +21,7 @@ interface GameBoardProps {
   accessibleRoomIds?: string[];
   isRollingDice: boolean;
   t: TranslationStrings;
-  locale: string;
+  locale: SupportedLocale;
   onRollDice: () => void;
   onMoveToRoom: (roomId: string) => void;
 }
@@ -98,7 +98,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm sm:text-base text-slate-100">
-                {isRollPhase ? t.rollDiceBtn : isMovePhase && currentDiceRoll ? `${t.rolledNumber}: ${currentDiceRoll} 🎲` : `${currentPlayer.name}${t.turn}`}
+                {isRollPhase ? t.rollDiceBtn : isMovePhase && currentDiceRoll ? `${t.rolledNumber}: ${currentDiceRoll} 🎲` : `${getPlayerDisplayName(currentPlayer, locale)}${t.turn}`}
               </span>
               {currentSecretTarget && (
                 <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40 font-bold flex items-center gap-1">
@@ -300,7 +300,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {roomPlayers.map(p => (
                       <div
                         key={p.id}
-                        title={p.name}
+                        title={getPlayerDisplayName(p, locale)}
                         style={{ backgroundColor: p.color }}
                         className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs shadow-md border-2 border-white/40 ring-1 ring-black/40 transform hover:scale-110 transition-transform"
                       >

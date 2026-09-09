@@ -16,6 +16,14 @@ export interface TranslationStrings {
   turn: string;
   player: string;
   detective: string;
+  aiLabel: string;
+  selectCharacterTitle: string;
+  selectCharacterSubtitle: string;
+  player1Choice: string;
+  player2Choice: string;
+  aiDetectivesPreview: string;
+  characterAlreadyChosen: string;
+  startGame: string;
   eliminated: string;
   cardsCount: string;
   viewNotes: string;
@@ -107,6 +115,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     turn: "'s Turn",
     player: 'Player',
     detective: 'AI Detective',
+    aiLabel: 'AI',
+    selectCharacterTitle: 'Choose Your Detectives',
+    selectCharacterSubtitle: 'Player 1 and Player 2 select their characters. 2 AI detectives will join from the remaining pool.',
+    player1Choice: 'Player 1 Character',
+    player2Choice: 'Player 2 Character',
+    aiDetectivesPreview: 'AI Detectives (Randomly Assigned)',
+    characterAlreadyChosen: 'Chosen by Player 1',
+    startGame: 'Start Investigation',
     eliminated: 'Eliminated',
     cardsCount: 'cards',
     viewNotes: 'Deduction Sheet',
@@ -218,6 +234,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     turn: ' - Turno de',
     player: 'Jugador',
     detective: 'Detective IA',
+    aiLabel: 'IA',
+    selectCharacterTitle: 'Elige tus Detectives',
+    selectCharacterSubtitle: 'El Jugador 1 y el Jugador 2 eligen a sus personajes. 2 detectives de IA se unirán del grupo restante.',
+    player1Choice: 'Personaje del Jugador 1',
+    player2Choice: 'Personaje del Jugador 2',
+    aiDetectivesPreview: 'Detectives de IA (Asignados al azar)',
+    characterAlreadyChosen: 'Elegido por Jugador 1',
+    startGame: 'Iniciar Investigación',
     eliminated: 'Eliminado',
     cardsCount: 'cartas',
     viewNotes: 'Cuaderno de Deducción',
@@ -329,6 +353,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     turn: '의 차례',
     player: '플레이어',
     detective: 'AI 탐정',
+    aiLabel: 'AI',
+    selectCharacterTitle: '사건을 맡을 탐정 캐릭터 선택',
+    selectCharacterSubtitle: '플레이어 1과 2가 각자의 용의자 캐릭터를 선택합니다. 남은 캐릭터 중 2명은 AI 탐정으로 자동 합류합니다.',
+    player1Choice: '플레이어 1 캐릭터',
+    player2Choice: '플레이어 2 캐릭터',
+    aiDetectivesPreview: 'AI 탐정 (남은 캐릭터 중 자동 배정)',
+    characterAlreadyChosen: '플레이어 1 선택 완료',
+    startGame: '사건 수사 시작',
     eliminated: '탈락됨',
     cardsCount: '장',
     viewNotes: '추리 수첩 보기',
