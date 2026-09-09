@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, Solution, Suggestion } from '@/engine/types';
+import { GameState, Solution, Suggestion, Card } from '@/engine/types';
 import { 
   initGame, 
   rollDice, 
@@ -16,17 +16,40 @@ import {
   decideBlakeAction, 
   recordShownCard 
 } from '@/engine/ai';
-
 import { SupportedLocale } from '@/i18n/translations';
+import { peerManager, PeerMessage } from '@/network/peerManager';
+
+export type PlayMode = 'local' | 'host' | 'guest';
+export type PlayerRole = 'p1' | 'p2';
 
 interface GameStore {
   gameState: GameState;
   aiMemories: Record<string, AIMemory>;
   selectedRoomId: string | null;
   isRollingDice: boolean;
-  
+
+  // 멀티플레이어 상태
+  playMode: PlayMode;
+  myPlayerRole: PlayerRole;
+  roomCode: string | null;
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionError: string | null;
+  guestSelectedCharacter: string | null;
+  hostSelectedCharacter: string | null;
+
+  // 비밀 반증 인터랙션 상태
+  pendingDisprovePrompt: { availableCards: Card[]; askerId: string } | null;
+  lastSecretClue: { card: Card; fromName: string } | null;
+
   // 액션
+  setPlayMode: (mode: PlayMode) => void;
+  createRoom: () => Promise<string>;
+  joinRoom: (code: string) => Promise<void>;
+  disconnectRoom: () => void;
   startNewGame: (p1CharacterId?: string, p2CharacterId?: string, locale?: SupportedLocale) => void;
+  syncGuestCharacterChoice: (charId: string) => void;
+  syncHostCharacterChoice: (charId: string) => void;
   selectRoom: (roomId: string) => void;
   performRollDice: () => void;
   performMove: (roomId: string) => void;
@@ -34,155 +57,543 @@ interface GameStore {
   performDisprove: (cardId?: string) => void;
   performAccusation: (accusation: Solution) => boolean;
   runAITurnIfNeeded: () => Promise<void>;
+  dismissSecretClue: () => void;
 }
 
-export const useGameStore = create<GameStore>((set, get) => ({
-  gameState: initGame(),
-  aiMemories: {},
-  selectedRoomId: null,
-  isRollingDice: false,
+export const useGameStore = create<GameStore>((set, get) => {
+  // Setup peer message handler
+  const handleIncomingPeerMessage = (msg: PeerMessage) => {
+    const { playMode } = get();
 
-  startNewGame: (p1CharacterId, p2CharacterId, locale) => {
-    const newState = initGame({ 
-      player1CharacterId: p1CharacterId, 
-      player2CharacterId: p2CharacterId, 
-      locale 
-    });
-    const ai1Player = newState.players.find(p => p.id === 'ai_1');
-    const ai2Player = newState.players.find(p => p.id === 'ai_2');
-    const ai1Mem = ai1Player ? initAIMemory(ai1Player) : ({} as AIMemory);
-    const ai2Mem = ai2Player ? initAIMemory(ai2Player) : ({} as AIMemory);
+    switch (msg.type) {
+      case 'LOBBY_UPDATE': {
+        if (msg.payload?.p1Character) {
+          set({ hostSelectedCharacter: msg.payload.p1Character as string });
+        }
+        if (msg.payload?.p2Character) {
+          set({ guestSelectedCharacter: msg.payload.p2Character as string });
+        }
+        break;
+      }
 
-    set({
-      gameState: newState,
-      aiMemories: {
-        ai_1: ai1Mem,
-        ai_2: ai2Mem,
-      },
-      selectedRoomId: null,
-      isRollingDice: false,
-    });
-  },
+      case 'GUEST_SELECT_CHAR': {
+        if (playMode === 'host' && msg.payload?.characterId) {
+          set({ guestSelectedCharacter: msg.payload.characterId as string });
+          // Broadcast back to guest
+          peerManager.sendMessage({
+            type: 'LOBBY_UPDATE',
+            payload: {
+              p1Character: get().hostSelectedCharacter,
+              p2Character: msg.payload.characterId as string,
+            },
+          });
+        }
+        break;
+      }
 
-  selectRoom: (roomId: string) => {
-    set({ selectedRoomId: roomId });
-  },
+      case 'START_GAME': {
+        if (playMode === 'guest' && msg.payload?.gameState) {
+          set({
+            gameState: msg.payload.gameState as GameState,
+            selectedRoomId: null,
+            isRollingDice: false,
+          });
+        }
+        break;
+      }
 
-  performRollDice: () => {
-    const { gameState } = get();
-    set({ isRollingDice: true });
+      case 'STATE_SYNC': {
+        if (playMode === 'guest' && msg.payload?.gameState) {
+          set({
+            gameState: msg.payload.gameState as GameState,
+            isRollingDice: false,
+          });
+        }
+        break;
+      }
 
-    setTimeout(() => {
-      const nextState = rollDice(gameState);
-      set({ gameState: nextState, isRollingDice: false });
-    }, 600);
-  },
+      // Guest requests an action to Host
+      case 'ACTION_ROLL': {
+        if (playMode === 'host') {
+          get().performRollDice();
+        }
+        break;
+      }
 
-  performMove: (roomId: string) => {
-    const { gameState } = get();
-    try {
-      const nextState = movePlayer(gameState, roomId);
-      set({ gameState: nextState, selectedRoomId: null });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Cannot move to this room.';
-      alert(msg);
+      case 'ACTION_MOVE': {
+        if (playMode === 'host' && msg.payload?.roomId) {
+          get().performMove(msg.payload.roomId as string);
+        }
+        break;
+      }
+
+      case 'ACTION_SUGGEST': {
+        if (playMode === 'host' && msg.payload?.suggestion) {
+          get().performSuggestion(msg.payload.suggestion as Omit<Suggestion, 'askerId'>);
+        }
+        break;
+      }
+
+      case 'ACTION_DISPROVE': {
+        if (playMode === 'host') {
+          get().performDisprove(msg.payload?.cardId as string | undefined);
+        }
+        break;
+      }
+
+      case 'ACTION_ACCUSE': {
+        if (playMode === 'host' && msg.payload?.accusation) {
+          get().performAccusation(msg.payload.accusation as Solution);
+        }
+        break;
+      }
+
+      // Disprove prompt sent from Host to Guest
+      case 'DISPROVE_REQUEST': {
+        if (playMode === 'guest' && msg.payload?.availableCards) {
+          set({
+            pendingDisprovePrompt: {
+              availableCards: msg.payload.availableCards as Card[],
+              askerId: msg.payload.askerId as string,
+            },
+          });
+        }
+        break;
+      }
+
+      // Private Clue revealed to the asker
+      case 'PRIVATE_CLUE_REVEALED': {
+        if (msg.payload?.card && msg.payload?.fromName) {
+          set({
+            lastSecretClue: {
+              card: msg.payload.card as Card,
+              fromName: msg.payload.fromName as string,
+            },
+          });
+        }
+        break;
+      }
+
+      default:
+        break;
     }
-  },
+  };
 
-  performSuggestion: (suggestion) => {
-    const { gameState, aiMemories } = get();
-    const nextState = makeSuggestion(gameState, suggestion);
-    set({ gameState: nextState });
+  peerManager.onMessageReceived = handleIncomingPeerMessage;
 
-    // 반증 플레이어 자동 체크
-    const disprover = findNextDisprovingPlayer(
-      nextState.players,
-      nextState.currentPlayerIndex,
-      nextState.currentSuggestion!
-    );
+  return {
+    gameState: initGame(),
+    aiMemories: {},
+    selectedRoomId: null,
+    isRollingDice: false,
 
-    // AI가 반증하는 경우 자동으로 첫 번째 소지 카드를 보여줌
-    if (disprover) {
-      const player = nextState.players[disprover.playerIndex];
-      if (player.type.startsWith('ai_')) {
+    playMode: 'local',
+    myPlayerRole: 'p1',
+    roomCode: null,
+    isConnected: false,
+    isConnecting: false,
+    connectionError: null,
+    guestSelectedCharacter: null,
+    hostSelectedCharacter: null,
+    pendingDisprovePrompt: null,
+    lastSecretClue: null,
+
+    setPlayMode: (mode) => {
+      set({ 
+        playMode: mode, 
+        myPlayerRole: mode === 'guest' ? 'p2' : 'p1' 
+      });
+    },
+
+    createRoom: async () => {
+      set({ isConnecting: true, connectionError: null });
+      peerManager.onConnectionStateChange = (connected, error) => {
+        set({ 
+          isConnected: connected, 
+          isConnecting: false,
+          connectionError: error || null 
+        });
+
+        if (connected) {
+          // Send current lobby state
+          peerManager.sendMessage({
+            type: 'LOBBY_UPDATE',
+            payload: {
+              p1Character: get().hostSelectedCharacter,
+              p2Character: get().guestSelectedCharacter,
+            },
+          });
+        }
+      };
+
+      try {
+        const code = await peerManager.createRoom();
+        set({
+          roomCode: code,
+          playMode: 'host',
+          myPlayerRole: 'p1',
+          isConnecting: false,
+        });
+        return code;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to create room';
+        set({ isConnecting: false, connectionError: message });
+        throw err;
+      }
+    },
+
+    joinRoom: async (code: string) => {
+      set({ isConnecting: true, connectionError: null });
+      peerManager.onConnectionStateChange = (connected, error) => {
+        set({ 
+          isConnected: connected, 
+          isConnecting: false,
+          connectionError: error || null 
+        });
+      };
+
+      try {
+        await peerManager.joinRoom(code);
+        set({
+          roomCode: code,
+          playMode: 'guest',
+          myPlayerRole: 'p2',
+          isConnecting: false,
+          isConnected: true,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to join room';
+        set({ isConnecting: false, connectionError: message });
+        throw err;
+      }
+    },
+
+    disconnectRoom: () => {
+      peerManager.cleanup();
+      set({
+        roomCode: null,
+        isConnected: false,
+        isConnecting: false,
+        connectionError: null,
+        playMode: 'local',
+        myPlayerRole: 'p1',
+      });
+    },
+
+    syncGuestCharacterChoice: (charId: string) => {
+      set({ guestSelectedCharacter: charId });
+      const { playMode } = get();
+      if (playMode === 'guest') {
+        peerManager.sendMessage({
+          type: 'GUEST_SELECT_CHAR',
+          payload: { characterId: charId },
+        });
+      }
+    },
+
+    syncHostCharacterChoice: (charId: string) => {
+      set({ hostSelectedCharacter: charId });
+      const { playMode, guestSelectedCharacter } = get();
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'LOBBY_UPDATE',
+          payload: {
+            p1Character: charId,
+            p2Character: guestSelectedCharacter,
+          },
+        });
+      }
+    },
+
+    startNewGame: (p1CharacterId, p2CharacterId, locale) => {
+      const { playMode } = get();
+      const newState = initGame({ 
+        player1CharacterId: p1CharacterId, 
+        player2CharacterId: p2CharacterId, 
+        locale 
+      });
+      const ai1Player = newState.players.find(p => p.id === 'ai_1');
+      const ai2Player = newState.players.find(p => p.id === 'ai_2');
+      const ai1Mem = ai1Player ? initAIMemory(ai1Player) : ({} as AIMemory);
+      const ai2Mem = ai2Player ? initAIMemory(ai2Player) : ({} as AIMemory);
+
+      set({
+        gameState: newState,
+        aiMemories: {
+          ai_1: ai1Mem,
+          ai_2: ai2Mem,
+        },
+        selectedRoomId: null,
+        isRollingDice: false,
+      });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'START_GAME',
+          payload: { gameState: newState },
+        });
+      }
+    },
+
+    selectRoom: (roomId: string) => {
+      set({ selectedRoomId: roomId });
+    },
+
+    performRollDice: () => {
+      const { playMode } = get();
+
+      if (playMode === 'guest') {
+        peerManager.sendMessage({ type: 'ACTION_ROLL' });
+        return;
+      }
+
+      const { gameState } = get();
+      set({ isRollingDice: true });
+
+      setTimeout(() => {
+        const nextState = rollDice(gameState);
+        set({ gameState: nextState, isRollingDice: false });
+
+        if (playMode === 'host') {
+          peerManager.sendMessage({
+            type: 'STATE_SYNC',
+            payload: { gameState: nextState },
+          });
+        }
+      }, 600);
+    },
+
+    performMove: (roomId: string) => {
+      const { playMode } = get();
+
+      if (playMode === 'guest') {
+        peerManager.sendMessage({
+          type: 'ACTION_MOVE',
+          payload: { roomId },
+        });
+        return;
+      }
+
+      const { gameState } = get();
+      try {
+        const nextState = movePlayer(gameState, roomId);
+        set({ gameState: nextState, selectedRoomId: null });
+
+        if (playMode === 'host') {
+          peerManager.sendMessage({
+            type: 'STATE_SYNC',
+            payload: { gameState: nextState },
+          });
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Cannot move to this room.';
+        alert(msg);
+      }
+    },
+
+    performSuggestion: (suggestion) => {
+      const { playMode } = get();
+
+      if (playMode === 'guest') {
+        peerManager.sendMessage({
+          type: 'ACTION_SUGGEST',
+          payload: { suggestion },
+        });
+        return;
+      }
+
+      const { gameState, aiMemories } = get();
+      const nextState = makeSuggestion(gameState, suggestion);
+      set({ gameState: nextState });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'STATE_SYNC',
+          payload: { gameState: nextState },
+        });
+      }
+
+      // Check disprover clockwise
+      const disprover = findNextDisprovingPlayer(
+        nextState.players,
+        nextState.currentPlayerIndex,
+        nextState.currentSuggestion!
+      );
+
+      const asker = nextState.players[nextState.currentPlayerIndex];
+
+      if (disprover) {
+        const player = nextState.players[disprover.playerIndex];
+
+        // Case 1: AI disproves
+        if (player.type.startsWith('ai_')) {
+          setTimeout(() => {
+            const shownCard = disprover.availableCards[0];
+            if (aiMemories[asker.id]) {
+              recordShownCard(aiMemories[asker.id], player.id, shownCard.id);
+            }
+
+            // If asker is Guest (Player 2 in multi-device), send private clue
+            if (playMode === 'host' && asker.roleType === 'p2') {
+              peerManager.sendMessage({
+                type: 'PRIVATE_CLUE_REVEALED',
+                payload: { card: shownCard, fromName: player.name },
+              });
+            } else if (asker.roleType === 'p1') {
+              set({
+                lastSecretClue: { card: shownCard, fromName: player.name },
+              });
+            }
+
+            get().performDisprove(shownCard.id);
+          }, 1200);
+        }
+        // Case 2: Guest (Player 2) must disprove
+        else if (playMode === 'host' && player.roleType === 'p2') {
+          peerManager.sendMessage({
+            type: 'DISPROVE_REQUEST',
+            payload: {
+              availableCards: disprover.availableCards,
+              askerId: asker.id,
+            },
+          });
+        }
+        // Case 3: Host (Player 1) must disprove
+        else if (player.roleType === 'p1') {
+          set({
+            pendingDisprovePrompt: {
+              availableCards: disprover.availableCards,
+              askerId: asker.id,
+            },
+          });
+        }
+      } else {
+        // Nobody could disprove
         setTimeout(() => {
-          const shownCard = disprover.availableCards[0];
-          // 질문자가 AI라면 해당 AI의 메모리 갱신
-          const asker = nextState.players[nextState.currentPlayerIndex];
-          if (aiMemories[asker.id]) {
-            recordShownCard(aiMemories[asker.id], player.id, shownCard.id);
-          }
-          get().performDisprove(shownCard.id);
+          get().performDisprove(undefined);
         }, 1200);
       }
-    } else {
-      // 아무도 반증 못함
-      setTimeout(() => {
-        get().performDisprove(undefined);
-      }, 1200);
-    }
-  },
+    },
 
-  performDisprove: (cardId) => {
-    const { gameState } = get();
-    const disprover = findNextDisprovingPlayer(
-      gameState.players,
-      gameState.currentPlayerIndex,
-      gameState.currentSuggestion!
-    );
+    performDisprove: (cardId) => {
+      const { playMode, gameState } = get();
 
-    const responderId = disprover ? gameState.players[disprover.playerIndex].id : 'none';
-    const nextState = resolveDisprove(gameState, responderId, cardId);
-    set({ gameState: nextState });
+      if (playMode === 'guest') {
+        peerManager.sendMessage({
+          type: 'ACTION_DISPROVE',
+          payload: { cardId },
+        });
+        set({ pendingDisprovePrompt: null });
+        return;
+      }
 
-    // 다음 턴이 AI 차례인지 확인하고 실행
-    setTimeout(() => {
-      get().runAITurnIfNeeded();
-    }, 1000);
-  },
+      set({ pendingDisprovePrompt: null });
 
-  performAccusation: (accusation) => {
-    const { gameState } = get();
-    const { state: nextState, isCorrect } = makeAccusation(gameState, accusation);
-    set({ gameState: nextState });
+      const disprover = findNextDisprovingPlayer(
+        gameState.players,
+        gameState.currentPlayerIndex,
+        gameState.currentSuggestion!
+      );
 
-    if (!isCorrect && nextState.phase !== 'GAME_OVER') {
+      const responderId = disprover ? gameState.players[disprover.playerIndex].id : 'none';
+      const responder = disprover ? gameState.players[disprover.playerIndex] : undefined;
+      const asker = gameState.players[gameState.currentPlayerIndex];
+
+      if (cardId && responder) {
+        const shownCard = responder.hand.find(c => c.id === cardId);
+        if (shownCard) {
+          if (asker.roleType === 'p2' && playMode === 'host') {
+            peerManager.sendMessage({
+              type: 'PRIVATE_CLUE_REVEALED',
+              payload: { card: shownCard, fromName: responder.name },
+            });
+          } else if (asker.roleType === 'p1') {
+            set({
+              lastSecretClue: { card: shownCard, fromName: responder.name },
+            });
+          }
+        }
+      }
+
+      const nextState = resolveDisprove(gameState, responderId, cardId);
+      set({ gameState: nextState });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'STATE_SYNC',
+          payload: { gameState: nextState },
+        });
+      }
+
+      // Trigger AI turn if next
       setTimeout(() => {
         get().runAITurnIfNeeded();
       }, 1000);
-    }
-    return isCorrect;
-  },
+    },
 
-  runAITurnIfNeeded: async () => {
-    const { gameState, aiMemories } = get();
-    if (gameState.phase === 'GAME_OVER') return;
+    performAccusation: (accusation) => {
+      const { playMode } = get();
 
-    const currentP = gameState.players[gameState.currentPlayerIndex];
-    if (!currentP.type.startsWith('ai_')) return;
-
-    const memory = aiMemories[currentP.id];
-    if (!memory) return;
-
-    // AI의 턴 1: 주사위 굴리기
-    get().performRollDice();
-
-    // 0.8초 후 AI 의사결정 및 이동
-    setTimeout(() => {
-      const stateAfterRoll = get().gameState;
-      const action = currentP.type === 'ai_logic' 
-        ? decideArthurAction(stateAfterRoll, memory)
-        : decideBlakeAction(stateAfterRoll, memory);
-
-      if (action.type === 'ACCUSE') {
-        get().performAccusation(action.accusation);
-      } else {
-        get().performMove(action.targetRoomId);
-        // 질문 던지기
-        setTimeout(() => {
-          get().performSuggestion(action.suggestion);
-        }, 800);
+      if (playMode === 'guest') {
+        peerManager.sendMessage({
+          type: 'ACTION_ACCUSE',
+          payload: { accusation },
+        });
+        return false;
       }
-    }, 800);
-  },
-}));
+
+      const { gameState } = get();
+      const { state: nextState, isCorrect } = makeAccusation(gameState, accusation);
+      set({ gameState: nextState });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'STATE_SYNC',
+          payload: { gameState: nextState },
+        });
+      }
+
+      if (!isCorrect && nextState.phase !== 'GAME_OVER') {
+        setTimeout(() => {
+          get().runAITurnIfNeeded();
+        }, 1000);
+      }
+      return isCorrect;
+    },
+
+    runAITurnIfNeeded: async () => {
+      const { playMode, gameState, aiMemories } = get();
+      if (playMode === 'guest') return; // Host handles AI execution
+      if (gameState.phase === 'GAME_OVER') return;
+
+      const currentP = gameState.players[gameState.currentPlayerIndex];
+      if (!currentP.type.startsWith('ai_')) return;
+
+      const memory = aiMemories[currentP.id];
+      if (!memory) return;
+
+      // AI roll
+      get().performRollDice();
+
+      setTimeout(() => {
+        const stateAfterRoll = get().gameState;
+        const action = currentP.type === 'ai_logic' 
+          ? decideArthurAction(stateAfterRoll, memory)
+          : decideBlakeAction(stateAfterRoll, memory);
+
+        if (action.type === 'ACCUSE') {
+          get().performAccusation(action.accusation);
+        } else {
+          get().performMove(action.targetRoomId);
+          setTimeout(() => {
+            get().performSuggestion(action.suggestion);
+          }, 800);
+        }
+      }, 800);
+    },
+
+    dismissSecretClue: () => {
+      set({ lastSecretClue: null });
+    },
+  };
+});

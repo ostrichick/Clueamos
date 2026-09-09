@@ -24,6 +24,25 @@ export interface TranslationStrings {
   aiDetectivesPreview: string;
   characterAlreadyChosen: string;
   startGame: string;
+  playModeLocal: string;
+  playModeMulti: string;
+  hostRoomTitle: string;
+  joinRoomTitle: string;
+  hostRoomBtn: string;
+  joinRoomBtn: string;
+  roomCodeLabel: string;
+  enterRoomCodePlaceholder: string;
+  copyInviteLink: string;
+  inviteLinkCopied: string;
+  waitingForPlayer2: string;
+  player2Connected: string;
+  connectedToRoom: string;
+  connectingToRoom: string;
+  waitingForOtherPlayer: string;
+  disprovePromptTitle: string;
+  disprovePromptDesc: string;
+  submitDisproveBtn: string;
+  secretClueReceived: string;
   eliminated: string;
   cardsCount: string;
   viewNotes: string;
@@ -123,6 +142,25 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     aiDetectivesPreview: 'AI Detectives (Randomly Assigned)',
     characterAlreadyChosen: 'Chosen by Player 1',
     startGame: 'Start Investigation',
+    playModeLocal: 'Single Screen (Pass & Play)',
+    playModeMulti: 'Separate Phones (Online Sync)',
+    hostRoomTitle: 'Create Room (Player 1)',
+    joinRoomTitle: 'Join Room (Player 2)',
+    hostRoomBtn: 'Create Room',
+    joinRoomBtn: 'Join Room',
+    roomCodeLabel: 'Room Code',
+    enterRoomCodePlaceholder: 'Enter 4-digit code',
+    copyInviteLink: 'Copy Invite Link',
+    inviteLinkCopied: 'Invite link copied to clipboard!',
+    waitingForPlayer2: 'Waiting for Player 2 (Wife) to join...',
+    player2Connected: 'Player 2 connected!',
+    connectedToRoom: 'Connected to room',
+    connectingToRoom: 'Connecting to room...',
+    waitingForOtherPlayer: 'is investigating... please wait',
+    disprovePromptTitle: 'Secret Disprove Required',
+    disprovePromptDesc: 'Select 1 card from your hand to secretly reveal:',
+    submitDisproveBtn: 'Reveal Clue',
+    secretClueReceived: 'secretly showed you this clue',
     eliminated: 'Eliminated',
     cardsCount: 'cards',
     viewNotes: 'Deduction Sheet',
@@ -242,6 +280,25 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     aiDetectivesPreview: 'Detectives de IA (Asignados al azar)',
     characterAlreadyChosen: 'Elegido por Jugador 1',
     startGame: 'Iniciar Investigación',
+    playModeLocal: 'Una Pantalla (Pass & Play)',
+    playModeMulti: 'Teléfonos Separados (En línea)',
+    hostRoomTitle: 'Crear Sala (Jugador 1)',
+    joinRoomTitle: 'Unirse a Sala (Jugador 2)',
+    hostRoomBtn: 'Crear Sala',
+    joinRoomBtn: 'Unirse a Sala',
+    roomCodeLabel: 'Código de Sala',
+    enterRoomCodePlaceholder: 'Ingresa código de 4 dígitos',
+    copyInviteLink: 'Copiar Enlace de Invitación',
+    inviteLinkCopied: '¡Enlace de invitación copiado!',
+    waitingForPlayer2: 'Esperando a que se una el Jugador 2 (Esposa)...',
+    player2Connected: '¡Jugador 2 conectado!',
+    connectedToRoom: 'Conectado a la sala',
+    connectingToRoom: 'Conectando a la sala...',
+    waitingForOtherPlayer: 'está investigando... por favor espera',
+    disprovePromptTitle: 'Refutación Secreta Requerida',
+    disprovePromptDesc: 'Elige 1 carta de tu mano para mostrar en secreto:',
+    submitDisproveBtn: 'Mostrar Pista',
+    secretClueReceived: 'te mostró esta pista en secreto',
     eliminated: 'Eliminado',
     cardsCount: 'cartas',
     viewNotes: 'Cuaderno de Deducción',
@@ -361,6 +418,25 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     aiDetectivesPreview: 'AI 탐정 (남은 캐릭터 중 자동 배정)',
     characterAlreadyChosen: '플레이어 1 선택 완료',
     startGame: '사건 수사 시작',
+    playModeLocal: '한 화면에서 플레이 (Pass & Play)',
+    playModeMulti: '각자 폰으로 플레이 (멀티 디바이스)',
+    hostRoomTitle: '방 만들기 (플레이어 1)',
+    joinRoomTitle: '방 참여하기 (플레이어 2)',
+    hostRoomBtn: '방 만들기',
+    joinRoomBtn: '방 참여하기',
+    roomCodeLabel: '방 코드',
+    enterRoomCodePlaceholder: '4자리 코드 입력',
+    copyInviteLink: '초대 링크 복사',
+    inviteLinkCopied: '초대 링크가 복사되었습니다! 아내분께 전달해주세요.',
+    waitingForPlayer2: '플레이어 2(아내)의 접속을 기다리는 중...',
+    player2Connected: '플레이어 2가 접속했습니다!',
+    connectedToRoom: '방에 연결되었습니다',
+    connectingToRoom: '방에 연결하는 중...',
+    waitingForOtherPlayer: '님이 수사 중입니다... 잠시 기다려주세요',
+    disprovePromptTitle: '은밀한 반증 요청',
+    disprovePromptDesc: '내 손패 중 제시할 반증 카드를 1장 선택하세요:',
+    submitDisproveBtn: '카드 비밀 제시하기',
+    secretClueReceived: '님이 이 단서를 은밀히 보여주었습니다',
     eliminated: '탈락됨',
     cardsCount: '장',
     viewNotes: '추리 수첩 보기',

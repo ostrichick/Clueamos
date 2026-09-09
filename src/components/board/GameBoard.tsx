@@ -22,6 +22,7 @@ interface GameBoardProps {
   isRollingDice: boolean;
   t: TranslationStrings;
   locale: SupportedLocale;
+  isMyTurn?: boolean;
   onRollDice: () => void;
   onMoveToRoom: (roomId: string) => void;
 }
@@ -35,13 +36,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   isRollingDice,
   t,
   locale,
+  isMyTurn = true,
   onRollDice,
   onMoveToRoom,
 }) => {
   const currentPlayer = players[currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
-  const isMovePhase = isHumanTurn && phase === 'PLAYING_MOVE';
-  const isRollPhase = isHumanTurn && phase === 'PLAYING_ROLL';
+  const isMovePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_MOVE';
+  const isRollPhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ROLL';
 
   // Generate grid cells once
   const grid = useMemo(() => generateBoardGrid(), []);
@@ -107,11 +109,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              {isRollPhase
-                ? t.adjacentRoomsDesc
-                : isMovePhase
-                  ? (locale === 'ko' ? '초록색으로 빛나는 방이나 비밀 통로를 클릭하여 입장하세요.' : locale === 'es' ? 'Haz clic en una habitación resaltada en verde o pasaje secreto para entrar.' : 'Click on a green highlighted room or secret passage to enter.')
-                  : t.notebookDesc}
+              {!isMyTurn && isHumanTurn
+                ? `${getPlayerDisplayName(currentPlayer, locale)} ${t.waitingForOtherPlayer}`
+                : isRollPhase
+                  ? t.adjacentRoomsDesc
+                  : isMovePhase
+                    ? (locale === 'ko' ? '초록색으로 빛나는 방이나 비밀 통로를 클릭하여 입장하세요.' : locale === 'es' ? 'Haz clic en una habitación resaltada en verde o pasaje secreto para entrar.' : 'Click on a green highlighted room or secret passage to enter.')
+                    : t.notebookDesc}
             </p>
           </div>
         </div>
