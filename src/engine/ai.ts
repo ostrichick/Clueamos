@@ -104,17 +104,13 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
     };
   }
 
-  // 이동할 방 결정: 아직 정보가 불확실한 방(locationCandidates)으로 이동 선호
-  const currentRoom = state.rooms.find(r => r.id === me.currentRoomId);
-  const possibleRooms = [
-    me.currentRoomId, 
-    ...(currentRoom?.adjacentRoomIds || [])
-  ];
+  // 이동할 방 결정: 주사위로 도달 가능한 방(state.accessibleRoomIds) 중 미지의 방 선호
+  const accessible = state.accessibleRoomIds || [me.currentRoomId];
 
-  // 인접 방 중 아직 용의선상에 있는 방 우선 선택
-  const targetRoomId = possibleRooms.find(roomId => 
+  // 도달 가능한 방 중 아직 용의선상에 있는 방 우선 선택
+  const targetRoomId = accessible.find(roomId => 
     locationCandidates.some(c => c.id === roomId)
-  ) || possibleRooms[Math.floor(Math.random() * possibleRooms.length)];
+  ) || accessible[Math.floor(Math.random() * accessible.length)];
 
   // 질문할 카드 조합: 아직 모르는 후보 중에서 선별
   const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
@@ -159,10 +155,9 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
     };
   }
 
-  // 이동 결정 (랜덤 또는 인접 방)
-  const currentRoom = state.rooms.find(r => r.id === me.currentRoomId);
-  const possibleRooms = [me.currentRoomId, ...(currentRoom?.adjacentRoomIds || [])];
-  const targetRoomId = possibleRooms[Math.floor(Math.random() * possibleRooms.length)];
+  // 이동 결정 (도달 가능한 방 중 선택)
+  const accessible = state.accessibleRoomIds || [me.currentRoomId];
+  const targetRoomId = accessible[Math.floor(Math.random() * accessible.length)];
 
   // 블러핑 기법: 25% 확률로 자신의 손패에 있는 카드를 질문에 섞음
   const isBluffing = Math.random() < 0.25 && me.hand.length > 0;

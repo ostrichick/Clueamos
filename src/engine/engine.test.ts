@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { 
   initGame, 
+  rollDice,
   movePlayer, 
   makeSuggestion, 
   getDisprovableCards, 
@@ -38,13 +39,21 @@ describe('Clueamos Core Game Engine', () => {
     expect(allHandCardIds).not.toContain(state.solution.motiveId);
   });
 
-  it('플레이어가 인접한 방으로 이동할 수 있어야 한다', () => {
+  it('주사위를 굴리고 도달 가능한 방으로 이동할 수 있어야 한다', () => {
     const state = initGame();
-    const p1 = state.players[0]; // 연회장 시작, 연회장은 주방, 서재와 인접
-    
-    // 주방으로 이동
-    const movedState = movePlayer(state, 'room_kitchen');
-    expect(movedState.players[0].currentRoomId).toBe('room_kitchen');
+    expect(state.phase).toBe('PLAYING_ROLL');
+
+    // 주사위 굴리기
+    const rolledState = rollDice(state);
+    expect(rolledState.phase).toBe('PLAYING_MOVE');
+    expect(rolledState.currentDiceRoll).toBeGreaterThanOrEqual(1);
+    expect(rolledState.currentDiceRoll).toBeLessThanOrEqual(6);
+    expect(rolledState.accessibleRoomIds?.length).toBeGreaterThan(0);
+
+    // 도달 가능한 첫 번째 방으로 이동
+    const targetRoomId = rolledState.accessibleRoomIds![0];
+    const movedState = movePlayer(rolledState, targetRoomId);
+    expect(movedState.players[0].currentRoomId).toBe(targetRoomId);
     expect(movedState.phase).toBe('PLAYING_SUGGEST');
   });
 

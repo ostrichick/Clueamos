@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { GameState, Card, Solution, Suggestion } from '@/engine/types';
 import { 
   initGame, 
+  rollDice, 
   movePlayer, 
   makeSuggestion, 
   findNextDisprovingPlayer, 
@@ -20,10 +21,12 @@ interface GameStore {
   gameState: GameState;
   aiMemories: Record<string, AIMemory>;
   selectedRoomId: string | null;
+  isRollingDice: boolean;
   
   // 액션
   startNewGame: (p1Name?: string, p2Name?: string) => void;
   selectRoom: (roomId: string) => void;
+  performRollDice: () => void;
   performMove: (roomId: string) => void;
   performSuggestion: (suggestion: Omit<Suggestion, 'askerId'>) => void;
   performDisprove: (cardId?: string) => void;
@@ -35,6 +38,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameState: initGame(),
   aiMemories: {},
   selectedRoomId: null,
+  isRollingDice: false,
 
   startNewGame: (p1Name, p2Name) => {
     const newState = initGame({ player1Name: p1Name, player2Name: p2Name });
@@ -48,11 +52,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ai_blake: blakeMem,
       },
       selectedRoomId: null,
+      isRollingDice: false,
     });
   },
 
   selectRoom: (roomId: string) => {
     set({ selectedRoomId: roomId });
+  },
+
+  performRollDice: () => {
+    const { gameState } = get();
+    set({ isRollingDice: true });
+
+    setTimeout(() => {
+      const nextState = rollDice(gameState);
+      set({ gameState: nextState, isRollingDice: false });
+    }, 600);
   },
 
   performMove: (roomId: string) => {
@@ -61,7 +76,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const nextState = movePlayer(gameState, roomId);
       set({ gameState: nextState, selectedRoomId: null });
     } catch (e: any) {
-      alert(e.message || '이동할 수 없습니다.');
+      alert(e.message || 'Cannot move to this room.');
     }
   },
 
@@ -140,19 +155,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const memory = aiMemories[currentP.id];
     if (!memory) return;
 
-    // AI 의사결정
-    const action = currentP.type === 'ai_logic' 
-      ? decideArthurAction(gameState, memory)
-      : decideBlakeAction(gameState, memory);
+    // AI의 턴 1: 주사위 굴리기
+    get().performRollDice();
 
-    if (action.type === 'ACCUSE') {
-      get().performAccusation(action.accusation);
-    } else {
-      // 이동 후 질문
-      get().performMove(action.targetRoomId);
-      setTimeout(() => {
-        get().performSuggestion(action.suggestion);
-      }, 800);
-    }
+    // 0.8초 후 AI 의사결정 및 이동
+    setTimeout(() => {
+      const stateAfterRoll = get().gameState;
+      const action = currentP.type === 'ai_logic' 
+        ? decideArthurAction(stateAfterRoll, memory)
+        : decideBlakeAction(stateAfterRoll, memory);
+
+      if (action.type === 'ACCUSE') {
+        get().performAccusation(action.accusation);
+      } else {
+        get().performMove(action.targetRoomId);
+        // 질문 던지기
+        setTimeout(() => {
+          get().performSuggestion(action.suggestion);
+        }, 800);
+      }
+    }, 800);
   },
 }));

@@ -22,6 +22,12 @@ export interface TranslationStrings {
   newGame: string;
   currentRoom: string;
   adjacentRoomsDesc: string;
+  rollDiceBtn: string;
+  rollingDice: string;
+  rolledNumber: string;
+  secretPassageBadge: string;
+  cannotReachRoom: string;
+  distanceSteps: string;
 
   // Deduction Note
   notebookTitle: string;
@@ -105,7 +111,13 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     viewMap: 'Hotel Map',
     newGame: 'New Game',
     currentRoom: 'Current Room',
-    adjacentRoomsDesc: 'Click an adjacent room to move',
+    adjacentRoomsDesc: 'Roll the die to move to an accessible room',
+    rollDiceBtn: 'Roll Die 🎲',
+    rollingDice: 'Rolling...',
+    rolledNumber: 'Rolled',
+    secretPassageBadge: 'Secret Passage!',
+    cannotReachRoom: 'Too far (Need higher roll)',
+    distanceSteps: 'steps',
 
     notebookTitle: 'Detective Investigation Notebook',
     notebookDesc: 'Click items to toggle ? / ✕ / ◯ (Your hand cards are automatically ✕)',
@@ -214,7 +226,13 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     viewMap: 'Mapa del Hotel',
     newGame: 'Nueva Partida',
     currentRoom: 'Habitación Actual',
-    adjacentRoomsDesc: 'Haz clic en una habitación adyacente para moverte',
+    adjacentRoomsDesc: 'Lanza el dado para moverte a una habitación accesible',
+    rollDiceBtn: 'Lanzar Dado 🎲',
+    rollingDice: 'Lanzando...',
+    rolledNumber: 'Sacaste',
+    secretPassageBadge: '¡Pasaje Secreto!',
+    cannotReachRoom: 'Muy lejos (Necesitas más dado)',
+    distanceSteps: 'pasos',
 
     notebookTitle: 'Cuaderno de Investigación',
     notebookDesc: 'Haz clic para alternar ? / ✕ / ◯ (Tus cartas se marcan ✕ automáticamente)',
@@ -323,7 +341,13 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     viewMap: '호텔 맵 보기',
     newGame: '새 게임',
     currentRoom: '현재 방',
-    adjacentRoomsDesc: '이동할 인접한 방을 클릭하세요',
+    adjacentRoomsDesc: '주사위를 굴려 나온 눈금 이하의 방으로 이동하세요',
+    rollDiceBtn: '주사위 굴리기 🎲',
+    rollingDice: '굴리는 중...',
+    rolledNumber: '주사위 눈금',
+    secretPassageBadge: '비밀 통로!',
+    cannotReachRoom: '거리 부족 (더 높은 주사위 필요)',
+    distanceSteps: '칸',
 
     notebookTitle: '나만의 사건 추리 수첩',
     notebookDesc: '항목을 클릭해 ? / ✕ / ◯ 토글 (내 손패는 자동으로 ✕ 표기)',

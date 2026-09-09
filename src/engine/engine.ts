@@ -9,6 +9,68 @@ import {
 } from './types';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS, MOTIVES, LOCATIONS, ALL_CARDS } from './data';
 
+// 방 간 거리 테이블 (최단 걸음 수 / 복도 칸 수)
+// 클래식 Clue 맵처럼 방 사이의 복도 타일 거리 정의
+export const ROOM_DISTANCES: Record<string, Record<string, number>> = {
+  room_ballroom: {
+    room_ballroom: 0,
+    room_kitchen: 3,
+    room_library: 4,
+    room_wine_cellar: 6,
+    room_room304: 6,
+    room_rooftop: 7,
+  },
+  room_kitchen: {
+    room_ballroom: 3,
+    room_kitchen: 0,
+    room_library: 5,
+    room_wine_cellar: 4,
+    room_room304: 7,
+    room_rooftop: 5,
+  },
+  room_library: {
+    room_ballroom: 4,
+    room_kitchen: 5,
+    room_library: 0,
+    room_wine_cellar: 7,
+    room_room304: 3,
+    room_rooftop: 6,
+  },
+  room_wine_cellar: {
+    room_ballroom: 6,
+    room_kitchen: 4,
+    room_library: 7,
+    room_wine_cellar: 0,
+    room_room304: 5,
+    room_rooftop: 3,
+  },
+  room_room304: {
+    room_ballroom: 6,
+    room_kitchen: 7,
+    room_library: 3,
+    room_wine_cellar: 5,
+    room_room304: 0,
+    room_rooftop: 4,
+  },
+  room_rooftop: {
+    room_ballroom: 7,
+    room_kitchen: 5,
+    room_library: 6,
+    room_wine_cellar: 3,
+    room_room304: 4,
+    room_rooftop: 0,
+  },
+};
+
+// 비밀 통로 (Clue의 대표 요소: 모서리 방 간 직통 통로!)
+// 서재 <-> 주방, 연회장 <-> 옥상 정원
+export const SECRET_PASSAGES: Record<string, string> = {
+  room_library: 'room_kitchen',
+  room_kitchen: 'room_library',
+  room_ballroom: 'room_rooftop',
+  room_rooftop: 'room_ballroom',
+};
+
 // Fisher-Yates 셔플 유틸리티
 export function shuffle<T>(array: T[]): T[] {
   const result = [...array];
@@ -26,14 +88,11 @@ export interface InitGameOptions {
 }
 
 /**
- * 게임 초기화 함수:
- * 1. 4개 카테고리(용의자, 장소, 도구, 동기)에서 각각 1장씩 뽑아 비밀 정답 봉투(Solution)에 격리
- * 2. 나머지 카드를 섞어 4명의 플레이어에게 공평하게 분배
- * 3. 4명의 플레이어(사람 2명 + AI 2명) 생성 및 초기 방 배치
+ * 게임 초기화 함수
  */
 export function initGame(options?: InitGameOptions): GameState {
-  const p1Name = options?.player1Name || '플레이어 1 (나)';
-  const p2Name = options?.player2Name || '플레이어 2 (아내)';
+  const p1Name = options?.player1Name || 'Player 1 (Me)';
+  const p2Name = options?.player2Name || 'Player 2 (Wife)';
   const maxTurns = options?.maxTurns || 16;
 
   // 1. 카테고리별 셔플
@@ -86,7 +145,7 @@ export function initGame(options?: InitGameOptions): GameState {
     },
     {
       id: 'ai_arthur',
-      name: '아서 (논리형 탐정)',
+      name: 'Arthur (Logical AI)',
       type: 'ai_logic',
       avatar: '🧐',
       color: '#6366f1', // indigo
@@ -97,7 +156,7 @@ export function initGame(options?: InitGameOptions): GameState {
     },
     {
       id: 'ai_blake',
-      name: '블레이크 (직감형 탐정)',
+      name: 'Blake (Instinct AI)',
       type: 'ai_instinct',
       avatar: '🕶️',
       color: '#f59e0b', // amber
@@ -108,7 +167,7 @@ export function initGame(options?: InitGameOptions): GameState {
     },
   ];
 
-  // 18장의 카드를 4명에게 분배 (4장, 5장 등)
+  // 18장의 카드를 4명에게 분배
   shuffledDeck.forEach((card, index) => {
     const playerIndex = index % initialPlayers.length;
     initialPlayers[playerIndex].hand.push(card);
@@ -117,13 +176,13 @@ export function initGame(options?: InitGameOptions): GameState {
   const initialLog: LogEntry = {
     id: 'log_0',
     turn: 1,
-    message: '사건이 발생했습니다. 그랜드 벨벳 호텔의 조사가 시작됩니다.',
+    message: 'The murder investigation at Grand Velvet Hotel has begun.',
     type: 'event',
     timestamp: Date.now(),
   };
 
   return {
-    phase: 'PLAYING_MOVE',
+    phase: 'PLAYING_ROLL', // 주사위를 먼저 굴려야 함!
     turnCount: 1,
     maxTurns,
     currentPlayerIndex: 0,
@@ -136,19 +195,58 @@ export function initGame(options?: InitGameOptions): GameState {
 }
 
 /**
- * 플레이어 이동 처리
+ * 주사위 굴리기 (1~6 눈금)
+ * 현재 방 위치에서 주사위 눈금 이하의 거리인 방 목록 및 비밀 통로 연결 방 계산
+ */
+export function rollDice(state: GameState): GameState {
+  const currentPlayer = state.players[state.currentPlayerIndex];
+  const diceValue = Math.floor(Math.random() * 6) + 1;
+
+  const currentDistances = ROOM_DISTANCES[currentPlayer.currentRoomId] || {};
+  const secretPassageTarget = SECRET_PASSAGES[currentPlayer.currentRoomId];
+
+  // 도달 가능한 방: 현재 방 포함, 거리 <= 주사위눈금인 방, 비밀통로 대상 방
+  const accessibleRoomIds: string[] = [currentPlayer.currentRoomId];
+
+  Object.entries(currentDistances).forEach(([roomId, dist]) => {
+    if (dist <= diceValue && !accessibleRoomIds.includes(roomId)) {
+      accessibleRoomIds.push(roomId);
+    }
+  });
+
+  if (secretPassageTarget && !accessibleRoomIds.includes(secretPassageTarget)) {
+    accessibleRoomIds.push(secretPassageTarget);
+  }
+
+  const newLog: LogEntry = {
+    id: `log_${Date.now()}_dice`,
+    turn: state.turnCount,
+    message: `🎲 ${currentPlayer.name} rolled a ${diceValue}! (${accessibleRoomIds.length} destinations reachable)`,
+    type: 'event',
+    timestamp: Date.now(),
+  };
+
+  return {
+    ...state,
+    phase: 'PLAYING_MOVE',
+    currentDiceRoll: diceValue,
+    accessibleRoomIds,
+    logs: [...state.logs, newLog],
+  };
+}
+
+/**
+ * 플레이어 이동 처리 (주사위 눈금으로 도달 가능한 방인지 검증)
  */
 export function movePlayer(state: GameState, targetRoomId: string): GameState {
   const currentPlayer = state.players[state.currentPlayerIndex];
-  const currentRoom = state.rooms.find(r => r.id === currentPlayer.currentRoomId);
+  const accessible = state.accessibleRoomIds || [currentPlayer.currentRoomId];
 
-  // 이동 가능 여부 검증 (인접한 방이거나 현재 방인 경우)
-  if (!currentRoom?.adjacentRoomIds.includes(targetRoomId) && targetRoomId !== currentRoom?.id) {
-    throw new Error('이동할 수 없는 방입니다.');
+  if (!accessible.includes(targetRoomId)) {
+    throw new Error('Not enough dice steps to reach this room!');
   }
 
   const targetRoom = state.rooms.find(r => r.id === targetRoomId);
-
   const updatedPlayers = state.players.map((p, idx) => 
     idx === state.currentPlayerIndex 
       ? { ...p, currentRoomId: targetRoomId }
@@ -158,7 +256,7 @@ export function movePlayer(state: GameState, targetRoomId: string): GameState {
   const newLog: LogEntry = {
     id: `log_${Date.now()}_move`,
     turn: state.turnCount,
-    message: `${currentPlayer.name}님이 [${targetRoom?.name}] (으)로 이동했습니다.`,
+    message: `${currentPlayer.name} moved to [${targetRoom?.name}].`,
     type: 'move',
     timestamp: Date.now(),
   };
@@ -192,7 +290,7 @@ export function makeSuggestion(
   const newLog: LogEntry = {
     id: `log_${Date.now()}_sugg`,
     turn: state.turnCount,
-    message: `${asker.name}님의 질문: "범인은 ${suspect}, 장소는 ${location}, 도구는 ${weapon}, 동기는 ${motive}일 것이다."`,
+    message: `${asker.name} suggests: "${suspect} in the ${location} with the ${weapon} for ${motive}."`,
     type: 'suggestion',
     timestamp: Date.now(),
   };
@@ -240,7 +338,7 @@ export function findNextDisprovingPlayer(
     }
   }
 
-  return null; // 아무도 반증할 수 없음
+  return null;
 }
 
 /**
@@ -257,11 +355,10 @@ export function resolveDisprove(
   let newLog: LogEntry;
 
   if (shownCardId && responder) {
-    const card = state.allCards.find(c => c.id === shownCardId);
     newLog = {
       id: `log_${Date.now()}_disprove`,
       turn: state.turnCount,
-      message: `${responder.name}님이 ${asker.name}님에게 증거 1장을 은밀히 제시하여 반증했습니다.`,
+      message: `${responder.name} secretly showed 1 clue to ${asker.name} to disprove the claim.`,
       type: 'disprove',
       timestamp: Date.now(),
     };
@@ -269,16 +366,17 @@ export function resolveDisprove(
     newLog = {
       id: `log_${Date.now()}_disprove_none`,
       turn: state.turnCount,
-      message: '아무도 이 가설을 반증하지 못했습니다! (정답에 매우 근접)',
+      message: 'Nobody could disprove this hypothesis! (Very close to truth)',
       type: 'disprove',
       timestamp: Date.now(),
     };
   }
 
-  // 다음 플레이어로 턴 넘기기
   return nextTurn({
     ...state,
     currentSuggestion: undefined,
+    currentDiceRoll: undefined,
+    accessibleRoomIds: undefined,
     logs: [...state.logs, newLog],
   });
 }
@@ -303,7 +401,7 @@ export function makeAccusation(
     const winLog: LogEntry = {
       id: `log_${Date.now()}_win`,
       turn: state.turnCount,
-      message: `🎉 [사건 해결!] ${player.name}님이 진실을 밝혀냈습니다! 승리!`,
+      message: `🎉 [Case Solved!] ${player.name} revealed the truth and won!`,
       type: 'accusation',
       timestamp: Date.now(),
     };
@@ -318,7 +416,6 @@ export function makeAccusation(
       },
     };
   } else {
-    // 오답 시 탈락(더 이상 질문 불가, 반증만 참여)
     const updatedPlayers = state.players.map((p, idx) => 
       idx === state.currentPlayerIndex ? { ...p, isEliminated: true } : p
     );
@@ -326,7 +423,7 @@ export function makeAccusation(
     const failLog: LogEntry = {
       id: `log_${Date.now()}_fail`,
       turn: state.turnCount,
-      message: `❌ ${player.name}님의 최종 고발이 빗나갔습니다! 현장에서 배제됩니다.`,
+      message: `❌ ${player.name} accusation was incorrect! Eliminated from investigation.`,
       type: 'accusation',
       timestamp: Date.now(),
     };
@@ -348,7 +445,6 @@ export function makeAccusation(
  * 다음 턴으로 전환
  */
 export function nextTurn(state: GameState): GameState {
-  // 살아있는 플레이어가 있는지 검사
   const activePlayers = state.players.filter(p => !p.isEliminated);
   if (activePlayers.length === 0) {
     return {
@@ -359,7 +455,7 @@ export function nextTurn(state: GameState): GameState {
         {
           id: `log_${Date.now()}_over`,
           turn: state.turnCount,
-          message: '모든 탐정의 추리가 실패하여 사건이 미궁에 빠졌습니다.',
+          message: 'All detectives failed their deductions. The culprit escaped.',
           type: 'event',
           timestamp: Date.now(),
         },
@@ -368,14 +464,12 @@ export function nextTurn(state: GameState): GameState {
   }
 
   let nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
-  // 탈락한 플레이어는 건너뜀
   while (state.players[nextIndex].isEliminated) {
     nextIndex = (nextIndex + 1) % state.players.length;
   }
 
   const nextTurnCount = nextIndex === 0 ? state.turnCount + 1 : state.turnCount;
 
-  // 최대 턴 초과 검사
   if (nextTurnCount > state.maxTurns) {
     return {
       ...state,
@@ -385,7 +479,7 @@ export function nextTurn(state: GameState): GameState {
         {
           id: `log_${Date.now()}_timeout`,
           turn: state.turnCount,
-          message: '시간 초과: 폭풍이 걷히고 범인이 영원히 도주했습니다.',
+          message: 'Time out: The storm cleared and the murderer slipped away.',
           type: 'event',
           timestamp: Date.now(),
         },
@@ -397,6 +491,8 @@ export function nextTurn(state: GameState): GameState {
     ...state,
     turnCount: nextTurnCount,
     currentPlayerIndex: nextIndex,
-    phase: 'PLAYING_MOVE',
+    phase: 'PLAYING_ROLL', // 다음 차례는 주사위 굴리기부터 시작
+    currentDiceRoll: undefined,
+    accessibleRoomIds: undefined,
   };
 }

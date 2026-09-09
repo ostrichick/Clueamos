@@ -18,6 +18,32 @@ class SoundController {
     return this.ctx;
   }
 
+  // 주사위 굴리는 소리 (딸그락거리는 연속 충격음)
+  playDice() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    for (let i = 0; i < 4; i++) {
+      const delay = i * 0.07;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320 + Math.random() * 120, ctx.currentTime + delay);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + delay + 0.05);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.05);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.05);
+    }
+  }
+
   // 발자국 / 방 이동 소리 (저음 둔탁한 소리)
   playMove() {
     if (!this.enabled) return;

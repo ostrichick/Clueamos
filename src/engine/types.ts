@@ -64,6 +64,7 @@ export interface LogEntry {
 
 export type GamePhase = 
   | 'LOBBY'
+  | 'PLAYING_ROLL'
   | 'PLAYING_MOVE'
   | 'PLAYING_SUGGEST'
   | 'WAITING_DISPROVE'
@@ -80,6 +81,8 @@ export interface GameState {
   allCards: Card[];
   solution: Solution;
   currentSuggestion?: Suggestion;
+  currentDiceRoll?: number;
+  accessibleRoomIds?: string[];
   logs: LogEntry[];
   winnerId?: string;
 }

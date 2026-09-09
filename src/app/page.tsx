@@ -16,9 +16,11 @@ import {
   Flame,
   Check,
   X,
-  Languages
+  Languages,
+  Dices
 } from 'lucide-react';
 import { SUSPECTS, LOCATIONS, WEAPONS, MOTIVES } from '@/engine/data';
+import { ROOM_DISTANCES, SECRET_PASSAGES } from '@/engine/engine';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import confetti from 'canvas-confetti';
@@ -27,9 +29,11 @@ export default function Home() {
   const {
     gameState,
     startNewGame,
+    performRollDice,
     performMove,
     performSuggestion,
     performAccusation,
+    isRollingDice,
   } = useGameStore();
 
   // 기본 언어: 영어 ('en'), 옵션: 스페인어 ('es'), 한국어 ('ko')
@@ -86,6 +90,11 @@ export default function Home() {
     const p2Name = locale === 'ko' ? '플레이어 2 (아내)' : locale === 'es' ? 'Jugadora 2 (Esposa)' : 'Player 2 (Wife)';
     startNewGame(p1Name, p2Name);
     setHasStarted(true);
+  };
+
+  const handleRollDice = () => {
+    sounds.playDice();
+    performRollDice();
   };
 
   const handleMove = (roomId: string) => {
@@ -297,44 +306,123 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* 6개 방 그리드 */}
+              {/* 주사위 굴리기 패널 (PLAYING_ROLL 상태일 때) */}
+              {isHumanTurn && gameState.phase === 'PLAYING_ROLL' && (
+                <div className="bg-gradient-to-r from-amber-500/15 via-slate-800/80 to-amber-500/15 border border-amber-500/40 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl shadow-amber-500/5">
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <Dices className={`w-6 h-6 ${isRollingDice ? 'animate-spin' : ''}`} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-slate-200">
+                        {isRollingDice ? t.rollingDice : t.rollDiceBtn}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {locale === 'ko' 
+                          ? '주사위 눈금에 따라 복도를 지나 이동할 수 있는 방이 결정됩니다.'
+                          : locale === 'es' 
+                            ? 'El resultado del dado determina qué habitaciones puedes alcanzar.'
+                            : 'Your roll dictates how many hallway steps you can travel.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    disabled={isRollingDice}
+                    onClick={handleRollDice}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    <Dices className="w-4 h-4" />
+                    <span>{isRollingDice ? t.rollingDice : t.rollDiceBtn}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* 주사위 굴린 직후 결과 배너 (PLAYING_MOVE 상태일 때) */}
+              {isHumanTurn && gameState.phase === 'PLAYING_MOVE' && gameState.currentDiceRoll && (
+                <div className="bg-slate-800/80 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🎲</span>
+                    <span className="font-bold text-emerald-400">
+                      {t.rolledNumber}: {gameState.currentDiceRoll}
+                    </span>
+                    <span className="text-slate-400">
+                      ({locale === 'ko' ? '하이라이트된 방 중 하나를 선택하세요' : locale === 'es' ? 'Elige una de las habitaciones resaltadas' : 'Choose one of the highlighted rooms'})
+                    </span>
+                  </div>
+                  {SECRET_PASSAGES[currentPlayer.currentRoomId] && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> {t.secretPassageBadge}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* 6개 방 그리드 (거리 및 도달 가능 여부 표시) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {gameState.rooms.map(room => {
-                  const currentRoom = gameState.rooms.find(r => r.id === currentPlayer.currentRoomId);
-                  const isAdjacent = currentRoom?.adjacentRoomIds.includes(room.id);
-                  const isCurrent = room.id === currentPlayer.currentRoomId;
+                  const currentRoomId = currentPlayer.currentRoomId;
+                  const isCurrent = room.id === currentRoomId;
+                  const distance = ROOM_DISTANCES[currentRoomId]?.[room.id] || 0;
+                  const isSecretPassage = SECRET_PASSAGES[currentRoomId] === room.id;
+                  
+                  // 도달 가능 여부: 현재 주사위 롤 이후 계산된 accessibleRoomIds에 포함되어 있는지
+                  const isAccessible = gameState.phase === 'PLAYING_MOVE' 
+                    ? (gameState.accessibleRoomIds?.includes(room.id) ?? false)
+                    : false;
+
                   const playersInRoom = gameState.players.filter(p => p.currentRoomId === room.id && !p.isEliminated);
 
                   return (
                     <button
                       key={room.id}
-                      disabled={!isHumanTurn || gameState.phase !== 'PLAYING_MOVE' || (!isAdjacent && !isCurrent)}
+                      disabled={!isHumanTurn || gameState.phase !== 'PLAYING_MOVE' || !isAccessible}
                       onClick={() => handleMove(room.id)}
-                      className={`h-32 p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all relative overflow-hidden ${
+                      className={`h-36 p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all relative overflow-hidden ${
                         isCurrent 
                           ? 'border-amber-500/80 bg-amber-500/10 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/40'
-                          : isAdjacent && isHumanTurn && gameState.phase === 'PLAYING_MOVE'
-                            ? 'border-slate-700 bg-slate-800/40 hover:bg-slate-800 hover:border-amber-400/50 cursor-pointer active:scale-95'
-                            : 'border-slate-800/60 bg-slate-900/20 opacity-70'
+                          : isAccessible && isHumanTurn && gameState.phase === 'PLAYING_MOVE'
+                            ? 'border-emerald-500/70 bg-emerald-950/20 hover:bg-emerald-900/30 hover:border-emerald-400 cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/10'
+                            : 'border-slate-800/60 bg-slate-900/20 opacity-60'
                       }`}
                     >
                       <div>
-                        <div className="font-bold text-sm text-slate-200">{getRoomName(room.id)}</div>
-                        <div className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{getRoomDesc(room.id)}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="font-bold text-sm text-slate-200">{getRoomName(room.id)}</div>
+                          {/* 거리 배지 */}
+                          {!isCurrent && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                              isAccessible 
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                                : 'bg-slate-800 text-slate-500'
+                            }`}>
+                              {isSecretPassage ? 'SECRET' : `${distance} ${t.distanceSteps}`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 line-clamp-2 mt-1">{getRoomDesc(room.id)}</div>
                       </div>
 
-                      {/* 방에 위치한 탐정 토큰들 */}
-                      <div className="flex items-center gap-1.5">
-                        {playersInRoom.map(p => (
-                          <div 
-                            key={p.id}
-                            title={`${p.name}`}
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs border border-white/20 shadow-md"
-                            style={{ backgroundColor: p.color }}
-                          >
-                            {p.avatar}
-                          </div>
-                        ))}
+                      {/* 하단 탐정 토큰들 및 비밀통로 배지 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          {playersInRoom.map(p => (
+                            <div 
+                              key={p.id}
+                              title={`${p.name}`}
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs border border-white/20 shadow-md"
+                              style={{ backgroundColor: p.color }}
+                            >
+                              {p.avatar}
+                            </div>
+                          ))}
+                        </div>
+
+                        {isSecretPassage && (
+                          <span className="text-[9px] text-purple-400 font-semibold flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" /> 통로
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
