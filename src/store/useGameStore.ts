@@ -447,7 +447,7 @@ export const useGameStore = create<GameStore>((set, get) => {
                 type: 'PRIVATE_CLUE_REVEALED',
                 payload: { card: shownCard, fromName: player.name },
               });
-            } else if (asker.roleType === 'p1') {
+            } else if (asker.roleType === 'p1' || (playMode === 'local' && asker.type === 'human')) {
               set({
                 lastSecretClue: { card: shownCard, fromName: player.name },
               });
@@ -466,8 +466,8 @@ export const useGameStore = create<GameStore>((set, get) => {
             },
           });
         }
-        // Case 3: Host (Player 1) must disprove
-        else if (player.roleType === 'p1') {
+        // Case 3: Host (Player 1) or Local human player must disprove
+        else if (player.roleType === 'p1' || playMode === 'local') {
           set({
             pendingDisprovePrompt: {
               availableCards: disprover.availableCards,
@@ -515,7 +515,7 @@ export const useGameStore = create<GameStore>((set, get) => {
               type: 'PRIVATE_CLUE_REVEALED',
               payload: { card: shownCard, fromName: responder.name },
             });
-          } else if (asker.roleType === 'p1') {
+          } else if (asker.roleType === 'p1' || (playMode === 'local' && asker.type === 'human')) {
             set({
               lastSecretClue: { card: shownCard, fromName: responder.name },
             });

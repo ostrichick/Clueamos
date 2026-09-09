@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import { SUSPECTS, LOCATIONS, WEAPONS, CHARACTER_PROFILES } from '@/engine/data';
 import { GameBoard } from '@/components/board/GameBoard';
+import { ClueCard } from '@/components/cards/ClueCard';
+import { CardHandTray } from '@/components/cards/CardHandTray';
+import { CardPassModal } from '@/components/cards/CardPassModal';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
@@ -78,11 +81,12 @@ export default function Home() {
   });
   const [copySuccessToast, setCopySuccessToast] = useState(false);
   const [selectedDisproveCard, setSelectedDisproveCard] = useState<string | null>(null);
+  const [isPassingCard, setIsPassingCard] = useState(false);
+  const [passingToPlayerName, setPassingToPlayerName] = useState<string>('');
 
   const [selectedSuspect, setSelectedSuspect] = useState(SUSPECTS[0].id);
   const [selectedWeapon, setSelectedWeapon] = useState(WEAPONS[0].id);
   const [activeTab, setActiveTab] = useState<'board' | 'notes'>('board');
-  const [showHand, setShowHand] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
   // 최종 고발 모달 상태 (용의자, 살인 장소, 흉기 도구)
@@ -225,6 +229,20 @@ export default function Home() {
       const next = current === 'UNKNOWN' ? 'NO' : current === 'NO' ? 'YES' : 'UNKNOWN';
       return { ...prev, [cardId]: next };
     });
+  };
+
+  const handleConfirmDisprove = (cardId: string) => {
+    const asker = gameState.players.find(p => p.id === pendingDisprovePrompt?.askerId);
+    const targetName = asker ? getPlayerDisplayName(asker, locale) : 'Detective';
+    setPassingToPlayerName(targetName);
+    setIsPassingCard(true);
+    sounds.playCardSlide();
+
+    setTimeout(() => {
+      setIsPassingCard(false);
+      performDisprove(cardId);
+      setSelectedDisproveCard(null);
+    }, 850);
   };
 
   // 카드 및 방 다국어 이름 가져오기 헬퍼
@@ -695,27 +713,21 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 실시간 은밀한 단서 알림 배너 */}
-      {lastSecretClue && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 max-w-md w-[92%] bg-indigo-950/95 border-2 border-indigo-400 p-4 rounded-2xl shadow-2xl z-50 backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🤫</span>
-            <div className="text-xs">
-              <div className="text-indigo-300 font-semibold">
-                {lastSecretClue.fromName} {t.secretClueReceived}:
-              </div>
-              <div className="text-sm sm:text-base font-black text-amber-300 mt-0.5">
-                {getCardName(lastSecretClue.card.id)}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={dismissSecretClue}
-            className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow"
-          >
-            OK
-          </button>
-        </div>
+      {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
+      {(lastSecretClue || isPassingCard) && (
+        <CardPassModal
+          secretClue={lastSecretClue}
+          isPassing={isPassingCard}
+          passingToName={passingToPlayerName}
+          passingCardId={selectedDisproveCard}
+          getCardName={getCardName}
+          onDismiss={dismissSecretClue}
+          onMarkNotebookAndDismiss={(cardId) => {
+            setUserNotes(prev => ({ ...prev, [cardId]: 'NO' }));
+            dismissSecretClue();
+          }}
+          t={t}
+        />
       )}
 
       {/* 메인 대시보드 */}
@@ -879,31 +891,15 @@ export default function Home() {
             </div>
           )}
 
-          {/* 내 비공개 손패 영역 (현재 기기 탐정의 카드만 표시) */}
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5 text-amber-400" />
-                {myPlayer ? getPlayerDisplayName(myPlayer, locale) : ''}{t.secretHand} ({myPlayer?.hand?.length || 0}{t.cardsCount})
-              </span>
-              <button
-                onClick={() => setShowHand(!showHand)}
-                className="text-xs text-amber-400 hover:underline"
-              >
-                {showHand ? t.hideHand : t.showHand}
-              </button>
-            </div>
-            {showHand && myPlayer && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                {myPlayer.hand.map(card => (
-                  <div key={card.id} className="p-2.5 rounded-lg bg-slate-800/70 border border-slate-700 text-xs">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">{card.category}</div>
-                    <div className="font-bold text-slate-200 mt-0.5">{getCardName(card.id)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* 내 비공개 손패 영역 (실물 카드 보관함 랙) */}
+          {myPlayer && (
+            <CardHandTray
+              cards={myPlayer.hand}
+              playerName={getPlayerDisplayName(myPlayer, locale)}
+              getCardName={getCardName}
+              t={t}
+            />
+          )}
         </div>
 
         {/* 우측 1열: 탐정 현황 & 실시간 사건 일지 */}
@@ -965,31 +961,34 @@ export default function Home() {
       </div>
 
       {/* 비밀 반증 요청 모달 창 (반증해야 하는 사람의 화면에만 팝업) */}
-      {pendingDisprovePrompt && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="max-w-md w-full bg-slate-900 border border-indigo-500/50 p-6 rounded-3xl flex flex-col gap-4 shadow-2xl">
-            <div className="flex items-center gap-2 text-indigo-400">
+      {pendingDisprovePrompt && !isPassingCard && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="max-w-md w-full bg-slate-900 border border-indigo-500/50 p-6 rounded-3xl flex flex-col gap-4 shadow-2xl text-center">
+            <div className="flex items-center justify-center gap-2 text-indigo-400">
               <Eye className="w-5 h-5" />
               <h2 className="text-lg font-black text-slate-100">{t.disprovePromptTitle}</h2>
             </div>
             <p className="text-xs text-slate-300">
-              {t.disprovePromptDesc}
+              {t.disproveCardSelectionPrompt}
             </p>
 
-            <div className="flex flex-col gap-2">
+            {/* 촉각적인 실물 카드 선택 영역 */}
+            <div className="flex items-center justify-center gap-3 sm:gap-4 py-3 min-h-[190px] overflow-x-auto">
               {pendingDisprovePrompt.availableCards.map(card => (
-                <button
-                  key={card.id}
-                  onClick={() => setSelectedDisproveCard(card.id)}
-                  className={`p-3 rounded-xl border text-left flex items-center justify-between text-xs font-bold transition-all ${
-                    selectedDisproveCard === card.id
-                      ? 'border-indigo-500 bg-indigo-500/20 text-indigo-200 ring-2 ring-indigo-500/40'
-                      : 'border-slate-800 bg-slate-800/60 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <span>{getCardName(card.id)}</span>
-                  <span className="text-[10px] text-slate-500 uppercase">{card.category}</span>
-                </button>
+                <div key={card.id} className="transition-transform duration-200">
+                  <ClueCard
+                    cardId={card.id}
+                    size="md"
+                    isSelected={selectedDisproveCard === card.id}
+                    isSelectable={true}
+                    onClick={() => {
+                      sounds.playCardSlide();
+                      setSelectedDisproveCard(card.id);
+                    }}
+                    getCardName={getCardName}
+                    className="shadow-xl cursor-pointer"
+                  />
+                </div>
               ))}
             </div>
 
@@ -997,13 +996,13 @@ export default function Home() {
               disabled={!selectedDisproveCard}
               onClick={() => {
                 if (selectedDisproveCard) {
-                  performDisprove(selectedDisproveCard);
-                  setSelectedDisproveCard(null);
+                  handleConfirmDisprove(selectedDisproveCard);
                 }
               }}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black text-xs transition-colors"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-40 text-white font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-[0.98]"
             >
-              {t.submitDisproveBtn}
+              <span>{t.submitDisproveBtn}</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>

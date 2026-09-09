@@ -72,10 +72,20 @@ export interface TranslationStrings {
   markNo: string;
   markYes: string;
 
-  // Hand
+  // Hand & Physical Cards
   secretHand: string;
   showHand: string;
   hideHand: string;
+  cardHandTitle: string;
+  suspectCard: string;
+  locationCard: string;
+  weaponCard: string;
+  cardPassingTo: string;
+  cardPassedFrom: string;
+  tapToFlip: string;
+  markInNotesAndClose: string;
+  inspectCard: string;
+  disproveCardSelectionPrompt: string;
 
   // Suggestion
   askHypothesis: string;
@@ -192,6 +202,16 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretHand: "'s Private Hand",
     showHand: 'Show',
     hideHand: 'Hide',
+    cardHandTitle: 'My Detective Cards',
+    suspectCard: 'SUSPECT',
+    locationCard: 'LOCATION',
+    weaponCard: 'WEAPON',
+    cardPassingTo: 'Passing card to',
+    cardPassedFrom: 'passed you a secret clue!',
+    tapToFlip: 'Tap card to reveal',
+    markInNotesAndClose: '📝 Mark in Notebook & Got It',
+    inspectCard: 'Inspect Card',
+    disproveCardSelectionPrompt: 'Select 1 card from your hand to slide across:',
 
     askHypothesis: 'Propose Hypothesis (Suggestion)',
     selectSuspect: 'Suspect',
@@ -330,6 +350,16 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretHand: 'Mano Privada de',
     showHand: 'Mostrar',
     hideHand: 'Ocultar',
+    cardHandTitle: 'Mis Cartas de Detective',
+    suspectCard: 'SOSPECHOSO',
+    locationCard: 'LUGAR',
+    weaponCard: 'ARMA',
+    cardPassingTo: 'Entregando carta a',
+    cardPassedFrom: '¡te pasó una pista secreta!',
+    tapToFlip: 'Toca la carta para revelar',
+    markInNotesAndClose: '📝 Marcar en Cuaderno y Confirmar',
+    inspectCard: 'Inspeccionar Carta',
+    disproveCardSelectionPrompt: 'Elige 1 carta de tu mano para pasar:',
 
     askHypothesis: 'Proponer Hipótesis (Pregunta)',
     selectSuspect: 'Sospechoso',
@@ -468,6 +498,16 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretHand: '의 비공개 손패',
     showHand: '확인하기',
     hideHand: '가리기',
+    cardHandTitle: '내 수사 카드 보관함',
+    suspectCard: '용의자',
+    locationCard: '살인 장소',
+    weaponCard: '범행 도구',
+    cardPassingTo: '님에게 카드를 은밀히 건네는 중...',
+    cardPassedFrom: '님이 비밀 단서 카드를 건넸습니다!',
+    tapToFlip: '카드를 터치하여 앞면 확인',
+    markInNotesAndClose: '📝 추리 수첩에 자동 체크하고 닫기',
+    inspectCard: '카드 자세히 보기',
+    disproveCardSelectionPrompt: '상대방에게 은밀히 건넬 반증 카드를 1장 선택하세요:',
 
     askHypothesis: '가설 질문 던지기',
     selectSuspect: '용의자 선택',
