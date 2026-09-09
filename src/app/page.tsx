@@ -368,7 +368,7 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
                   <div className="flex items-center gap-3">
                     <div className="text-2xl font-mono font-black text-amber-400 tracking-wider bg-slate-950 px-3 py-1.5 rounded-lg border border-amber-500/40">
-                      #{roomCode}
+                      {roomCode}
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
@@ -612,7 +612,7 @@ export default function Home() {
           {playMode !== 'local' && roomCode && (
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-slate-300">#{roomCode}</span>
+              <span className="text-slate-300">{roomCode}</span>
               <span className="text-[10px] text-amber-400 font-bold">({playMode.toUpperCase()})</span>
             </div>
           )}
