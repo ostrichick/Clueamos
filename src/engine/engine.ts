@@ -7,7 +7,7 @@ import {
   DisproveResponse, 
   LogEntry 
 } from './types';
-import { SUSPECTS, LOCATION_CARDS, WEAPONS, MOTIVES, LOCATIONS, ALL_CARDS } from './data';
+import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS } from './data';
 import { calculateReachablePaths } from './boardGrid';
 
 // 방 간 거리 테이블 (최단 걸음 수 / 복도 칸 수)
@@ -96,26 +96,23 @@ export function initGame(options?: InitGameOptions): GameState {
   const p2Name = options?.player2Name || 'Player 2 (Wife)';
   const maxTurns = options?.maxTurns || 16;
 
-  // 1. 카테고리별 셔플
+  // 1. 카테고리별 셔플 (용의자, 장소, 흉기 3대 요소)
   const shuffledSuspects = shuffle(SUSPECTS);
   const shuffledLocations = shuffle(LOCATION_CARDS);
   const shuffledWeapons = shuffle(WEAPONS);
-  const shuffledMotives = shuffle(MOTIVES);
 
-  // 정답 봉투 (비밀 격리)
+  // 정답 봉투 (비밀 격리 3장)
   const solution: Solution = {
     suspectId: shuffledSuspects[0].id,
     locationId: shuffledLocations[0].id,
     weaponId: shuffledWeapons[0].id,
-    motiveId: shuffledMotives[0].id,
   };
 
-  // 나머지 카드 묶음 (22 - 4 = 18장)
+  // 나머지 카드 묶음 (18 - 3 = 15장)
   const remainingCards: Card[] = [
     ...shuffledSuspects.slice(1),
     ...shuffledLocations.slice(1),
     ...shuffledWeapons.slice(1),
-    ...shuffledMotives.slice(1),
   ];
 
   const shuffledDeck = shuffle(remainingCards);
@@ -272,12 +269,11 @@ export function makeSuggestion(
   const suspect = state.allCards.find(c => c.id === suggestion.suspectId)?.name;
   const location = state.allCards.find(c => c.id === suggestion.locationId)?.name;
   const weapon = state.allCards.find(c => c.id === suggestion.weaponId)?.name;
-  const motive = state.allCards.find(c => c.id === suggestion.motiveId)?.name;
 
   const newLog: LogEntry = {
     id: `log_${Date.now()}_sugg`,
     turn: state.turnCount,
-    message: `${asker.name} suggests: "${suspect} in the ${location} with the ${weapon} for ${motive}."`,
+    message: `${asker.name} suggests: "${suspect} in the ${location} with the ${weapon}."`,
     type: 'suggestion',
     timestamp: Date.now(),
   };
@@ -298,7 +294,6 @@ export function getDisprovableCards(player: Player, suggestion: Suggestion): Car
     suggestion.suspectId,
     suggestion.locationId,
     suggestion.weaponId,
-    suggestion.motiveId,
   ];
 
   return player.hand.filter(card => queriedIds.includes(card.id));
@@ -381,8 +376,7 @@ export function makeAccusation(
   const isCorrect = 
     accusation.suspectId === sol.suspectId &&
     accusation.locationId === sol.locationId &&
-    accusation.weaponId === sol.weaponId &&
-    accusation.motiveId === sol.motiveId;
+    accusation.weaponId === sol.weaponId;
 
   if (isCorrect) {
     const winLog: LogEntry = {

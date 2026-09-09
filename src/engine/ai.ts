@@ -1,5 +1,5 @@
 import { Card, GameState, Player, Suggestion, Solution } from './types';
-import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS, MOTIVES } from './data';
+import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
 
 export type DeductionMark = 'UNKNOWN' | 'POSSIBLE' | 'IMPOSSIBLE' | 'CONFIRMED';
 
@@ -57,12 +57,11 @@ export function recordShownCard(memory: AIMemory, showerPlayerId: string, cardId
 /**
  * 카테고리별로 아직 배제되지 않은(UNKNOWN / POSSIBLE) 카드 후보 반환
  */
-export function getRemainingCandidates(memory: AIMemory, category: 'suspect' | 'location' | 'weapon' | 'motive'): Card[] {
+export function getRemainingCandidates(memory: AIMemory, category: 'suspect' | 'location' | 'weapon'): Card[] {
   let sourceList: Card[] = [];
   if (category === 'suspect') sourceList = SUSPECTS;
   else if (category === 'location') sourceList = LOCATION_CARDS;
   else if (category === 'weapon') sourceList = WEAPONS;
-  else if (category === 'motive') sourceList = MOTIVES;
 
   return sourceList.filter(c => memory.cardStatus.get(c.id) !== 'IMPOSSIBLE');
 }
@@ -77,21 +76,19 @@ export type AIAction =
 /**
  * 1. 아서(Arthur) - 논리 소거형 AI 알고리즘
  * - 체계적으로 남은 후보군 중 하나를 선택해 질문
- * - 4개 카테고리 중 단 1개의 후보만 남았을 때(확신도 100%) 최종 고발 단행
+ * - 3개 카테고리 중 단 1개의 후보만 남았을 때(확신도 100%) 최종 고발 단행
  */
 export function decideArthurAction(state: GameState, memory: AIMemory): AIAction {
   const me = state.players[state.currentPlayerIndex];
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
-  const motiveCandidates = getRemainingCandidates(memory, 'motive');
 
-  // 확신도 검사: 모든 카테고리 후보가 1개씩만 남았다면 즉시 최종 고발!
+  // 확신도 검사: 3개 카테고리 후보가 1개씩만 남았다면 즉시 최종 고발!
   if (
     suspectCandidates.length === 1 &&
     locationCandidates.length === 1 &&
-    weaponCandidates.length === 1 &&
-    motiveCandidates.length === 1
+    weaponCandidates.length === 1
   ) {
     return {
       type: 'ACCUSE',
@@ -99,7 +96,6 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
         suspectId: suspectCandidates[0].id,
         locationId: locationCandidates[0].id,
         weaponId: weaponCandidates[0].id,
-        motiveId: motiveCandidates[0].id,
       },
     };
   }
@@ -115,7 +111,6 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
   // 질문할 카드 조합: 아직 모르는 후보 중에서 선별
   const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
   const weapon = weaponCandidates[Math.floor(Math.random() * weaponCandidates.length)] || WEAPONS[0];
-  const motive = motiveCandidates[Math.floor(Math.random() * motiveCandidates.length)] || MOTIVES[0];
 
   return {
     type: 'MOVE_AND_SUGGEST',
@@ -124,14 +119,13 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
       suspectId: suspect.id,
       locationId: targetRoomId,
       weaponId: weapon.id,
-      motiveId: motive.id,
     },
   };
 }
 
 /**
  * 2. 블레이크(Blake) - 직감 & 블러핑형 AI 알고리즘
- * - 3개 카테고리가 1개씩 남고 나머지 1개가 2개 이하일 때 과감하게 고발(확률 50~60% 승부수)
+ * - 3개 카테고리 후보 수 합이 4 이하(거의 좁혀짐)면 과감하게 승부수 고발
  * - 25% 확률로 자신이 가진 카드를 질문에 섞어 블러핑 시도
  */
 export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction {
@@ -139,18 +133,16 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
-  const motiveCandidates = getRemainingCandidates(memory, 'motive');
 
-  // 과감한 승부수: 총 후보 수 합이 5 이하(거의 좁혀짐)면 바로 최종 고발 시도!
-  const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length + motiveCandidates.length;
-  if (totalCandidates <= 5) {
+  // 과감한 승부수: 총 후보 수 합이 4 이하(거의 좁혀짐)면 바로 최종 고발 시도!
+  const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length;
+  if (totalCandidates <= 4) {
     return {
       type: 'ACCUSE',
       accusation: {
         suspectId: suspectCandidates[0].id,
         locationId: locationCandidates[0].id,
         weaponId: weaponCandidates[0].id,
-        motiveId: motiveCandidates[0].id,
       },
     };
   }
@@ -169,7 +161,6 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
   }
 
   const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
-  const motive = motiveCandidates[Math.floor(Math.random() * motiveCandidates.length)] || MOTIVES[0];
 
   return {
     type: 'MOVE_AND_SUGGEST',
@@ -178,7 +169,6 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
       suspectId: suspect.id,
       locationId: targetRoomId,
       weaponId: weapon.id,
-      motiveId: motive.id,
     },
   };
 }

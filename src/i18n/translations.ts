@@ -1,4 +1,5 @@
 // 다국어 지원 번역 사전 (기본: 영어, 옵션: 스페인어, 한국어)
+// 정통 Clue 3요소: 용의자(색상 이모지), 살인 장소(이모지), 흉기 도구(유니코드 이모지)
 
 export type SupportedLocale = 'en' | 'es' | 'ko';
 
@@ -40,7 +41,6 @@ export interface TranslationStrings {
   suspectsHeader: string;
   locationsHeader: string;
   weaponsHeader: string;
-  motivesHeader: string;
   markUnknown: string;
   markNo: string;
   markYes: string;
@@ -54,7 +54,6 @@ export interface TranslationStrings {
   askHypothesis: string;
   selectSuspect: string;
   selectWeapon: string;
-  selectMotive: string;
   askQuestionBtn: string;
 
   // Accusation
@@ -64,7 +63,6 @@ export interface TranslationStrings {
   accuseSuspect: string;
   accuseLocation: string;
   accuseWeapon: string;
-  accuseMotive: string;
   cancel: string;
   declareTruth: string;
 
@@ -80,7 +78,6 @@ export interface TranslationStrings {
   solutionCulprit: string;
   solutionLocation: string;
   solutionWeapon: string;
-  solutionMotive: string;
   playAgain: string;
 
   // Cards & Rooms names
@@ -104,7 +101,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     ruleTitle: 'Custom 4-Player Rules',
     rule1: 'Play together with 2 AI detectives (Arthur & Blake) for non-stop deduction excitement.',
     rule2: 'AI plays completely fair without cheating or peeking at secret answers.',
-    rule3: 'Solve the 4 crime elements: Suspect, Location, Weapon, and the Motive.',
+    rule3: 'Deduce the 3 elements of the crime: Suspect, Murder Location, and Weapon.',
     enterScene: 'Enter Crime Scene',
     round: 'Round',
     turn: "'s Turn",
@@ -132,9 +129,8 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     notebookTitle: 'Detective Investigation Notebook',
     notebookDesc: 'Click items to toggle ? / ✕ / ◯ (Your hand cards are automatically ✕)',
     suspectsHeader: 'Suspects (6)',
-    locationsHeader: 'Locations (6)',
-    weaponsHeader: 'Weapons (6)',
-    motivesHeader: 'Motives (4)',
+    locationsHeader: 'Murder Locations (6)',
+    weaponsHeader: 'Murder Weapons (6)',
     markUnknown: '?',
     markNo: '✕',
     markYes: '◯',
@@ -146,16 +142,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     askHypothesis: 'Propose Hypothesis (Suggestion)',
     selectSuspect: 'Suspect',
     selectWeapon: 'Weapon',
-    selectMotive: 'Motive',
     askQuestionBtn: 'Question Other Detectives',
 
     finalAccusationBtn: 'Final Accusation!',
     accuseTitle: 'Final Accusation',
-    accuseWarning: 'Caution: You only get ONE shot. If you are wrong, you are eliminated from investigation!',
+    accuseWarning: 'Caution: You only get ONE shot. If you are wrong, you are eliminated from the investigation!',
     accuseSuspect: 'Culprit (Suspect)',
-    accuseLocation: 'Crime Location',
+    accuseLocation: 'Murder Location (Crime Scene)',
     accuseWeapon: 'Murder Weapon',
-    accuseMotive: 'Motive',
     cancel: 'Cancel',
     declareTruth: 'Declare the Truth',
 
@@ -167,45 +161,39 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     mysteryUnsolved: 'The culprit escaped and the case remains cold.',
     secretSolutionTitle: 'The Truth of the Case',
     solutionCulprit: 'Culprit',
-    solutionLocation: 'Location',
-    solutionWeapon: 'Weapon',
-    solutionMotive: 'Motive',
+    solutionLocation: 'Murder Location',
+    solutionWeapon: 'Murder Weapon',
     playAgain: 'Investigate New Case',
 
     cards: {
-      suspect_manager: { name: 'Manager Bauer', description: 'The stubborn hotel manager with master keys and dirty secrets.' },
-      suspect_colonel: { name: 'Colonel Hastings', description: 'Retired military veteran seen pacing hallways late at night.' },
-      suspect_chef: { name: 'Chef Pierre', description: 'Master with knives, recently argued violently over kitchen inventories.' },
-      suspect_actress: { name: 'Actress Veronica', description: 'Glamorous diva hiding near-bankruptcy behind her smile.' },
-      suspect_doctor: { name: 'Dr. Klein', description: 'Unreadable neurosurgeon who always carries a locked leather bag.' },
-      suspect_guard: { name: 'Night Guard Jack', description: 'Knows every secret backdoor and ventilation shaft in the hotel.' },
+      suspect_scarlett: { name: '🔴 Miss Scarlett', description: 'Glamorous actress in a striking crimson gown with many secrets.' },
+      suspect_mustard: { name: '🟡 Colonel Mustard', description: 'Decorated military veteran in his mustard uniform, skilled with weaponry.' },
+      suspect_white: { name: '⚪ Mrs. White', description: 'Meticulous head housekeeper dressed in immaculate white with master keys.' },
+      suspect_green: { name: '🟢 Mr. Green', description: 'Shrewd businessman in a green pinstripe suit, holding massive debts.' },
+      suspect_peacock: { name: '🔵 Mrs. Peacock', description: 'High-society widow adorned in elegant blue peacock feathers and jewelry.' },
+      suspect_plum: { name: '🟣 Professor Plum', description: 'Eccentric archaeology professor in a plum velvet vest, prone to outbursts.' },
 
-      room_ballroom: { name: 'Grand Ballroom', description: 'First floor ballroom with flickering crystal chandeliers.' },
-      room_kitchen: { name: 'Main Kitchen', description: 'Cluttered kitchen with culinary blades and scattered ingredients.' },
-      room_library: { name: 'Library & Lounge', description: 'Antique library with a dying fireplace and confidential documents.' },
-      room_wine_cellar: { name: 'Wine Cellar', description: 'Cold, dark basement vault filled with vintage barrels.' },
-      room_room304: { name: 'Suite Room 304', description: 'Victim luxurious terrace suite where the body was found.' },
-      room_rooftop: { name: 'Rooftop Greenhouse', description: 'Glass conservatory battered by the raging storm outside.' },
+      room_ballroom: { name: '💃 Grand Ballroom', description: 'Opulent first floor ballroom with crystal chandeliers.' },
+      room_kitchen: { name: '🍳 Main Kitchen', description: 'Cluttered kitchen with culinary blades and industrial cookware.' },
+      room_library: { name: '📚 Library & Lounge', description: 'Antique library with a crackling fireplace and rare tomes.' },
+      room_wine_cellar: { name: '🍷 Wine Cellar', description: 'Cold, shadowy basement vault filled with vintage barrels.' },
+      room_room304: { name: '🛏️ Suite Room 304', description: 'Luxurious private terrace suite where the body was discovered.' },
+      room_rooftop: { name: '🌿 Rooftop Greenhouse', description: 'Glass conservatory battered by the raging midnight storm.' },
 
-      weapon_candlestick: { name: 'Silver Candlestick', description: 'Heavy antique silver candlestick from the ballroom mantle.' },
-      weapon_poison: { name: 'Arsenic Vial', description: 'A small blue bottle with a torn prescription label.' },
-      weapon_masterkey: { name: 'Brass Master Key', description: 'A master key capable of unlocking all hotel doors.' },
-      weapon_rope: { name: 'Curtain Cord', description: 'Strong golden braided cord taken from the velvet drapes.' },
-      weapon_fountainpen: { name: 'Sharp Fountain Pen', description: 'Heavy gold-nibbed pen sharp enough to pierce flesh.' },
-      weapon_trophy: { name: 'Bronze Trophy', description: 'Solid bronze hunting trophy found on the library bookshelf.' },
-
-      motive_inheritance: { name: 'Inheritance Fortune', description: 'Fierce dispute over the victim forged last will.' },
-      motive_blackmail: { name: 'Fatal Blackmail', description: 'Letters exposing an unforgivable past scandal.' },
-      motive_revenge: { name: 'Blood Revenge', description: 'Payback for a tragedy that happened 10 years ago.' },
-      motive_theft: { name: 'Diamond Theft', description: 'Looting the rare Blue Sapphire kept in the private safe.' },
+      weapon_candlestick: { name: '🕯️ Candlestick', description: 'Heavy solid silver candlestick taken from the ballroom.' },
+      weapon_knife: { name: '🔪 Knife', description: 'Razor-sharp chef carving knife missing from the kitchen.' },
+      weapon_revolver: { name: '🔫 Revolver', description: 'Six-shot service handgun removed from the colonel holster.' },
+      weapon_rope: { name: '🪢 Rope', description: 'Strong golden braided curtain cord from the terrace suite.' },
+      weapon_wrench: { name: '🔧 Wrench', description: 'Heavy steel pipe wrench from the basement utility room.' },
+      weapon_poison: { name: '🧪 Poison', description: 'Lethal bottle of cyanide with a scratched prescription label.' },
     },
     rooms: {
-      room_ballroom: { name: 'Grand Ballroom', description: 'First floor ballroom with flickering crystal chandeliers.' },
-      room_kitchen: { name: 'Main Kitchen', description: 'Cluttered kitchen with culinary blades and scattered ingredients.' },
-      room_library: { name: 'Library & Lounge', description: 'Antique library with a dying fireplace and confidential documents.' },
-      room_wine_cellar: { name: 'Wine Cellar', description: 'Cold, dark basement vault filled with vintage barrels.' },
-      room_room304: { name: 'Suite Room 304', description: 'Victim luxurious terrace suite where the body was found.' },
-      room_rooftop: { name: 'Rooftop Greenhouse', description: 'Glass conservatory battered by the raging storm outside.' },
+      room_ballroom: { name: '💃 Grand Ballroom', description: 'Opulent first floor ballroom with crystal chandeliers.' },
+      room_kitchen: { name: '🍳 Main Kitchen', description: 'Cluttered kitchen with culinary blades and industrial cookware.' },
+      room_library: { name: '📚 Library & Lounge', description: 'Antique library with a crackling fireplace and rare tomes.' },
+      room_wine_cellar: { name: '🍷 Wine Cellar', description: 'Cold, shadowy basement vault filled with vintage barrels.' },
+      room_room304: { name: '🛏️ Suite Room 304', description: 'Luxurious private terrace suite where the body was discovered.' },
+      room_rooftop: { name: '🌿 Rooftop Greenhouse', description: 'Glass conservatory battered by the raging midnight storm.' },
     },
     logMessages: {
       start: 'The murder has taken place. The investigation at Grand Velvet Hotel begins.',
@@ -224,7 +212,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     ruleTitle: 'Reglas para 4 Jugadores',
     rule1: 'Juega en pareja junto a 2 detectives de IA (Arthur y Blake) para máxima emoción.',
     rule2: 'La IA juega de forma justa sin trampas ni mirar las respuestas secretas.',
-    rule3: 'Descubre los 4 elementos del crimen: Sospechoso, Lugar, Arma y el Móvil.',
+    rule3: 'Descubre los 3 elementos del crimen: Sospechoso, Lugar del Crimen y Arma Homicida.',
     enterScene: 'Entrar a la Escena del Crimen',
     round: 'Ronda',
     turn: ' - Turno de',
@@ -252,9 +240,8 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     notebookTitle: 'Cuaderno de Investigación',
     notebookDesc: 'Haz clic para alternar ? / ✕ / ◯ (Tus cartas se marcan ✕ automáticamente)',
     suspectsHeader: 'Sospechosos (6)',
-    locationsHeader: 'Lugares (6)',
-    weaponsHeader: 'Armas (6)',
-    motivesHeader: 'Móviles (4)',
+    locationsHeader: 'Lugares del Crimen (6)',
+    weaponsHeader: 'Armas Homicidas (6)',
     markUnknown: '?',
     markNo: '✕',
     markYes: '◯',
@@ -266,16 +253,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     askHypothesis: 'Proponer Hipótesis (Pregunta)',
     selectSuspect: 'Sospechoso',
     selectWeapon: 'Arma',
-    selectMotive: 'Móvil',
     askQuestionBtn: 'Interrogar a los Detectives',
 
     finalAccusationBtn: '¡Acusación Final!',
     accuseTitle: 'Acusación Definitiva',
-    accuseWarning: 'Atención: Solo tienes UNA oportunidad. ¡Si fallas, quedas eliminado!',
+    accuseWarning: 'Atención: Solo tienes UNA oportunidad. ¡Si fallas, quedas fuera del caso!',
     accuseSuspect: 'Culpable (Sospechoso)',
     accuseLocation: 'Lugar del Crimen',
     accuseWeapon: 'Arma Homicida',
-    accuseMotive: 'Móvil del Crimen',
     cancel: 'Cancelar',
     declareTruth: 'Declarar la Verdad',
 
@@ -287,45 +272,39 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     mysteryUnsolved: 'El culpable escapó y el caso quedó sin resolver.',
     secretSolutionTitle: 'La Verdad del Caso',
     solutionCulprit: 'Culpable',
-    solutionLocation: 'Lugar',
-    solutionWeapon: 'Arma',
-    solutionMotive: 'Móvil',
+    solutionLocation: 'Lugar del Crimen',
+    solutionWeapon: 'Arma Homicida',
     playAgain: 'Investigar Nuevo Caso',
 
     cards: {
-      suspect_manager: { name: 'Gerente Bauer', description: 'El obstinado gerente del hotel que oculta oscuros secretos.' },
-      suspect_colonel: { name: 'Coronel Hastings', description: 'Veterano militar visto merodeando por los pasillos de noche.' },
-      suspect_chef: { name: 'Chef Pierre', description: 'Experto con cuchillos, discutió recientemente por inventarios.' },
-      suspect_actress: { name: 'Actriz Verónica', description: 'Glamurosa diva que esconde una inminente bancarrota.' },
-      suspect_doctor: { name: 'Dr. Klein', description: 'Neurocirujano inexpresivo que siempre lleva un maletín cerrado.' },
-      suspect_guard: { name: 'Guardia Jack', description: 'Conoce cada puerta secreta y conducto de ventilación.' },
+      suspect_scarlett: { name: '🔴 Señorita Escarlata', description: 'Glamurosa actriz vestida de rojo carmesí llena de secretos.' },
+      suspect_mustard: { name: '🟡 Coronel Mostaza', description: 'Veterano militar con uniforme mostaza, experto en tácticas y armas.' },
+      suspect_white: { name: '⚪ Señora Blanco', description: 'Gobernanta jefa vestida de blanco impecable con llave maestra.' },
+      suspect_green: { name: '🟢 Señor Verde', description: 'Astuto negociante con traje de rayas verdes que oculta grandes deudas.' },
+      suspect_peacock: { name: '🔵 Señora Pavo Real', description: 'Viuda de alta sociedad con elegante broche de plumas azules.' },
+      suspect_plum: { name: '🟣 Profesor Mora', description: 'Excéntrico arqueólogo con chaleco de terciopelo morado.' },
 
-      room_ballroom: { name: 'Gran Salón', description: 'Salón de baile con candelabros de cristal titilantes.' },
-      room_kitchen: { name: 'Cocina Principal', description: 'Cocina desordenada con cuchillos e ingredientes.' },
-      room_library: { name: 'Biblioteca y Sala', description: 'Biblioteca antigua con chimenea y documentos confidenciales.' },
-      room_wine_cellar: { name: 'Bodega de Vinos', description: 'Sótano frío y oscuro lleno de barricas añejas.' },
-      room_room304: { name: 'Habitación Suite 304', description: 'Lujosa suite donde se encontró el cuerpo.' },
-      room_rooftop: { name: 'Invernadero en Azotea', description: 'Invernadero de cristal azotado por la feroz tormenta.' },
+      room_ballroom: { name: '💃 Gran Salón', description: 'Lujoso salón de baile con candelabros de cristal titilantes.' },
+      room_kitchen: { name: '🍳 Cocina Principal', description: 'Cocina desordenada con cuchillos e ingredientes de cocina.' },
+      room_library: { name: '📚 Biblioteca y Sala', description: 'Biblioteca clásica con chimenea y libros centenarios.' },
+      room_wine_cellar: { name: '🍷 Bodega de Vinos', description: 'Sótano frío y oscuro lleno de barricas añejas.' },
+      room_room304: { name: '🛏️ Habitación Suite 304', description: 'Exclusiva suite con terraza donde se encontró el cuerpo.' },
+      room_rooftop: { name: '🌿 Invernadero en Azotea', description: 'Invernadero de cristal azotado por la tormenta nocturna.' },
 
-      weapon_candlestick: { name: 'Candelabro de Plata', description: 'Pesado candelabro de plata antigua del salón.' },
-      weapon_poison: { name: 'Frasco de Arsénico', description: 'Pequeño frasco azul con etiqueta rasgada.' },
-      weapon_masterkey: { name: 'Llave Maestra', description: 'Llave de latón capaz de abrir cualquier puerta.' },
-      weapon_rope: { name: 'Cuerda de Cortina', description: 'Fuerte cordón dorado tomado de los cortinajes.' },
-      weapon_fountainpen: { name: 'Pluma Afilada', description: 'Pluma dorada lo bastante afilada para perforar.' },
-      weapon_trophy: { name: 'Trofeo de Bronce', description: 'Pesado trofeo de caza de bronce de la biblioteca.' },
-
-      motive_inheritance: { name: 'Herencia Millonaria', description: 'Disputa por un testamento falsificado.' },
-      motive_blackmail: { name: 'Chantaje Letal', description: 'Cartas que revelan un escándalo imperdonable.' },
-      motive_revenge: { name: 'Venganza de Sangre', description: 'Represalia por una tragedia de hace 10 años.' },
-      motive_theft: { name: 'Robo de Diamante', description: 'Saqueo del raro Zafiro Azul de la caja fuerte.' },
+      weapon_candlestick: { name: '🕯️ Candelabro', description: 'Pesado candelabro de plata maciza del gran salón.' },
+      weapon_knife: { name: '🔪 Cuchillo', description: 'Afilado cuchillo de chef que desapareció de la cocina.' },
+      weapon_revolver: { name: '🔫 Revólver', description: 'Arma de seis tiros sustraída de la cartuchera militar.' },
+      weapon_rope: { name: '🪢 Cuerda', description: 'Fuerte cordón dorado de las cortinas de la suite.' },
+      weapon_wrench: { name: '🔧 Llave Inglesa', description: 'Pesada llave de acero del cuarto de calderas del sótano.' },
+      weapon_poison: { name: '🧪 Veneno', description: 'Letal frasco de cianuro con la etiqueta arrancada.' },
     },
     rooms: {
-      room_ballroom: { name: 'Gran Salón', description: 'Salón de baile con candelabros de cristal titilantes.' },
-      room_kitchen: { name: 'Cocina Principal', description: 'Cocina desordenada con cuchillos e ingredientes.' },
-      room_library: { name: 'Biblioteca y Sala', description: 'Biblioteca antigua con chimenea y documentos confidenciales.' },
-      room_wine_cellar: { name: 'Bodega de Vinos', description: 'Sótano frío y oscuro lleno de barricas añejas.' },
-      room_room304: { name: 'Habitación Suite 304', description: 'Lujosa suite donde se encontró el cuerpo.' },
-      room_rooftop: { name: 'Invernadero en Azotea', description: 'Invernadero de cristal azotado por la feroz tormenta.' },
+      room_ballroom: { name: '💃 Gran Salón', description: 'Lujoso salón de baile con candelabros de cristal titilantes.' },
+      room_kitchen: { name: '🍳 Cocina Principal', description: 'Cocina desordenada con cuchillos e ingredientes de cocina.' },
+      room_library: { name: '📚 Biblioteca y Sala', description: 'Biblioteca clásica con chimenea y libros centenarios.' },
+      room_wine_cellar: { name: '🍷 Bodega de Vinos', description: 'Sótano frío y oscuro lleno de barricas añejas.' },
+      room_room304: { name: '🛏️ Habitación Suite 304', description: 'Exclusiva suite con terraza donde se encontró el cuerpo.' },
+      room_rooftop: { name: '🌿 Invernadero en Azotea', description: 'Invernadero de cristal azotado por la tormenta nocturna.' },
     },
     logMessages: {
       start: 'El crimen ha ocurrido. Comienza la investigación en el Hotel Grand Velvet.',
@@ -344,7 +323,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     ruleTitle: '부부 맞춤형 4인 플레이 룰',
     rule1: '둘이서도 지루하지 않게 컴퓨터 탐정 2명(아서, 블레이크)이 함께 추리합니다.',
     rule2: 'AI는 정답을 훔쳐보지 않으며, 여러분과 똑같은 단서만을 바탕으로 공정하게 행동합니다.',
-    rule3: '용의자 6명, 장소 6곳, 도구 6개, 그리고 범행 동기 4개의 조합을 먼저 밝혀내세요.',
+    rule3: '용의자 6명, 살인 장소 6곳, 범행 도구 6개의 조합을 먼저 밝혀내세요.',
     enterScene: '사건 현장 입장하기',
     round: '라운드',
     turn: '의 차례',
@@ -372,9 +351,8 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     notebookTitle: '나만의 사건 추리 수첩',
     notebookDesc: '항목을 클릭해 ? / ✕ / ◯ 토글 (내 손패는 자동으로 ✕ 표기)',
     suspectsHeader: '용의자 (6)',
-    locationsHeader: '현장 장소 (6)',
+    locationsHeader: '살인이 일어난 장소 (6)',
     weaponsHeader: '범행 도구 (6)',
-    motivesHeader: '범행 동기 (4)',
     markUnknown: '?',
     markNo: '✕',
     markYes: '◯',
@@ -386,16 +364,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     askHypothesis: '가설 질문 던지기',
     selectSuspect: '용의자 선택',
     selectWeapon: '도구 선택',
-    selectMotive: '범행 동기 선택',
     askQuestionBtn: '탐정들에게 이 가설 질문하기',
 
     finalAccusationBtn: '최종 고발!',
     accuseTitle: '최종 사건 고발 (Accusation)',
     accuseWarning: '주의: 단 한 번의 기회입니다. 하나라도 틀릴 경우 당신은 수사에서 즉시 배제(탈락)됩니다!',
     accuseSuspect: '범인 (용의자)',
-    accuseLocation: '사건 장소',
+    accuseLocation: '살인이 일어난 장소',
     accuseWeapon: '흉기 / 도구',
-    accuseMotive: '범행 동기',
     cancel: '취소',
     declareTruth: '진실 선언하기',
 
@@ -407,45 +383,39 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     mysteryUnsolved: '범인을 잡지 못하고 사건이 미궁에 빠졌습니다.',
     secretSolutionTitle: '사건의 진실 (Secret Solution)',
     solutionCulprit: '범인',
-    solutionLocation: '장소',
-    solutionWeapon: '도구',
-    solutionMotive: '동기',
+    solutionLocation: '살인 장소',
+    solutionWeapon: '흉기',
     playAgain: '새로운 사건 수사하기',
 
     cards: {
-      suspect_manager: { name: '지배인 바우어', description: '호텔의 모든 비밀과 열쇠를 쥐고 있는 완고한 지배인.' },
-      suspect_colonel: { name: '예비역 대령 헤이스팅스', description: '언제나 정복을 입고 다니며 밤마다 복도를 서성이는 군인 출신.' },
-      suspect_chef: { name: '수셰프 피에르', description: '칼을 능숙하게 다루며 최근 주방 재고 문제로 다툰 적이 있음.' },
-      suspect_actress: { name: '여배우 베로니카', description: '화려한 모습 뒤에 파산 직전의 경제적 위기를 감추고 있는 배우.' },
-      suspect_doctor: { name: '신경외과의 닥터 클라인', description: '항상 가죽 가방을 지니고 다니며 표정을 읽을 수 없는 의사.' },
-      suspect_guard: { name: '야간 경비원 잭', description: '호텔의 후문과 환풍구 구조를 누구보다 훤히 꿰뚫고 있는 인물.' },
+      suspect_scarlett: { name: '🔴 미스 스칼렛', description: '매혹적인 붉은 드레스를 입은 유명 배우. 호텔 곳곳의 비밀을 알고 있다.' },
+      suspect_mustard: { name: '🟡 커널 머스타드', description: '빛바랜 황색 정복을 차려입은 예비역 대령. 무기와 전술에 능통하다.' },
+      suspect_white: { name: '⚪ 미세스 화이트', description: '결벽증이 있는 호텔 수석 지배인. 흰색 유니폼에 마스터키를 소지한다.' },
+      suspect_green: { name: '🟢 미스터 그린', description: '초록색 핀스트라이프 양복의 수상한 사업가. 거액의 채무를 쥐고 있다.' },
+      suspect_peacock: { name: '🔵 미세스 피콕', description: '푸른 공작 깃털 브로치를 단 상류층 미망인. 유산 상속을 노린다.' },
+      suspect_plum: { name: '🟣 프로페서 플럼', description: '보랏빛 벨벳 조끼를 입은 괴짜 고고학 교수. 피해자와 심한 언쟁을 벌였다.' },
 
-      room_ballroom: { name: '연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },
-      room_kitchen: { name: '메인 주방', description: '식기들이 어지럽게 널려 있는 주방.' },
-      room_library: { name: '서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
-      room_wine_cellar: { name: '지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고.' },
-      room_room304: { name: '객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸.' },
-      room_rooftop: { name: '옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실.' },
+      room_ballroom: { name: '💃 연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },
+      room_kitchen: { name: '🍳 메인 주방', description: '각종 조리도구와 날카로운 칼들이 널려 있는 주방.' },
+      room_library: { name: '📚 서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
+      room_wine_cellar: { name: '🍷 지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고.' },
+      room_room304: { name: '🛏️ 객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸.' },
+      room_rooftop: { name: '🌿 옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실.' },
 
-      weapon_candlestick: { name: '은제 촛대', description: '연회장 벽면에 장식되어 있던 고풍스러운 촛대.' },
-      weapon_poison: { name: '비소 독약병', description: '라벨이 뜯겨나간 푸른색 작은 유리병.' },
-      weapon_masterkey: { name: '황동 마스터키', description: '호텔의 모든 룸을 열 수 있는 마스터키.' },
-      weapon_rope: { name: '커튼 밧줄', description: '연회장 커튼을 묶어두었던 금색 매듭 밧줄.' },
-      weapon_fountainpen: { name: '날카로운 만년필', description: '서재 데스크에 놓여 있던 날카로운 금촉 만년필.' },
-      weapon_trophy: { name: '청동 트로피', description: '서재 선반에 있던 묵직한 청동 트로피.' },
-
-      motive_inheritance: { name: '막대한 유산 상속', description: '호텔 소유권을 둘러싼 유언장 위조와 상속 다툼.' },
-      motive_blackmail: { name: '치명적 비밀 폭로', description: '과거의 치명적인 스캔들이 담긴 편지와 협박.' },
-      motive_revenge: { name: '오랜 원한과 복수', description: '10년 전 사건에 대한 피의 복수극.' },
-      motive_theft: { name: '희귀 다이아몬드 절도', description: '금고에 보관 중이던 블루 사파이어 강탈.' },
+      weapon_candlestick: { name: '🕯️ 은제 촛대', description: '연회장 벽면에 장식되어 있던 묵직한 순은 촛대.' },
+      weapon_knife: { name: '🔪 단검', description: '주방에서 사라진 날카로운 조리용 칼.' },
+      weapon_revolver: { name: '🔫 리볼버', description: '대령의 군용 가죽 홀스터에서 없어진 6연발 권총.' },
+      weapon_rope: { name: '🪢 밧줄', description: '스위트룸 테라스 커튼을 묶어두었던 금색 매듭 밧줄.' },
+      weapon_wrench: { name: '🔧 렌치', description: '지하 보일러 배관 점검에 사용된 묵직한 강철 렌치.' },
+      weapon_poison: { name: '🧪 독약병', description: '라벨이 뜯겨나간 치명적인 청산가리 유리병.' },
     },
     rooms: {
-      room_ballroom: { name: '연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },
-      room_kitchen: { name: '메인 주방', description: '식기들이 어지럽게 널려 있는 주방.' },
-      room_library: { name: '서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
-      room_wine_cellar: { name: '지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고.' },
-      room_room304: { name: '객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸.' },
-      room_rooftop: { name: '옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실.' },
+      room_ballroom: { name: '💃 연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },
+      room_kitchen: { name: '🍳 메인 주방', description: '각종 조리도구와 날카로운 칼들이 널려 있는 주방.' },
+      room_library: { name: '📚 서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
+      room_wine_cellar: { name: '🍷 지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고.' },
+      room_room304: { name: '🛏️ 객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸.' },
+      room_rooftop: { name: '🌿 옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실.' },
     },
     logMessages: {
       start: '사건이 발생했습니다. 그랜드 벨벳 호텔의 조사가 시작됩니다.',

@@ -1,21 +1,89 @@
 import { Card, Room } from './types';
 
+// 1. 용의자 6명 (색깔에서 이름을 따오고, 이름 옆에 해당 색깔 이모지 부여)
 export const SUSPECTS: Card[] = [
-  { id: 'suspect_manager', category: 'suspect', name: '지배인 바우어', description: '호텔의 모든 비밀과 열쇠를 쥐고 있는 완고한 지배인.' },
-  { id: 'suspect_colonel', category: 'suspect', name: '예비역 대령 헤이스팅스', description: '언제나 정복을 입고 다니며 밤마다 복도를 서성이는 군인 출신.' },
-  { id: 'suspect_chef', category: 'suspect', name: '수셰프 피에르', description: '칼을 능숙하게 다루며 최근 주방 재고 문제로 다툰 적이 있음.' },
-  { id: 'suspect_actress', category: 'suspect', name: '여배우 베로니카', description: '화려한 모습 뒤에 파산 직전의 경제적 위기를 감추고 있는 배우.' },
-  { id: 'suspect_doctor', category: 'suspect', name: '신경외과의 닥터 클라인', description: '항상 가죽 가방을 지니고 다니며 표정을 읽을 수 없는 의사.' },
-  { id: 'suspect_guard', category: 'suspect', name: '야간 경비원 잭', description: '호텔의 후문과 환풍구 구조를 누구보다 훤히 꿰뚫고 있는 인물.' },
+  { 
+    id: 'suspect_scarlett', 
+    category: 'suspect', 
+    name: '🔴 미스 스칼렛 (Miss Scarlett)', 
+    description: '매혹적인 붉은 드레스를 입은 유명 배우. 호텔 곳곳의 비밀을 알고 있다.' 
+  },
+  { 
+    id: 'suspect_mustard', 
+    category: 'suspect', 
+    name: '🟡 커널 머스타드 (Colonel Mustard)', 
+    description: '빛바랜 황색 정복을 차려입은 예비역 대령. 무기와 전술에 능통하다.' 
+  },
+  { 
+    id: 'suspect_white', 
+    category: 'suspect', 
+    name: '⚪ 미세스 화이트 (Mrs. White)', 
+    description: '결벽증이 있는 호텔 수석 지배인. 흰색 유니폼에 항상 마스터키를 소지한다.' 
+  },
+  { 
+    id: 'suspect_green', 
+    category: 'suspect', 
+    name: '🟢 미스터 그린 (Mr. Green)', 
+    description: '초록색 핀스트라이프 양복의 수상한 사업가. 거액의 채무를 쥐고 있다.' 
+  },
+  { 
+    id: 'suspect_peacock', 
+    category: 'suspect', 
+    name: '🔵 미세스 피콕 (Mrs. Peacock)', 
+    description: '푸른 공작 깃털 브로치를 단 상류층 미망인. 유산 상속을 노린다.' 
+  },
+  { 
+    id: 'suspect_plum', 
+    category: 'suspect', 
+    name: '🟣 프로페서 플럼 (Professor Plum)', 
+    description: '보랏빛 벨벳 조끼를 입은 괴짜 고고학 교수. 피해자와 심한 언쟁을 벌였다.' 
+  },
 ];
 
+// 2. 살인이 일어난 현장 장소 6곳 (살인 장소 이모지 부여)
 export const LOCATIONS: Room[] = [
-  { id: 'room_ballroom', name: '연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장', adjacentRoomIds: ['room_kitchen', 'room_library'], gridCoord: { x: 0, y: 0 } },
-  { id: 'room_kitchen', name: '메인 주방', description: '식기들이 어지럽게 널려 있는 주방', adjacentRoomIds: ['room_ballroom', 'room_wine_cellar'], gridCoord: { x: 1, y: 0 } },
-  { id: 'room_library', name: '서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재', adjacentRoomIds: ['room_ballroom', 'room_room304'], gridCoord: { x: 0, y: 1 } },
-  { id: 'room_wine_cellar', name: '지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고', adjacentRoomIds: ['room_kitchen', 'room_rooftop'], gridCoord: { x: 1, y: 1 } },
-  { id: 'room_room304', name: '객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸', adjacentRoomIds: ['room_library', 'room_rooftop'], gridCoord: { x: 0, y: 2 } },
-  { id: 'room_rooftop', name: '옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실', adjacentRoomIds: ['room_room304', 'room_wine_cellar'], gridCoord: { x: 1, y: 2 } },
+  { 
+    id: 'room_ballroom', 
+    name: '💃 연회장 (Grand Ballroom)', 
+    description: '샹들리에가 희미하게 흔들리는 1층 대연회장.', 
+    adjacentRoomIds: ['room_kitchen', 'room_library'], 
+    gridCoord: { x: 0, y: 0 } 
+  },
+  { 
+    id: 'room_kitchen', 
+    name: '🍳 메인 주방 (Main Kitchen)', 
+    description: '각종 조리도구와 칼들이 널려 있는 주방.', 
+    adjacentRoomIds: ['room_ballroom', 'room_wine_cellar'], 
+    gridCoord: { x: 1, y: 0 } 
+  },
+  { 
+    id: 'room_library', 
+    name: '📚 서재 & 라운지 (Library)', 
+    description: '벽난로 불씨가 남아 있는 고풍스러운 서재.', 
+    adjacentRoomIds: ['room_ballroom', 'room_room304'], 
+    gridCoord: { x: 0, y: 1 } 
+  },
+  { 
+    id: 'room_wine_cellar', 
+    name: '🍷 지하 와인창고 (Wine Cellar)', 
+    description: '서늘하고 어두컴컴한 지하 와인 저장고.', 
+    adjacentRoomIds: ['room_kitchen', 'room_rooftop'], 
+    gridCoord: { x: 1, y: 1 } 
+  },
+  { 
+    id: 'room_room304', 
+    name: '🛏️ 객실 304호 (Suite Room 304)', 
+    description: '피해자가 머물렀던 고급 스위트룸.', 
+    adjacentRoomIds: ['room_library', 'room_rooftop'], 
+    gridCoord: { x: 0, y: 2 } 
+  },
+  { 
+    id: 'room_rooftop', 
+    name: '🌿 옥상 온실정원 (Greenhouse)', 
+    description: '비바람이 들이치는 옥상의 유리 온실.', 
+    adjacentRoomIds: ['room_room304', 'room_wine_cellar'], 
+    gridCoord: { x: 1, y: 2 } 
+  },
 ];
 
 export const LOCATION_CARDS: Card[] = LOCATIONS.map(r => ({
@@ -25,25 +93,49 @@ export const LOCATION_CARDS: Card[] = LOCATIONS.map(r => ({
   description: r.description,
 }));
 
+// 3. 흉기 도구 6개 (존재하는 실제 유니코드 이모지만 적용)
 export const WEAPONS: Card[] = [
-  { id: 'weapon_candlestick', category: 'weapon', name: '묵직한 은제 촛대', description: '연회장 벽면에 장식되어 있던 고풍스러운 촛대.' },
-  { id: 'weapon_poison', category: 'weapon', name: '비소 독약병', description: '라벨이 뜯겨나간 푸른색 작은 유리병.' },
-  { id: 'weapon_masterkey', category: 'weapon', name: '황동 마스터키', description: '호텔의 모든 룸을 열 수 있는 마스터키.' },
-  { id: 'weapon_rope', category: 'weapon', name: '질긴 커튼 밧줄', description: '연회장 커튼을 묶어두었던 금색 매듭 밧줄.' },
-  { id: 'weapon_fountainpen', category: 'weapon', name: '날카로운 만년필', description: '서재 데스크에 놓여 있던 무겁고 날카로운 금촉 만년필.' },
-  { id: 'weapon_trophy', category: 'weapon', name: '청동 사냥 트로피', description: '서재 선반에 있던 묵직한 청동 트로피.' },
+  { 
+    id: 'weapon_candlestick', 
+    category: 'weapon', 
+    name: '🕯️ 은제 촛대 (Candlestick)', 
+    description: '연회장 벽면에 장식되어 있던 묵직한 순은 촛대.' 
+  },
+  { 
+    id: 'weapon_knife', 
+    category: 'weapon', 
+    name: '🔪 단검 (Knife)', 
+    description: '주방에서 사라진 날카로운 조리용 칼.' 
+  },
+  { 
+    id: 'weapon_revolver', 
+    category: 'weapon', 
+    name: '🔫 리볼버 (Revolver)', 
+    description: '대령의 군용 가죽 홀스터에서 없어진 6연발 권총.' 
+  },
+  { 
+    id: 'weapon_rope', 
+    category: 'weapon', 
+    name: '🪢 밧줄 (Rope)', 
+    description: '스위트룸 테라스 커튼을 묶어두었던 금색 매듭 밧줄.' 
+  },
+  { 
+    id: 'weapon_wrench', 
+    category: 'weapon', 
+    name: '🔧 렌치 (Wrench)', 
+    description: '지하 보일러 배관 점검에 사용된 묵직한 강철 렌치.' 
+  },
+  { 
+    id: 'weapon_poison', 
+    category: 'weapon', 
+    name: '🧪 독약병 (Poison)', 
+    description: '라벨이 뜯겨나간 치명적인 청산가리 유리병.' 
+  },
 ];
 
-export const MOTIVES: Card[] = [
-  { id: 'motive_inheritance', category: 'motive', name: '막대한 유산 상속', description: '호텔 소유권을 둘러싼 유언장 위조와 상속 다툼.' },
-  { id: 'motive_blackmail', category: 'motive', name: '치명적 비밀 폭로', description: '과거의 치명적인 스캔들이 담긴 편지와 협박.' },
-  { id: 'motive_revenge', category: 'motive', name: '오랜 원한과 복수', description: '10년 전 사건에 대한 피의 복수극.' },
-  { id: 'motive_theft', category: 'motive', name: '희귀 다이아몬드 절도', description: '금고에 보관 중이던 블루 사파이어 강탈.' },
-];
-
+// 정통 Clue 18장 카드 (용의자 6 + 살인 장소 6 + 흉기 6)
 export const ALL_CARDS: Card[] = [
   ...SUSPECTS,
   ...LOCATION_CARDS,
   ...WEAPONS,
-  ...MOTIVES,
 ];

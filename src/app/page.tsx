@@ -19,7 +19,7 @@ import {
   Languages,
   Dices
 } from 'lucide-react';
-import { SUSPECTS, LOCATIONS, WEAPONS, MOTIVES } from '@/engine/data';
+import { SUSPECTS, LOCATIONS, WEAPONS } from '@/engine/data';
 import { ROOM_DISTANCES, SECRET_PASSAGES } from '@/engine/engine';
 import { GameBoard } from '@/components/board/GameBoard';
 import { sounds } from '@/utils/sounds';
@@ -44,17 +44,15 @@ export default function Home() {
   const [hasStarted, setHasStarted] = useState(false);
   const [selectedSuspect, setSelectedSuspect] = useState(SUSPECTS[0].id);
   const [selectedWeapon, setSelectedWeapon] = useState(WEAPONS[0].id);
-  const [selectedMotive, setSelectedMotive] = useState(MOTIVES[0].id);
   const [activeTab, setActiveTab] = useState<'board' | 'notes'>('board');
   const [showHand, setShowHand] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   
-  // 최종 고발 모달 상태
+  // 최종 고발 모달 상태 (용의자, 살인 장소, 흉기 도구)
   const [isAccuseModalOpen, setIsAccuseModalOpen] = useState(false);
   const [accuseSuspect, setAccuseSuspect] = useState(SUSPECTS[0].id);
   const [accuseLocation, setAccuseLocation] = useState(LOCATIONS[0].id);
   const [accuseWeapon, setAccuseWeapon] = useState(WEAPONS[0].id);
-  const [accuseMotive, setAccuseMotive] = useState(MOTIVES[0].id);
 
   // 개인 추리 수첩 (체크리스트: ? / NO / YES)
   const [userNotes, setUserNotes] = useState<Record<string, 'UNKNOWN' | 'YES' | 'NO'>>({});
@@ -109,7 +107,6 @@ export default function Home() {
       suspectId: selectedSuspect,
       locationId: currentPlayer.currentRoomId,
       weaponId: selectedWeapon,
-      motiveId: selectedMotive,
     });
   };
 
@@ -119,7 +116,6 @@ export default function Home() {
       suspectId: accuseSuspect,
       locationId: accuseLocation,
       weaponId: accuseWeapon,
-      motiveId: accuseMotive,
     });
 
     if (isCorrect) {
@@ -329,6 +325,12 @@ export default function Home() {
                       </select>
                     </div>
                     <div>
+                      <label className="text-slate-400 block mb-1">{t.solutionLocation}</label>
+                      <div className="w-full bg-slate-900/80 border border-slate-700 rounded-lg p-2.5 text-amber-300 font-semibold truncate flex items-center">
+                        <span>{getRoomName(currentPlayer.currentRoomId)}</span>
+                      </div>
+                    </div>
+                    <div>
                       <label className="text-slate-400 block mb-1">{t.selectWeapon}</label>
                       <select 
                         value={selectedWeapon} 
@@ -336,16 +338,6 @@ export default function Home() {
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
                       >
                         {WEAPONS.map(w => <option key={w.id} value={w.id}>{getCardName(w.id)}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-slate-400 block mb-1">{t.selectMotive}</label>
-                      <select 
-                        value={selectedMotive} 
-                        onChange={e => setSelectedMotive(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
-                      >
-                        {MOTIVES.map(m => <option key={m.id} value={m.id}>{getCardName(m.id)}</option>)}
                       </select>
                     </div>
                   </div>
@@ -375,7 +367,7 @@ export default function Home() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 {/* 용의자 */}
                 <div className="flex flex-col gap-1.5">
                   <div className="font-bold text-rose-400 border-b border-slate-800 pb-1">{t.suspectsHeader}</div>
@@ -401,7 +393,7 @@ export default function Home() {
                   })}
                 </div>
 
-                {/* 장소 */}
+                {/* 살인이 일어난 장소 */}
                 <div className="flex flex-col gap-1.5">
                   <div className="font-bold text-blue-400 border-b border-slate-800 pb-1">{t.locationsHeader}</div>
                   {LOCATIONS.map(r => {
@@ -426,7 +418,7 @@ export default function Home() {
                   })}
                 </div>
 
-                {/* 도구 */}
+                {/* 범행 도구 */}
                 <div className="flex flex-col gap-1.5">
                   <div className="font-bold text-amber-400 border-b border-slate-800 pb-1">{t.weaponsHeader}</div>
                   {WEAPONS.map(w => {
@@ -441,31 +433,6 @@ export default function Home() {
                         } border-slate-800 bg-slate-900/40`}
                       >
                         <span className="text-slate-300">{getCardName(w.id)}</span>
-                        <span>
-                          {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
-                          {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
-                          {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 동기 */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="font-bold text-purple-400 border-b border-slate-800 pb-1">{t.motivesHeader}</div>
-                  {MOTIVES.map(m => {
-                    const isMyCard = currentPlayer.hand.some(c => c.id === m.id);
-                    const mark = isMyCard ? 'NO' : (userNotes[m.id] || 'UNKNOWN');
-                    return (
-                      <div 
-                        key={m.id} 
-                        onClick={() => !isMyCard && toggleNote(m.id)}
-                        className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                          !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
-                        } border-slate-800 bg-slate-900/40`}
-                      >
-                        <span className="text-slate-300">{getCardName(m.id)}</span>
                         <span>
                           {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
                           {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
@@ -576,7 +543,7 @@ export default function Home() {
               {t.accuseWarning}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div>
                 <label className="text-slate-400 block mb-1">{t.accuseSuspect}</label>
                 <select 
@@ -605,16 +572,6 @@ export default function Home() {
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200"
                 >
                   {WEAPONS.map(w => <option key={w.id} value={w.id}>{getCardName(w.id)}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-slate-400 block mb-1">{t.accuseMotive}</label>
-                <select 
-                  value={accuseMotive} 
-                  onChange={e => setAccuseMotive(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200"
-                >
-                  {MOTIVES.map(m => <option key={m.id} value={m.id}>{getCardName(m.id)}</option>)}
                 </select>
               </div>
             </div>
@@ -655,7 +612,6 @@ export default function Home() {
               <div>• {t.solutionCulprit}: {getCardName(gameState.solution.suspectId)}</div>
               <div>• {t.solutionLocation}: {getRoomName(gameState.solution.locationId)}</div>
               <div>• {t.solutionWeapon}: {getCardName(gameState.solution.weaponId)}</div>
-              <div>• {t.solutionMotive}: {getCardName(gameState.solution.motiveId)}</div>
             </div>
             <button
               onClick={() => handleStartGame()}

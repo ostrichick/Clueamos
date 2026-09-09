@@ -1,7 +1,7 @@
 // Clueamos 코어 타입 정의
-// 추리 요소 4가지: 용의자(Suspect), 장소(Location), 도구(Weapon), 동기(Motive)
+// 추리 3요소: 용의자(Suspect), 살인이 일어난 장소(Location), 도구(Weapon)
 
-export type CardCategory = 'suspect' | 'location' | 'weapon' | 'motive';
+export type CardCategory = 'suspect' | 'location' | 'weapon';
 
 export interface Card {
   id: string;
@@ -37,7 +37,6 @@ export interface Solution {
   suspectId: string;
   locationId: string;
   weaponId: string;
-  motiveId: string;
 }
 
 export interface Suggestion {
@@ -45,7 +44,6 @@ export interface Suggestion {
   suspectId: string;
   locationId: string;
   weaponId: string;
-  motiveId: string;
 }
 
 export interface DisproveResponse {

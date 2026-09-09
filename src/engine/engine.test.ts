@@ -21,22 +21,20 @@ describe('Clueamos Core Game Engine', () => {
     expect(state.players[2].type).toBe('ai_logic');
     expect(state.players[3].type).toBe('ai_instinct');
 
-    // 2. 정답 봉투 검증 (각 카테고리 1장씩 총 4장)
+    // 2. 정답 봉투 검증 (각 카테고리 1장씩 총 3장)
     expect(state.solution.suspectId).toBeDefined();
     expect(state.solution.locationId).toBeDefined();
     expect(state.solution.weaponId).toBeDefined();
-    expect(state.solution.motiveId).toBeDefined();
 
-    // 3. 전체 카드 분배 검증 (22장 - 4장 = 18장이 4명에게 분배됨)
+    // 3. 전체 카드 분배 검증 (18장 - 3장 = 15장이 4명에게 분배됨)
     const totalDistributedCards = state.players.reduce((sum, p) => sum + p.hand.length, 0);
-    expect(totalDistributedCards).toBe(18);
+    expect(totalDistributedCards).toBe(15);
 
     // 4. 정답 카드는 어떤 플레이어의 손패에도 없어야 함
     const allHandCardIds = state.players.flatMap(p => p.hand.map(c => c.id));
     expect(allHandCardIds).not.toContain(state.solution.suspectId);
     expect(allHandCardIds).not.toContain(state.solution.locationId);
     expect(allHandCardIds).not.toContain(state.solution.weaponId);
-    expect(allHandCardIds).not.toContain(state.solution.motiveId);
   });
 
   it('주사위를 굴리고 도달 가능한 방으로 이동할 수 있어야 한다', () => {
@@ -66,7 +64,6 @@ describe('Clueamos Core Game Engine', () => {
       suspectId: state.allCards.find(c => c.category === 'suspect')!.id,
       locationId: state.allCards.find(c => c.category === 'location')!.id,
       weaponId: state.allCards.find(c => c.category === 'weapon')!.id,
-      motiveId: state.allCards.find(c => c.category === 'motive')!.id,
     });
 
     expect(suggestState.currentSuggestion).toBeDefined();
@@ -78,7 +75,7 @@ describe('Clueamos Core Game Engine', () => {
       0, 
       suggestState.currentSuggestion!
     );
-    // 18장의 카드가 분배되어 있으므로 누군가 소지하거나 아무도 없을 수 있음
+    // 15장의 카드가 분배되어 있으므로 누군가 소지하거나 아무도 없을 수 있음
     if (disprover) {
       expect(disprover.playerIndex).toBeGreaterThan(0);
       expect(disprover.availableCards.length).toBeGreaterThan(0);
@@ -100,7 +97,6 @@ describe('Clueamos Core Game Engine', () => {
       suspectId: 'wrong_suspect',
       locationId: 'wrong_location',
       weaponId: 'wrong_weapon',
-      motiveId: 'wrong_motive',
     };
 
     const result = makeAccusation(state, fakeAccusation);
