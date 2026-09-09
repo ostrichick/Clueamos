@@ -8,6 +8,7 @@ import {
   LogEntry 
 } from './types';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS, MOTIVES, LOCATIONS, ALL_CARDS } from './data';
+import { calculateReachablePaths } from './boardGrid';
 
 // 방 간 거리 테이블 (최단 걸음 수 / 복도 칸 수)
 // 클래식 Clue 맵처럼 방 사이의 복도 타일 거리 정의
@@ -196,32 +197,18 @@ export function initGame(options?: InitGameOptions): GameState {
 
 /**
  * 주사위 굴리기 (1~6 눈금)
- * 현재 방 위치에서 주사위 눈금 이하의 거리인 방 목록 및 비밀 통로 연결 방 계산
+ * 13x13 복도 그리드 BFS 경로 탐색으로 도달 가능한 방 목록 및 비밀 통로 계산
  */
 export function rollDice(state: GameState): GameState {
   const currentPlayer = state.players[state.currentPlayerIndex];
   const diceValue = Math.floor(Math.random() * 6) + 1;
 
-  const currentDistances = ROOM_DISTANCES[currentPlayer.currentRoomId] || {};
-  const secretPassageTarget = SECRET_PASSAGES[currentPlayer.currentRoomId];
-
-  // 도달 가능한 방: 현재 방 포함, 거리 <= 주사위눈금인 방, 비밀통로 대상 방
-  const accessibleRoomIds: string[] = [currentPlayer.currentRoomId];
-
-  Object.entries(currentDistances).forEach(([roomId, dist]) => {
-    if (dist <= diceValue && !accessibleRoomIds.includes(roomId)) {
-      accessibleRoomIds.push(roomId);
-    }
-  });
-
-  if (secretPassageTarget && !accessibleRoomIds.includes(secretPassageTarget)) {
-    accessibleRoomIds.push(secretPassageTarget);
-  }
+  const { reachableRoomIds } = calculateReachablePaths(currentPlayer.currentRoomId, diceValue);
 
   const newLog: LogEntry = {
     id: `log_${Date.now()}_dice`,
     turn: state.turnCount,
-    message: `🎲 ${currentPlayer.name} rolled a ${diceValue}! (${accessibleRoomIds.length} destinations reachable)`,
+    message: `🎲 ${currentPlayer.name} rolled a ${diceValue}! (${reachableRoomIds.length} destinations reachable)`,
     type: 'event',
     timestamp: Date.now(),
   };
@@ -230,7 +217,7 @@ export function rollDice(state: GameState): GameState {
     ...state,
     phase: 'PLAYING_MOVE',
     currentDiceRoll: diceValue,
-    accessibleRoomIds,
+    accessibleRoomIds: reachableRoomIds,
     logs: [...state.logs, newLog],
   };
 }

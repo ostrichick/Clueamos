@@ -34,6 +34,11 @@
 
 - [x] **Phase 4 & 5: 웹 배포 및 연출 고도화**
   - [x] **오리지널 Clue 정통 룰 도입: 주사위 굴리기(Dice Roll) & 복도 칸수 거리 시스템**
+  - [x] **13x13 클래식 맨션 비주얼 보드판(Visual Mansion Board) 구현 (`GameBoard.tsx`)**
+    - 실제 Clue 보드처럼 50개의 황갈색 체크무늬 복도 타일(Hallway Checkered Squares) 배치
+    - 6개 방의 고유 테마 벽면, 바닥 텍스처, 출입문(Doorways) 및 중앙 기밀 사건 봉투(Case File)
+    - 주사위 눈금에 따른 타일별 도달 가능 걸음 수(1, 2, 3...) 시각화 및 에메랄드 발자국 하이라이트
+    - 방 내부 탐정 미플/말(Pawns) 렌더링 및 모서리 비밀 통로(Secret Passages) 연출
   - [x] 모서리 방 간 **비밀 통로(Secret Passage)** 시스템 구현 (서재 ⇄ 주방, 연회장 ⇄ 옥상정원)
   - [x] 주사위 굴림 사운드 효과 및 도달 가능한 방 에메랄드 하이라이트/거리 배지 UI
   - [x] Web Audio API 기반 절차적 사운드 효과 시스템 구현 (`src/utils/sounds.ts`: 발자국, 질문, 단서 공개, 승리/패배 효과음)

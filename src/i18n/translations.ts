@@ -28,6 +28,11 @@ export interface TranslationStrings {
   secretPassageBadge: string;
   cannotReachRoom: string;
   distanceSteps: string;
+  clickToEnter: string;
+  secretPassageTo: string;
+  confidentialCaseFile: string;
+  legendTiles: string;
+  legendDoors: string;
 
   // Deduction Note
   notebookTitle: string;
@@ -118,6 +123,11 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretPassageBadge: 'Secret Passage!',
     cannotReachRoom: 'Too far (Need higher roll)',
     distanceSteps: 'steps',
+    clickToEnter: 'Click to Enter',
+    secretPassageTo: 'Secret Passage to',
+    confidentialCaseFile: 'CONFIDENTIAL CASE FILE',
+    legendTiles: 'Hallway Tile (1 Step)',
+    legendDoors: 'Room Doorway',
 
     notebookTitle: 'Detective Investigation Notebook',
     notebookDesc: 'Click items to toggle ? / ✕ / ◯ (Your hand cards are automatically ✕)',
@@ -233,6 +243,11 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretPassageBadge: '¡Pasaje Secreto!',
     cannotReachRoom: 'Muy lejos (Necesitas más dado)',
     distanceSteps: 'pasos',
+    clickToEnter: 'Clic para entrar',
+    secretPassageTo: 'Pasaje Secreto hacia',
+    confidentialCaseFile: 'EXPEDIENTE CONFIDENCIAL',
+    legendTiles: 'Casilla de Pasillo (1 Paso)',
+    legendDoors: 'Puerta de Habitación',
 
     notebookTitle: 'Cuaderno de Investigación',
     notebookDesc: 'Haz clic para alternar ? / ✕ / ◯ (Tus cartas se marcan ✕ automáticamente)',
@@ -348,6 +363,11 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretPassageBadge: '비밀 통로!',
     cannotReachRoom: '거리 부족 (더 높은 주사위 필요)',
     distanceSteps: '칸',
+    clickToEnter: '클릭하여 이동',
+    secretPassageTo: '비밀 통로: ',
+    confidentialCaseFile: '기밀 사건 수사 봉투',
+    legendTiles: '복도 타일 (1칸)',
+    legendDoors: '방 출입구',
 
     notebookTitle: '나만의 사건 추리 수첩',
     notebookDesc: '항목을 클릭해 ? / ✕ / ◯ 토글 (내 손패는 자동으로 ✕ 표기)',
