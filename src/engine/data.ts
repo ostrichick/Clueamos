@@ -45,6 +45,7 @@ export interface CharacterProfile {
   avatar: string;
   color: string;
   defaultRoomId: string;
+  portraitUrl: string;
 }
 
 export const CHARACTER_PROFILES: Record<string, CharacterProfile> = {
@@ -53,36 +54,42 @@ export const CHARACTER_PROFILES: Record<string, CharacterProfile> = {
     avatar: '🔴',
     color: '#ef4444',
     defaultRoomId: 'room_ballroom',
+    portraitUrl: '/portraits/suspect_scarlett.jpg',
   },
   suspect_mustard: {
     id: 'suspect_mustard',
     avatar: '🟡',
     color: '#eab308',
     defaultRoomId: 'room_kitchen',
+    portraitUrl: '/portraits/suspect_mustard.jpg',
   },
   suspect_white: {
     id: 'suspect_white',
     avatar: '⚪',
     color: '#cbd5e1',
     defaultRoomId: 'room_library',
+    portraitUrl: '/portraits/suspect_white.jpg',
   },
   suspect_green: {
     id: 'suspect_green',
     avatar: '🟢',
     color: '#22c55e',
     defaultRoomId: 'room_wine_cellar',
+    portraitUrl: '/portraits/suspect_green.jpg',
   },
   suspect_peacock: {
     id: 'suspect_peacock',
     avatar: '🔵',
     color: '#3b82f6',
     defaultRoomId: 'room_room304',
+    portraitUrl: '/portraits/suspect_peacock.jpg',
   },
   suspect_plum: {
     id: 'suspect_plum',
     avatar: '🟣',
     color: '#a855f7',
     defaultRoomId: 'room_rooftop',
+    portraitUrl: '/portraits/suspect_plum.jpg',
   },
 };
 

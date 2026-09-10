@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { 
   Languages, 
   Smartphone, 
@@ -314,8 +315,23 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{profile?.avatar}</span>
+                      <div className="flex items-center gap-2.5">
+                        {profile?.portraitUrl ? (
+                          <div 
+                            className="w-8 h-8 rounded-full border-2 overflow-hidden shrink-0 shadow-md bg-slate-950" 
+                            style={{ borderColor: profile.color }}
+                          >
+                            <Image
+                              src={profile.portraitUrl}
+                              alt={getCardName(s.id)}
+                              width={32}
+                              height={32}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xl">{profile?.avatar}</span>
+                        )}
                         <span className="font-bold text-xs text-slate-200">
                           {getCardName(s.id)}
                         </span>

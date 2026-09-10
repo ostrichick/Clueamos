@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { CHARACTER_PROFILES, LOCATIONS, WEAPONS } from '@/engine/data';
 
 export type CardCategory = 'suspect' | 'location' | 'weapon';
@@ -49,12 +50,14 @@ export const ClueCard: React.FC<ClueCardProps> = ({
   const displayName = getCardName ? getCardName(cardId) : cardId;
   let accentColor = '#64748b';
   let categoryLabel = 'CLUE';
+  let portraitUrl: string | undefined = undefined;
 
   if (detectedCategory === 'suspect') {
     const profile = CHARACTER_PROFILES[cardId];
     icon = profile?.avatar || '👤';
     accentColor = profile?.color || '#ef4444';
     categoryLabel = 'SUSPECT';
+    portraitUrl = profile?.portraitUrl;
   } else if (detectedCategory === 'location') {
     const loc = LOCATIONS.find(l => l.id === cardId);
     if (loc) {
@@ -146,15 +149,25 @@ export const ClueCard: React.FC<ClueCardProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center my-1 z-10">
         <div
           style={{
-            borderColor: `${accentColor}50`,
-            background: `radial-gradient(circle, ${accentColor}22 0%, rgba(15,23,42,0.8) 70%)`,
+            borderColor: `${accentColor}70`,
+            boxShadow: `inset 0 0 12px rgba(0,0,0,0.8), 0 2px 10px ${accentColor}30`,
           }}
-          className="w-4/5 aspect-square rounded-full border-2 flex items-center justify-center shadow-inner relative group"
+          className="w-4/5 aspect-square rounded-full border-2 flex items-center justify-center shadow-inner relative group overflow-hidden bg-slate-950"
         >
-          {/* Cameo inner glow */}
-          <span className={`${sizeStyles.icon} drop-shadow-md transform transition-transform duration-300 group-hover:scale-110`}>
-            {icon}
-          </span>
+          {portraitUrl ? (
+            <Image
+              src={portraitUrl}
+              alt={displayName}
+              width={160}
+              height={160}
+              className="w-full h-full object-cover object-center transform transition-transform duration-500 group-hover:scale-115"
+            />
+          ) : (
+            /* Cameo inner glow with icon for rooms and weapons */
+            <span className={`${sizeStyles.icon} drop-shadow-md transform transition-transform duration-300 group-hover:scale-110`}>
+              {icon}
+            </span>
+          )}
         </div>
       </div>
 
