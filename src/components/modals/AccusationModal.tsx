@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AlertTriangle, Eye } from 'lucide-react';
 import { SUSPECTS, LOCATIONS, WEAPONS } from '@/engine/data';
 import { TranslationStrings } from '@/i18n/translations';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 interface AccusationModalProps {
   isOpen: boolean;
@@ -24,6 +25,10 @@ export const AccusationModal: React.FC<AccusationModalProps> = ({
   getRoomName,
   getEffectiveCardStatus,
 }) => {
+  const { handlePointerDown, modalStyle } = useDraggableModal({
+    isOpen,
+  });
+
   const getStatus = (id: string) => {
     if (getEffectiveCardStatus) return getEffectiveCardStatus(id);
     return { mark: 'EMPTY' as const, tag: '', label: '' };
@@ -55,8 +60,13 @@ export const AccusationModal: React.FC<AccusationModalProps> = ({
   const weaponStatus = getStatus(weapon);
 
   return (
-    <div className="fixed inset-0 bg-slate-950/40 flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in">
-      <div className="max-w-2xl w-full bg-slate-900/95 border-2 border-rose-500/80 p-5 sm:p-6 rounded-3xl flex flex-col gap-4 shadow-2xl shadow-rose-950/80 text-left">
+    <div className="fixed inset-0 bg-slate-950/40 flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in select-none">
+      <div 
+        onPointerDown={handlePointerDown}
+        style={modalStyle}
+        className="max-w-2xl w-full bg-slate-900/95 border-2 border-rose-500/80 p-5 sm:p-6 rounded-3xl flex flex-col gap-3.5 shadow-2xl shadow-rose-950/80 text-left"
+      >
+        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-rose-400">
             <AlertTriangle className="w-5 h-5 text-rose-400 animate-pulse" />

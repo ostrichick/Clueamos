@@ -6,6 +6,7 @@ import { Card } from '@/engine/types';
 import { ClueCard } from '@/components/cards/ClueCard';
 import { TranslationStrings } from '@/i18n/translations';
 import { sounds } from '@/utils/sounds';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 interface DisprovePromptModalProps {
   prompt: { availableCards: Card[]; askerId: string } | null;
@@ -26,11 +27,20 @@ export const DisprovePromptModal: React.FC<DisprovePromptModalProps> = ({
   getCardName,
   t,
 }) => {
+  const { handlePointerDown, modalStyle } = useDraggableModal({
+    isOpen: !!prompt && !isPassingCard,
+  });
+
   if (!prompt || isPassingCard) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in">
-      <div className="max-w-md w-full bg-slate-900 border border-indigo-500/50 p-6 rounded-3xl flex flex-col gap-4 shadow-2xl text-center">
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in select-none">
+      <div 
+        onPointerDown={handlePointerDown}
+        style={modalStyle}
+        className="max-w-md w-full bg-slate-900 border border-indigo-500/50 p-6 rounded-3xl flex flex-col gap-3 shadow-2xl text-center"
+      >
+        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
         <div className="flex items-center justify-center gap-2 text-indigo-400">
           <Eye className="w-5 h-5" />
           <h2 className="text-lg font-black text-slate-100">{t.disprovePromptTitle}</h2>

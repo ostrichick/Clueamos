@@ -12,10 +12,12 @@ import {
 import { SECRET_PASSAGES, getPlayerDisplayName } from '@/engine/engine';
 import { Player } from '@/engine/types';
 import { TranslationStrings, SupportedLocale } from '@/i18n/translations';
-import { Sparkles, Dices, ArrowRight, X, ShieldAlert } from 'lucide-react';
+import { Sparkles, Dices, ArrowRight, X, ShieldAlert, Flame, BookOpenCheck, Clock } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
 import { haptics } from '@/utils/haptics';
 import { OnBoardDiceOverlay } from './OnBoardDiceOverlay';
+import { TurnReviewState, PlayerRole } from '@/store/useGameStore';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 const WEAPON_ICONS: Record<string, string> = {
   weapon_candlestick: '🕯️',
@@ -41,6 +43,12 @@ interface GameBoardProps {
   onRollDice: () => void;
   onMoveToRoom: (roomId: string) => void;
   onWaitInHallway?: () => void;
+  onEndTurn?: () => void;
+  onOpenAccuse?: () => void;
+  turnReview?: TurnReviewState | null;
+  onConfirmTurnReview?: () => void;
+  myPlayerRole?: PlayerRole;
+  isAutoPlaying?: boolean;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -58,11 +66,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onRollDice,
   onMoveToRoom,
   onWaitInHallway,
+  onEndTurn,
+  onOpenAccuse,
+  turnReview,
+  onConfirmTurnReview,
+  myPlayerRole,
+  isAutoPlaying,
 }) => {
   const currentPlayer = players[currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
-  const isMovePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_MOVE';
-  const isRollPhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ROLL';
+  const isMovePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_MOVE' && !isAutoPlaying;
+  const isRollPhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ROLL' && !isAutoPlaying;
+  const isActionDonePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ACTION_DONE' && !isAutoPlaying;
+  const isTurnReviewReady = Boolean(turnReview?.readyRoles?.includes(myPlayerRole || 'p1'));
 
   const [walkingState, setWalkingState] = useState<{
     playerId: string;
@@ -75,6 +91,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // Center Confidential Case File Inspection Modal
   const [showCaseFileModal, setShowCaseFileModal] = useState(false);
+  const caseFileDraggable = useDraggableModal({
+    isOpen: showCaseFileModal,
+  });
 
   // Touch swipe detection for dice roll
   const touchStartY = useRef<number | null>(null);
@@ -277,57 +296,115 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm sm:text-base text-slate-100">
-                {isRollPhase 
-                  ? t.rollDiceBtn 
-                  : isMovePhase && currentDiceRoll 
-                    ? `${t.rolledNumber}: 🎲 ${diceRolls ? `${diceRolls[0]} + ${diceRolls[1]} = ${currentDiceRoll}` : currentDiceRoll}` 
-                    : `${getPlayerDisplayName(currentPlayer, locale)}${t.turn}`}
+                {turnReview && turnReview.active
+                  ? `📝 ${t.turnReviewTitle}`
+                  : isActionDonePhase
+                    ? `✅ ${t.actionDoneTitle}`
+                    : isRollPhase 
+                      ? t.rollDiceBtn 
+                      : isMovePhase && currentDiceRoll 
+                        ? `${t.rolledNumber}: 🎲 ${diceRolls ? `${diceRolls[0]} + ${diceRolls[1]} = ${currentDiceRoll}` : currentDiceRoll}` 
+                        : `${getPlayerDisplayName(currentPlayer, locale)}${t.turn}`}
               </span>
               {currentSecretTarget && (
                 <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40 font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" /> {t.secretPassageBadge}
                 </span>
               )}
+              {turnReview && turnReview.active && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/40 font-bold font-mono">
+                  Round {turnReview.turnNumber}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {!isHumanTurn
-                ? (phase === 'PLAYING_ROLL' 
-                    ? `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiRolling}` 
-                    : phase === 'PLAYING_MOVE' 
-                      ? `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiMoving}` 
-                      : `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiSuggesting}`)
-                : !isMyTurn && isHumanTurn
-                  ? `${getPlayerDisplayName(currentPlayer, locale)} ${t.waitingForOtherPlayer}`
-                  : isRollPhase
-                    ? t.shakeToRoll
-                    : isMovePhase
-                      ? (locale === 'ko' ? '도달 가능한 방이나 비밀 통로를 클릭하여 입장하세요. (마우스/터치 시 발자국 경로 미리보기)' : locale === 'es' ? 'Haz clic en una habitación alcanzable o pasaje secreto. (Pasa el cursor para ver las huellas)' : 'Click an accessible room or secret passage. Hover to preview footsteps route.')
-                      : t.notebookDesc}
+            <p className="text-xs text-slate-400 mt-0.5 max-w-md">
+              {turnReview && turnReview.active
+                ? (turnReview.summary ? `📢 ${turnReview.summary}` : t.turnReviewSubtitle)
+                : isActionDonePhase
+                  ? t.actionDoneDesc
+                  : !isHumanTurn
+                    ? (phase === 'PLAYING_ROLL' 
+                        ? `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiRolling}` 
+                        : phase === 'PLAYING_MOVE' 
+                          ? `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiMoving}` 
+                          : `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiSuggesting}`)
+                    : !isMyTurn && isHumanTurn
+                      ? `${getPlayerDisplayName(currentPlayer, locale)} ${t.waitingForOtherPlayer}`
+                      : isRollPhase
+                        ? t.shakeToRoll
+                        : isMovePhase
+                          ? (locale === 'ko' ? '도달 가능한 방이나 비밀 통로를 클릭하여 입장하세요. (마우스/터치 시 발자국 경로 미리보기)' : locale === 'es' ? 'Haz clic en una habitación alcanzable o pasaje secreto. (Pasa el cursor para ver las huellas)' : 'Click an accessible room or secret passage. Hover to preview footsteps route.')
+                          : t.notebookDesc}
             </p>
           </div>
         </div>
 
-        {/* 주사위 굴리기 및 이동 단계 액션 버튼들 */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        {/* 주사위 굴리기, 이동, 턴 종료, 노트 확인 등 보드 내부 액션 버튼 영역 */}
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-end">
+          {/* A. 주사위 굴리기 */}
           {isRollPhase && (
             <button
               disabled={isRollingDice}
               onClick={onRollDice}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Dices className="w-4 h-4" />
               <span>{isRollingDice ? t.rollingDice : t.rollDiceBtn}</span>
             </button>
           )}
 
+          {/* B. 복도 대기 */}
           {isMovePhase && onWaitInHallway && (
             <button
               onClick={onWaitInHallway}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs shadow transition-all active:scale-95 flex items-center justify-center gap-1.5"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs shadow transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>🚶</span>
               <span>{t.waitInHallway}</span>
             </button>
+          )}
+
+          {/* C. 보드 내 턴 넘기기 (Pass Turn) 및 최종 고발 (Accusation) */}
+          {isActionDonePhase && onEndTurn && (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={onEndTurn}
+                className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95 animate-pulse"
+              >
+                <span>{t.endTurnBtn}</span>
+              </button>
+
+              {onOpenAccuse && !currentPlayer?.isEliminated && (
+                <button
+                  onClick={onOpenAccuse}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-all duration-200 flex items-center justify-center gap-1.5 shadow-lg shadow-rose-900/40 cursor-pointer active:scale-95 ring-1 ring-rose-400/50"
+                >
+                  <Flame className="w-3.5 h-3.5 text-rose-200" />
+                  <span>{t.makeAccusationBtn}</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* D. 보드 내 노트 확인 완료 (Notes Ready) */}
+          {turnReview && turnReview.active && onConfirmTurnReview && (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {!isTurnReviewReady ? (
+                <button
+                  onClick={onConfirmTurnReview}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer animate-pulse"
+                >
+                  <BookOpenCheck className="w-4 h-4 text-slate-950" />
+                  <span>{t.turnReviewConfirmBtn}</span>
+                  <Sparkles className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                  <span>{t.turnReviewWaitingPeer}</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -617,11 +694,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 비밀 사건 봉투 검사 모달 (Confidential Case File Wax Seal Modal) */}
       {showCaseFileModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-stone-900 via-stone-950 to-amber-950/90 border-2 border-amber-600/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none">
+          <div 
+            onPointerDown={caseFileDraggable.handlePointerDown}
+            style={caseFileDraggable.modalStyle}
+            className="bg-gradient-to-b from-stone-900 via-stone-950 to-amber-950/90 border-2 border-amber-600/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center text-center animate-in zoom-in-95 duration-200"
+          >
+            <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+
             <button
               onClick={() => setShowCaseFileModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

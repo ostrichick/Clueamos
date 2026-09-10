@@ -6,6 +6,7 @@ import { TranslationStrings } from '@/i18n/translations';
 import { ClueCard } from '@/components/cards/ClueCard';
 import { sounds } from '@/utils/sounds';
 import { ShieldCheck, HelpCircle, AlertTriangle, ArrowRight, BookMarked, X } from 'lucide-react';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 export interface HypothesisVisualizerModalProps {
   visual: HypothesisVisualState | null;
@@ -29,6 +30,9 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
   const [secondsLeft, setSecondsLeft] = useState<number>(5.0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const soundPlayedRef = useRef<string>('');
+  const { handlePointerDown, modalStyle } = useDraggableModal({
+    isOpen: !!visual,
+  });
 
   // Sounds & Timers based on phase
   useEffect(() => {
@@ -104,8 +108,14 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         }`} 
       />
 
-      <div className="relative max-w-lg w-full bg-slate-900/95 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-4 text-center overflow-hidden">
-        
+      <div
+        onPointerDown={handlePointerDown}
+        style={modalStyle}
+        className="relative max-w-lg w-full bg-slate-900/95 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-3 text-center overflow-hidden"
+      >
+        {/* 상단 드래그 핸들 */}
+        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+
         {/* Top Close Button (for user override anytime) */}
         {!isAsking && (
           <button

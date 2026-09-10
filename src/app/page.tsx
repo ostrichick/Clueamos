@@ -24,6 +24,7 @@ import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
 import confetti from 'canvas-confetti';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 export default function Home() {
   const {
@@ -131,6 +132,7 @@ export default function Home() {
   const [isAccuseModalOpen, setIsAccuseModalOpen] = useState(false);
   // 메인 로비 나가기 확인 모달 상태
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const exitModalDraggable = useDraggableModal({ isOpen: isExitModalOpen });
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
@@ -332,6 +334,47 @@ export default function Home() {
       return () => clearTimeout(timer);
     }
   }, [isAutoPlaying, activeHypothesisVisual, lastSecretClue, dismissSecretClue, dismissHypothesisVisual]);
+
+  // 행동 촉구 알림음: 턴 종료(Pass Turn) 또는 노트 확인(Notes Ready)을 눌러야 할 때 은은한 2음 차임벨 1회 재생
+  const lastPromptAlertRef = useRef<string>('');
+  useEffect(() => {
+    if (!isGameStarted || isAutoPlaying) return;
+
+    // 1. 내 턴의 행동 완료 단계 (턴 넘기기 또는 최종 고발 필요)
+    if (gameState.phase === 'PLAYING_ACTION_DONE' && isHumanTurn && isMyTurn) {
+      const key = `action_done_${gameState.turnCount}`;
+      if (lastPromptAlertRef.current !== key) {
+        lastPromptAlertRef.current = key;
+        sounds.playActionPrompt();
+      }
+      return;
+    }
+
+    // 2. 턴 종료 후 수첩 정리 및 노트 확인 단계 (노트 레디 필요)
+    if (
+      turnReviewState?.active &&
+      myPlayerRole &&
+      !turnReviewState.readyRoles.includes(myPlayerRole)
+    ) {
+      const key = `turn_review_${turnReviewState.turnNumber || gameState.turnCount}`;
+      if (lastPromptAlertRef.current !== key) {
+        lastPromptAlertRef.current = key;
+        sounds.playActionPrompt();
+      }
+      return;
+    }
+  }, [
+    isGameStarted,
+    isAutoPlaying,
+    gameState.phase,
+    gameState.turnCount,
+    isHumanTurn,
+    isMyTurn,
+    turnReviewState?.active,
+    turnReviewState?.readyRoles,
+    turnReviewState?.turnNumber,
+    myPlayerRole,
+  ]);
 
   // 직접 조작으로 제어권 되찾기
   const handleResumeControl = () => {
@@ -607,7 +650,7 @@ export default function Home() {
       />
 
       {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
-      {(lastSecretClue || isPassingCard) && (
+      {!activeHypothesisVisual && (lastSecretClue || isPassingCard) && (
         <CardPassModal
           secretClue={lastSecretClue}
           isPassing={isPassingCard}
@@ -676,6 +719,12 @@ export default function Home() {
             onRollDice={handleRollDice}
             onMoveToRoom={handleMove}
             onWaitInHallway={performWaitInHallway}
+            onEndTurn={performEndTurn}
+            onOpenAccuse={() => setIsAccuseModalOpen(true)}
+            turnReview={turnReviewState}
+            onConfirmTurnReview={confirmTurnReview}
+            myPlayerRole={myPlayerRole}
+            isAutoPlaying={isAutoPlaying}
           />
         </div>
 
@@ -924,10 +973,14 @@ export default function Home() {
         visual={activeHypothesisVisual}
         getCardName={getCardName}
         getRoomName={getRoomName}
-        onDismiss={dismissHypothesisVisual}
+        onDismiss={() => {
+          dismissHypothesisVisual();
+          if (lastSecretClue) dismissSecretClue();
+        }}
         onMarkNotebookAndDismiss={(cardId) => {
           setUserNotes(prev => ({ ...prev, [cardId]: 'NO' }));
           dismissHypothesisVisual();
+          if (lastSecretClue) dismissSecretClue();
         }}
         t={t}
         myPlayerId={myPlayer?.id}
@@ -984,8 +1037,13 @@ export default function Home() {
 
       {/* 게임 나가기 확인 모달 창 */}
       {isExitModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="max-w-sm w-full bg-slate-900 border border-amber-500/40 p-6 rounded-3xl text-center flex flex-col items-center gap-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 select-none">
+          <div 
+            onPointerDown={exitModalDraggable.handlePointerDown}
+            style={exitModalDraggable.modalStyle}
+            className="max-w-sm w-full bg-slate-900 border border-amber-500/40 p-6 rounded-3xl text-center flex flex-col items-center gap-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+          >
+            <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
             <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center text-2xl shadow-inner">
               🚪
             </div>

@@ -915,17 +915,8 @@ export const useGameStore = create<GameStore>((set, get) => {
               });
             }
 
-            // If asker is Guest (Player 2 in multi-device), send private clue
-            if (playMode === 'host' && asker.roleType === 'p2') {
-              peerManager.sendMessage({
-                type: 'PRIVATE_CLUE_REVEALED',
-                payload: { card: shownCard, fromName: player.name },
-              });
-            } else if (asker.roleType === 'p1' || (playMode === 'local' && asker.type === 'human')) {
-              set({
-                lastSecretClue: { card: shownCard, fromName: player.name },
-              });
-            }
+            // When activeHypothesisVisual is displayed, it already visualizes the revealed card
+            // and provides 1-click note recording. Do not set lastSecretClue which creates a redundant 2nd 5s modal.
 
             get().performDisprove(shownCard.id);
           }, 1500);
@@ -1026,14 +1017,9 @@ export const useGameStore = create<GameStore>((set, get) => {
         const shownCard = responder.hand.find(c => c.id === cardId);
         if (shownCard) {
           if (asker.roleType === 'p2' && playMode === 'host') {
-            peerManager.sendMessage({
-              type: 'PRIVATE_CLUE_REVEALED',
-              payload: { card: shownCard, fromName: responder.name },
-            });
+            // When activeHypothesisVisual handles the reveal, lastSecretClue is not needed
           } else if (asker.roleType === 'p1' || (playMode === 'local' && asker.type === 'human')) {
-            set({
-              lastSecretClue: { card: shownCard, fromName: responder.name },
-            });
+            // activeHypothesisVisual will be set below with disprovedVisual
           }
 
           // If human responder disproved: update activeHypothesisVisual

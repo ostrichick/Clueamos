@@ -5,6 +5,7 @@ import { Sparkles, ScrollText, ChevronUp, ChevronDown } from 'lucide-react';
 import { Solution, Player, LogEntry, GamePhase } from '@/engine/types';
 import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 interface GameOverModalProps {
   phase: GamePhase;
@@ -34,14 +35,22 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   onExitToLobby,
 }) => {
   const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const { handlePointerDown, modalStyle } = useDraggableModal({
+    isOpen: phase === 'GAME_OVER',
+  });
 
   if (phase !== 'GAME_OVER') return null;
 
   const winner = players.find(p => p.id === winnerId);
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in">
-      <div className="max-w-lg w-full bg-slate-900 border border-amber-500/50 p-6 rounded-3xl text-center flex flex-col items-center gap-4 shadow-2xl my-auto">
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in select-none">
+      <div 
+        onPointerDown={handlePointerDown}
+        style={modalStyle}
+        className="max-w-lg w-full bg-slate-900 border border-amber-500/50 p-6 rounded-3xl text-center flex flex-col items-center gap-3 shadow-2xl my-auto"
+      >
+        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
         <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/10">
           🏆
         </div>

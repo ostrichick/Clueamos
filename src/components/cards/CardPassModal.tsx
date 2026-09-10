@@ -6,6 +6,7 @@ import { ClueCard } from './ClueCard';
 import { Sparkles, CheckCheck, X } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
 import { TranslationStrings } from '@/i18n/translations';
+import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 export interface CardPassModalProps {
   secretClue?: {
@@ -28,9 +29,16 @@ const PassingCardView: React.FC<{
   getCardName: (id: string) => string;
   t: TranslationStrings;
 }> = ({ passingToName, passingCardId, getCardName, t }) => {
+  const { handlePointerDown, modalStyle } = useDraggableModal();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-      <div className="flex flex-col items-center gap-6 text-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-300">
+      <div 
+        onPointerDown={handlePointerDown}
+        style={modalStyle}
+        className="flex flex-col items-center gap-6 text-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-300"
+      >
+        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
         <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 text-xs font-bold animate-pulse">
           <Sparkles className="w-4 h-4" />
           <span>{t.cardPassingTo} {passingToName || '...'}</span>
@@ -116,16 +124,24 @@ const SecretClueRevealView: React.FC<{
     }
   };
 
+  const { handlePointerDown, modalStyle } = useDraggableModal();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md select-none">
       {/* Background glow effects */}
       <div className="absolute w-96 h-96 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
 
-      <div className="relative flex flex-col items-center gap-5 max-w-md w-full text-center">
+      <div 
+        onPointerDown={handlePointerDown}
+        style={modalStyle}
+        className="relative flex flex-col items-center gap-4 max-w-md w-full text-center"
+      >
+        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+
         {/* Close Button Top Right */}
         <button
           onClick={onDismiss}
-          className="absolute -top-3 -right-2 sm:top-0 sm:right-0 p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors z-20"
+          className="absolute -top-3 -right-2 sm:top-0 sm:right-0 p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors z-20 cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

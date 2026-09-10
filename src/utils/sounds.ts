@@ -713,6 +713,24 @@ class SoundController {
     });
   }
 
+  // 16. 행동 촉구 알림음: 턴 종료(Pass Turn) 또는 노트 확인(Notes Ready)을 눌러야 할 때 알려주는 맑고 은은한 2음 차임벨
+  playActionPrompt() {
+    haptics.tick();
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const tones = [
+      { f: 523.25, t: 0.0, dur: 0.35, vol: 0.16 }, // C5
+      { f: 783.99, t: 0.14, dur: 0.55, vol: 0.20 }, // G5
+    ];
+
+    tones.forEach(({ f, t, dur, vol }) => {
+      this.playAcousticTone(now + t, f, dur, vol, true);
+    });
+  }
+
   // ==========================================
   // 12. 웹 오디오 프로시저럴 미스터리 누아르 BGM 엔진
   // ==========================================
