@@ -63,6 +63,7 @@ export const ClueCard: React.FC<ClueCardProps> = ({
     if (loc) {
       const match = loc.name.match(/^(\S+)/);
       icon = match ? match[1] : '🏛️';
+      portraitUrl = loc.imageUrl;
     } else {
       icon = '🏛️';
     }

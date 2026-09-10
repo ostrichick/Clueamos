@@ -380,7 +380,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
       room_ballroom: { name: '💃 Grand Ballroom', description: 'Opulent first floor ballroom with crystal chandeliers.' },
       room_kitchen: { name: '🍳 Main Kitchen', description: 'Cluttered kitchen with culinary blades and industrial cookware.' },
-      room_library: { name: '📚 Library & Lounge', description: 'Antique library with a crackling fireplace and rare tomes.' },
+      room_library: { name: '📚 Library', description: 'Antique library with a crackling fireplace and rare tomes.' },
       room_wine_cellar: { name: '🍷 Wine Cellar', description: 'Cold, shadowy basement vault filled with vintage barrels.' },
       room_room304: { name: '🛏️ Suite Room 304', description: 'Luxurious private terrace suite where the body was discovered.' },
       room_rooftop: { name: '🌿 Rooftop Greenhouse', description: 'Glass conservatory battered by the raging midnight storm.' },
@@ -395,7 +395,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     rooms: {
       room_ballroom: { name: '💃 Grand Ballroom', description: 'Opulent first floor ballroom with crystal chandeliers.' },
       room_kitchen: { name: '🍳 Main Kitchen', description: 'Cluttered kitchen with culinary blades and industrial cookware.' },
-      room_library: { name: '📚 Library & Lounge', description: 'Antique library with a crackling fireplace and rare tomes.' },
+      room_library: { name: '📚 Library', description: 'Antique library with a crackling fireplace and rare tomes.' },
       room_wine_cellar: { name: '🍷 Wine Cellar', description: 'Cold, shadowy basement vault filled with vintage barrels.' },
       room_room304: { name: '🛏️ Suite Room 304', description: 'Luxurious private terrace suite where the body was discovered.' },
       room_rooftop: { name: '🌿 Rooftop Greenhouse', description: 'Glass conservatory battered by the raging midnight storm.' },
@@ -634,7 +634,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
       room_ballroom: { name: '💃 Gran Salón', description: 'Lujoso salón de baile con candelabros de cristal titilantes.' },
       room_kitchen: { name: '🍳 Cocina Principal', description: 'Cocina desordenada con cuchillos e ingredientes de cocina.' },
-      room_library: { name: '📚 Biblioteca y Sala', description: 'Biblioteca clásica con chimenea y libros centenarios.' },
+      room_library: { name: '📚 Biblioteca', description: 'Biblioteca clásica con chimenea y libros centenarios.' },
       room_wine_cellar: { name: '🍷 Bodega de Vinos', description: 'Sótano frío y oscuro lleno de barricas añejas.' },
       room_room304: { name: '🛏️ Habitación Suite 304', description: 'Exclusiva suite con terraza donde se encontró el cuerpo.' },
       room_rooftop: { name: '🌿 Invernadero en Azotea', description: 'Invernadero de cristal azotado por la tormenta nocturna.' },
@@ -649,7 +649,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     rooms: {
       room_ballroom: { name: '💃 Gran Salón', description: 'Lujoso salón de baile con candelabros de cristal titilantes.' },
       room_kitchen: { name: '🍳 Cocina Principal', description: 'Cocina desordenada con cuchillos e ingredientes de cocina.' },
-      room_library: { name: '📚 Biblioteca y Sala', description: 'Biblioteca clásica con chimenea y libros centenarios.' },
+      room_library: { name: '📚 Biblioteca', description: 'Biblioteca clásica con chimenea y libros centenarios.' },
       room_wine_cellar: { name: '🍷 Bodega de Vinos', description: 'Sótano frío y oscuro lleno de barricas añejas.' },
       room_room304: { name: '🛏️ Habitación Suite 304', description: 'Exclusiva suite con terraza donde se encontró el cuerpo.' },
       room_rooftop: { name: '🌿 Invernadero en Azotea', description: 'Invernadero de cristal azotado por la tormenta nocturna.' },
@@ -888,7 +888,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
       room_ballroom: { name: '💃 연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },
       room_kitchen: { name: '🍳 메인 주방', description: '각종 조리도구와 날카로운 칼들이 널려 있는 주방.' },
-      room_library: { name: '📚 서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
+      room_library: { name: '📚 서재', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
       room_wine_cellar: { name: '🍷 지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고.' },
       room_room304: { name: '🛏️ 객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸.' },
       room_rooftop: { name: '🌿 옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실.' },
@@ -903,7 +903,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     rooms: {
       room_ballroom: { name: '💃 연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },
       room_kitchen: { name: '🍳 메인 주방', description: '각종 조리도구와 날카로운 칼들이 널려 있는 주방.' },
-      room_library: { name: '📚 서재 & 라운지', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
+      room_library: { name: '📚 서재', description: '벽난로 불씨가 남아 있는 고풍스러운 서재.' },
       room_wine_cellar: { name: '🍷 지하 와인창고', description: '서늘하고 어두컴컴한 지하 와인 저장고.' },
       room_room304: { name: '🛏️ 객실 304호', description: '피해자가 머물렀던 테라스가 딸린 고급 스위트룸.' },
       room_rooftop: { name: '🌿 옥상 온실정원', description: '비바람이 들이치는 옥상의 유리 온실.' },

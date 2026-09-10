@@ -281,8 +281,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             </span>
           </div>
 
-          {/* 6명 용의자 캐릭터 선택 그리드 카드 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {/* 6명 용의자 캐릭터 선택 그리드 카드 (대형 고화질 초상화) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
             {SUSPECTS.map(s => {
               const profile = CHARACTER_PROFILES[s.id];
               const isP1 = effectiveP1 === s.id;
@@ -305,58 +305,55 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   style={{
                     borderColor: isSelected ? profile?.color : undefined,
                   }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
+                  className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2.5 overflow-hidden group ${
                     isSelected
-                      ? 'ring-2 bg-slate-800/90 shadow-lg'
+                      ? 'ring-2 bg-slate-800/95 shadow-xl border-amber-400'
                       : isDisabled
                         ? 'opacity-40 cursor-not-allowed bg-slate-900/30 border-slate-800'
-                        : 'cursor-pointer hover:bg-slate-800/50 bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                        : 'cursor-pointer hover:bg-slate-800/60 bg-slate-900/50 border-slate-800 hover:border-slate-700 active:scale-[0.98]'
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        {profile?.portraitUrl ? (
-                          <div 
-                            className="w-8 h-8 rounded-full border-2 overflow-hidden shrink-0 shadow-md bg-slate-950" 
-                            style={{ borderColor: profile.color }}
-                          >
-                            <Image
-                              src={profile.portraitUrl}
-                              alt={getCardName(s.id)}
-                              width={32}
-                              height={32}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-xl">{profile?.avatar}</span>
-                        )}
-                        <span className="font-bold text-xs text-slate-200">
-                          {getCardName(s.id)}
+                  {/* 대형 초상화 이미지 뷰 */}
+                  <div className="relative w-full h-44 sm:h-48 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/60 shadow-inner">
+                    <Image
+                      src={profile.portraitUrl}
+                      alt={getCardName(s.id)}
+                      fill
+                      className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    />
+
+                    {/* 상단 좌측: 캐릭터 이름 배지 */}
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-700/80 text-[11px] font-black text-slate-100 shadow-md">
+                      <span>{profile?.avatar}</span>
+                      <span>{getCardName(s.id)}</span>
+                    </div>
+
+                    {/* 상단 우측: 플레이어 역할 뱃지 */}
+                    {isP1 && (
+                      <span className="absolute top-2 right-2 text-[10px] font-black px-2 py-1 rounded-md bg-amber-500 text-slate-950 shadow-md">
+                        {playMode === 'solo' ? (locale === 'ko' ? '내 캐릭터' : 'Your Detective') : `${t.player} 1`}
+                      </span>
+                    )}
+                    {playMode !== 'solo' && isP2 && (
+                      <span className="absolute top-2 right-2 text-[10px] font-black px-2 py-1 rounded-md bg-pink-500 text-slate-950 shadow-md">
+                        {t.player} 2
+                      </span>
+                    )}
+
+                    {/* 선택 불가 안내 오버레이 */}
+                    {isDisabled && (
+                      <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-2 text-center">
+                        <span className="text-xs text-amber-300 font-bold bg-slate-900/90 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                          🔒 {t.characterAlreadyChosen}
                         </span>
                       </div>
-                      {isP1 && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500 text-slate-950">
-                          {playMode === 'solo' ? (locale === 'ko' ? '내 캐릭터' : 'Your Detective') : `${t.player} 1`}
-                        </span>
-                      )}
-                      {playMode !== 'solo' && isP2 && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-pink-500 text-slate-950">
-                          {t.player} 2
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                      {t.cards[s.id]?.description || s.description}
-                    </p>
+                    )}
                   </div>
 
-                  {isDisabled && (
-                    <div className="text-[10px] text-amber-400/80 font-semibold mt-1">
-                      🔒 {t.characterAlreadyChosen}
-                    </div>
-                  )}
+                  {/* 설명 텍스트 */}
+                  <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed px-0.5">
+                    {t.cards[s.id]?.description || s.description}
+                  </p>
                 </div>
               );
             })}

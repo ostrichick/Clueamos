@@ -34,6 +34,7 @@ export interface Room {
   description: string;
   adjacentRoomIds: string[];
   gridCoord: { x: number; y: number };
+  imageUrl?: string;
 }
 
 export interface Solution {

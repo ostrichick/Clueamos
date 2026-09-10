@@ -475,7 +475,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   gridColumnStart: roomConfig.colRange[0] + 1,
                   gridColumnEnd: roomConfig.colRange[1] + 2,
                 }}
-                className={`rounded-2xl border-2 p-2 sm:p-3 flex flex-col justify-between transition-all relative overflow-hidden ${
+                className={`rounded-2xl border-2 p-2 sm:p-3 flex flex-col justify-between transition-all relative overflow-hidden group ${
                   roomConfig.theme.bgColor
                 } ${roomConfig.theme.borderColor} ${
                   isCurrent
@@ -485,6 +485,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       : 'opacity-85'
                 }`}
               >
+                {/* 방 고유 배경 일러스트 (1920s 빈티지 유화 질감) */}
+                <div 
+                  className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-30 transition-opacity duration-300 group-hover:opacity-45"
+                  style={{
+                    backgroundImage: `url(/rooms/${roomId}.jpg)`,
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-slate-950/30 pointer-events-none" />
+
                 {/* 상단: 방 타이틀 명판 & 거리 배지 */}
                 <div className="flex items-start justify-between gap-1 z-10">
                   <div className="flex items-center gap-1.5">

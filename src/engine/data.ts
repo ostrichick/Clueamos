@@ -100,42 +100,48 @@ export const LOCATIONS: Room[] = [
     name: '💃 연회장 (Grand Ballroom)', 
     description: '샹들리에가 희미하게 흔들리는 1층 대연회장.', 
     adjacentRoomIds: ['room_kitchen', 'room_library'], 
-    gridCoord: { x: 0, y: 0 } 
+    gridCoord: { x: 0, y: 0 },
+    imageUrl: '/rooms/room_ballroom.jpg',
   },
   { 
     id: 'room_kitchen', 
     name: '🍳 메인 주방 (Main Kitchen)', 
     description: '각종 조리도구와 칼들이 널려 있는 주방.', 
     adjacentRoomIds: ['room_ballroom', 'room_wine_cellar'], 
-    gridCoord: { x: 1, y: 0 } 
+    gridCoord: { x: 1, y: 0 },
+    imageUrl: '/rooms/room_kitchen.jpg',
   },
   { 
     id: 'room_library', 
-    name: '📚 서재 & 라운지 (Library)', 
+    name: '📚 서재 (Library)', 
     description: '벽난로 불씨가 남아 있는 고풍스러운 서재.', 
     adjacentRoomIds: ['room_ballroom', 'room_room304'], 
-    gridCoord: { x: 0, y: 1 } 
+    gridCoord: { x: 0, y: 1 },
+    imageUrl: '/rooms/room_library.jpg',
   },
   { 
     id: 'room_wine_cellar', 
     name: '🍷 지하 와인창고 (Wine Cellar)', 
     description: '서늘하고 어두컴컴한 지하 와인 저장고.', 
     adjacentRoomIds: ['room_kitchen', 'room_rooftop'], 
-    gridCoord: { x: 1, y: 1 } 
+    gridCoord: { x: 1, y: 1 },
+    imageUrl: '/rooms/room_wine_cellar.jpg',
   },
   { 
     id: 'room_room304', 
     name: '🛏️ 객실 304호 (Suite Room 304)', 
     description: '피해자가 머물렀던 고급 스위트룸.', 
     adjacentRoomIds: ['room_library', 'room_rooftop'], 
-    gridCoord: { x: 0, y: 2 } 
+    gridCoord: { x: 0, y: 2 },
+    imageUrl: '/rooms/room_room304.jpg',
   },
   { 
     id: 'room_rooftop', 
     name: '🌿 옥상 온실정원 (Greenhouse)', 
     description: '비바람이 들이치는 옥상의 유리 온실.', 
     adjacentRoomIds: ['room_room304', 'room_wine_cellar'], 
-    gridCoord: { x: 1, y: 2 } 
+    gridCoord: { x: 1, y: 2 },
+    imageUrl: '/rooms/room_rooftop.jpg',
   },
 ];
 
