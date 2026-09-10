@@ -227,6 +227,14 @@ export default function Home() {
     }
   };
 
+  const handleCreateRoom = () => {
+    createRoom();
+  };
+
+  const handleJoinRoom = (code: string) => {
+    joinRoom(code);
+  };
+
   const handleStartGame = () => {
     sounds.playMove();
     startNewGame(effectiveP1, effectiveP2, locale);
@@ -325,8 +333,8 @@ export default function Home() {
         isConnecting={isConnecting}
         isConnected={isConnected}
         connectionError={connectionError}
-        createRoom={createRoom}
-        joinRoom={joinRoom}
+        createRoom={handleCreateRoom}
+        joinRoom={handleJoinRoom}
         disconnectRoom={disconnectRoom}
         handleCopyInviteLink={handleCopyInviteLink}
         copySuccessToast={copySuccessToast}

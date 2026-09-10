@@ -56,15 +56,31 @@ export class PeerManager {
   /**
    * Host: Create a new room with a 2-digit code (10-99)
    */
-  public async createRoom(desiredCode?: string): Promise<string> {
+  public async createRoom(desiredCode?: unknown): Promise<string> {
     this.cleanup();
     this.isHost = true;
-    const code = desiredCode || Math.floor(10 + Math.random() * 90).toString();
+    const sanitized = (typeof desiredCode === 'string') ? desiredCode.trim().replace(/\D/g, '') : '';
+    const code = (sanitized.length === 2)
+      ? sanitized
+      : Math.floor(10 + Math.random() * 90).toString();
     this.roomCode = code;
 
     const myReceiveTopic = `${TOPIC_PREFIX}${code}/to_host`;
 
     return new Promise((resolve, reject) => {
+      let isSettled = false;
+      const timeoutId = setTimeout(() => {
+        if (!isSettled) {
+          isSettled = true;
+          this.cleanup();
+          const timeoutErr = new Error('Room creation timed out. Please check your network and try again.');
+          if (this.onConnectionStateChange) {
+            this.onConnectionStateChange(false, timeoutErr.message);
+          }
+          reject(timeoutErr);
+        }
+      }, 10000);
+
       try {
         const client = mqtt.connect(MQTT_BROKER, {
           clientId: `clue_host_${code}_${Math.random().toString(36).substring(2, 7)}`,
@@ -76,6 +92,9 @@ export class PeerManager {
 
         client.on('connect', () => {
           client.subscribe(myReceiveTopic, { qos: 1 }, (err) => {
+            if (isSettled) return;
+            isSettled = true;
+            clearTimeout(timeoutId);
             if (err) {
               reject(err);
             } else {
@@ -108,6 +127,12 @@ export class PeerManager {
         });
 
         client.on('error', (err) => {
+          if (!isSettled) {
+            isSettled = true;
+            clearTimeout(timeoutId);
+            this.cleanup();
+            reject(err);
+          }
           if (this.onConnectionStateChange) {
             this.onConnectionStateChange(false, err.message);
           }

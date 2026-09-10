@@ -457,7 +457,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       });
     },
 
-    createRoom: async (desiredCode?: string) => {
+    createRoom: async (desiredCode?: unknown) => {
+      const codeParam = typeof desiredCode === 'string' ? desiredCode : undefined;
       set({ isConnecting: true, connectionError: null });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
@@ -480,23 +481,25 @@ export const useGameStore = create<GameStore>((set, get) => {
       };
 
       try {
-        const code = await peerManager.createRoom(desiredCode);
-        saveSession({ roomCode: code, playMode: 'host', role: 'p1' });
+        const code = await peerManager.createRoom(codeParam);
+        const codeStr = String(code);
+        saveSession({ roomCode: codeStr, playMode: 'host', role: 'p1' });
         set({
-          roomCode: code,
+          roomCode: codeStr,
           playMode: 'host',
           myPlayerRole: 'p1',
           isConnecting: false,
         });
-        return code;
+        return codeStr;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to create room';
         set({ isConnecting: false, connectionError: message });
-        throw err;
+        return '';
       }
     },
 
     joinRoom: async (code: string) => {
+      const cleanCode = typeof code === 'string' ? code.trim() : '';
       set({ isConnecting: true, connectionError: null });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
@@ -507,10 +510,10 @@ export const useGameStore = create<GameStore>((set, get) => {
       };
 
       try {
-        await peerManager.joinRoom(code);
-        saveSession({ roomCode: code, playMode: 'guest', role: 'p2' });
+        await peerManager.joinRoom(cleanCode);
+        saveSession({ roomCode: cleanCode, playMode: 'guest', role: 'p2' });
         set({
-          roomCode: code,
+          roomCode: cleanCode,
           playMode: 'guest',
           myPlayerRole: 'p2',
           isConnecting: false,
@@ -527,7 +530,6 @@ export const useGameStore = create<GameStore>((set, get) => {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to join room';
         set({ isConnecting: false, connectionError: message });
-        throw err;
       }
     },
 

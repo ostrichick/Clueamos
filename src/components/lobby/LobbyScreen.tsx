@@ -163,8 +163,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   </div>
                   <button
                     disabled={isConnecting}
-                    onClick={createRoom}
-                    className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors shadow disabled:opacity-50"
+                    onClick={() => createRoom()}
+                    className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors shadow disabled:opacity-50 cursor-pointer"
                   >
                     {isConnecting && playMode === 'host' ? t.connectingToRoom : t.hostRoomBtn}
                   </button>
