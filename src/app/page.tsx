@@ -237,6 +237,17 @@ export default function Home() {
       // 이미 AI 대리 플레이 중인 경우
       if (isAutoPlaying) {
         setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
+
+        // 1. 턴 검토 배너(Notes Ready)가 활성화되어 있는 경우 자동 확인
+        if (turnReviewState && turnReviewState.active) {
+          const isMultiplayer = playMode === 'host' || playMode === 'guest';
+          if (!isMultiplayer || !turnReviewState.readyRoles.includes(myPlayerRole)) {
+            confirmTurnReview();
+            return;
+          }
+        }
+
+        // 2. 내 턴인 경우 단계별 자동 수행 (주사위, 이동, 질문, 턴 종료 등)
         if (isMyTurn) {
           executeAutoPlayTurn();
         }
@@ -270,16 +281,31 @@ export default function Home() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isGameStarted, gameState.phase, isMyTurn, isAutoPlaying, setIsAutoPlaying, executeAutoPlayTurn]);
+  }, [isGameStarted, gameState.phase, isMyTurn, isAutoPlaying, setIsAutoPlaying, executeAutoPlayTurn, turnReviewState, playMode, myPlayerRole, confirmTurnReview]);
 
-  // AI 대리 플레이 상태에서 단계 전환 시 자동 수행
+  // AI 대리 플레이(AFK) 중 턴 검토 배너(Notes Ready) 자동 확인
+  useEffect(() => {
+    if (!isGameStarted || gameState.phase === 'GAME_OVER' || !isAutoPlaying) return;
+    if (!turnReviewState || !turnReviewState.active) return;
+
+    const isMultiplayer = playMode === 'host' || playMode === 'guest';
+    if (isMultiplayer && turnReviewState.readyRoles.includes(myPlayerRole)) return;
+
+    const timer = setTimeout(() => {
+      confirmTurnReview();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [isGameStarted, gameState.phase, isAutoPlaying, turnReviewState, playMode, myPlayerRole, confirmTurnReview]);
+
+  // AI 대리 플레이 상태에서 단계 전환 시 자동 수행 (행동 완료 시 1초 후 자동 턴 종료)
   useEffect(() => {
     if (!isGameStarted || gameState.phase === 'GAME_OVER') return;
     if (!isAutoPlaying || !isMyTurn) return;
 
+    const delay = gameState.phase === 'PLAYING_ACTION_DONE' ? 1000 : 700;
     const timer = setTimeout(() => {
       executeAutoPlayTurn();
-    }, 700);
+    }, delay);
     return () => clearTimeout(timer);
   }, [isGameStarted, gameState.phase, isAutoPlaying, isMyTurn, executeAutoPlayTurn]);
 
@@ -295,14 +321,14 @@ export default function Home() {
     }
   }, [isGameStarted, gameState.phase, isAutoPlaying, pendingDisprovePrompt, executeAutoPlayTurn]);
 
-  // 대리 플레이 중 모달 팝업 자동 닫기 (2.5초 후)
+  // 대리 플레이 중 모달 팝업 자동 닫기 (1.2초 후)
   useEffect(() => {
     if (!isAutoPlaying) return;
     if (activeHypothesisVisual || lastSecretClue) {
       const timer = setTimeout(() => {
         if (lastSecretClue) dismissSecretClue();
         if (activeHypothesisVisual) dismissHypothesisVisual();
-      }, 2500);
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [isAutoPlaying, activeHypothesisVisual, lastSecretClue, dismissSecretClue, dismissHypothesisVisual]);

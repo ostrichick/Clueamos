@@ -1259,13 +1259,21 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     runAITurnIfNeeded: async () => {
-      const { playMode, gameState, lastSecretClue, activeHypothesisVisual, turnReviewState } = get();
+      const { playMode, gameState, lastSecretClue, activeHypothesisVisual, turnReviewState, isAutoPlaying } = get();
       if (playMode === 'guest') return; // Host/Local/Solo handles AI execution
       if (gameState.phase === 'GAME_OVER') return;
       if (lastSecretClue || activeHypothesisVisual || (turnReviewState && turnReviewState.active)) return; // Wait until human player dismisses visual modal and confirms review
 
       const currentP = gameState.players[gameState.currentPlayerIndex];
-      if (!currentP || !currentP.type.startsWith('ai_')) return;
+      if (!currentP) return;
+
+      // If current player is human: if in AutoPlay (AFK), let AI take over
+      if (currentP.type === 'human') {
+        if (isAutoPlaying) {
+          get().executeAutoPlayTurn();
+        }
+        return;
+      }
 
       // Ensure AI memory is initialized
       let memory = get().aiMemories[currentP.id];
@@ -1354,7 +1362,11 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ lastSecretClue: null });
       setTimeout(() => {
         if (!get().activeHypothesisVisual && !get().turnReviewState?.active) {
-          get().runAITurnIfNeeded();
+          if (get().isAutoPlaying) {
+            get().executeAutoPlayTurn();
+          } else {
+            get().runAITurnIfNeeded();
+          }
         }
       }, 400);
     },
@@ -1369,7 +1381,11 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
       setTimeout(() => {
         if (!get().lastSecretClue && !get().turnReviewState?.active) {
-          get().runAITurnIfNeeded();
+          if (get().isAutoPlaying) {
+            get().executeAutoPlayTurn();
+          } else {
+            get().runAITurnIfNeeded();
+          }
         }
       }, 400);
     },
@@ -1419,6 +1435,15 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // 4. 행동 완료 단계: 최종 고발 가능 여부 확인 후 턴 넘기기
       if (gameState.phase === 'PLAYING_ACTION_DONE') {
+        if (lastSecretClue) {
+          get().dismissSecretClue();
+          return;
+        }
+        if (activeHypothesisVisual) {
+          get().dismissHypothesisVisual();
+          return;
+        }
+
         const accusation = shouldAIAccuse(currentP, memory);
         if (accusation) {
           get().performAccusation(accusation);
@@ -1434,6 +1459,8 @@ export const useGameStore = create<GameStore>((set, get) => {
           const action = decideArthurAction(gameState, memory);
           if (action.type === 'MOVE_AND_SUGGEST') {
             get().performSuggestion(action.suggestion);
+          } else {
+            get().performEndTurn();
           }
         } catch (err) {
           console.error('AutoPlay suggest error:', err);
