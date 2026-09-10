@@ -909,9 +909,16 @@ export const useGameStore = create<GameStore>((set, get) => {
             set({ activeHypothesisVisual: disprovedVisual });
 
             if (playMode === 'host') {
+              const guestPlayer = nextState.players.find(p => p.roleType === 'p2');
+              const isGuestInvolved = guestPlayer && (guestPlayer.id === asker.id || guestPlayer.id === player.id);
               peerManager.sendMessage({
                 type: 'HYPOTHESIS_VISUAL',
-                payload: { visual: disprovedVisual as unknown as Record<string, unknown> },
+                payload: { 
+                  visual: {
+                    ...disprovedVisual,
+                    shownCardId: isGuestInvolved ? disprovedVisual.shownCardId : undefined,
+                  } as unknown as Record<string, unknown> 
+                },
               });
             }
 
@@ -957,7 +964,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           const { aiMemories: curMemories } = get();
           nextState.players.forEach(p => {
             if (p.type.startsWith('ai_') && curMemories[p.id]) {
-              recordUndisprovenSuggestion(curMemories[p.id], { ...suggestion, askerId: asker.id }, p.hand);
+              recordUndisprovenSuggestion(curMemories[p.id], { ...suggestion, askerId: asker.id }, p.hand, asker.type);
             }
           });
 
@@ -1037,9 +1044,16 @@ export const useGameStore = create<GameStore>((set, get) => {
             };
             set({ activeHypothesisVisual: disprovedVisual });
             if (playMode === 'host') {
+              const guestPlayer = gameState.players.find(p => p.roleType === 'p2');
+              const isGuestInvolved = guestPlayer && (guestPlayer.id === asker.id || guestPlayer.id === responder.id);
               peerManager.sendMessage({
                 type: 'HYPOTHESIS_VISUAL',
-                payload: { visual: disprovedVisual as unknown as Record<string, unknown> },
+                payload: { 
+                  visual: {
+                    ...disprovedVisual,
+                    shownCardId: isGuestInvolved ? disprovedVisual.shownCardId : undefined,
+                  } as unknown as Record<string, unknown> 
+                },
               });
             }
           }
@@ -1270,7 +1284,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // If in PLAYING_ACTION_DONE phase: AI evaluates final accusation or ends turn
       if (gameState.phase === 'PLAYING_ACTION_DONE') {
-        const accusation = shouldAIAccuse(currentP, memory);
+        const accusation = shouldAIAccuse(currentP, memory, gameState.turnCount);
         if (accusation) {
           get().performAccusation(accusation);
         } else {
@@ -1430,7 +1444,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           return;
         }
 
-        const accusation = shouldAIAccuse(currentP, memory);
+        const accusation = shouldAIAccuse(currentP, memory, gameState.turnCount);
         if (accusation) {
           get().performAccusation(accusation);
         } else {

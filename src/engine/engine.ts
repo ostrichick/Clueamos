@@ -12,59 +12,6 @@ import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS, CHARACTER_PROF
 import { calculateReachablePaths } from './boardGrid';
 import { translations, SupportedLocale } from '../i18n/translations';
 
-// 방 간 거리 테이블 (최단 걸음 수 / 복도 칸 수)
-// 클래식 Clue 맵처럼 방 사이의 복도 타일 거리 정의
-export const ROOM_DISTANCES: Record<string, Record<string, number>> = {
-  room_ballroom: {
-    room_ballroom: 0,
-    room_kitchen: 3,
-    room_library: 4,
-    room_wine_cellar: 6,
-    room_room304: 6,
-    room_rooftop: 7,
-  },
-  room_kitchen: {
-    room_ballroom: 3,
-    room_kitchen: 0,
-    room_library: 5,
-    room_wine_cellar: 4,
-    room_room304: 7,
-    room_rooftop: 5,
-  },
-  room_library: {
-    room_ballroom: 4,
-    room_kitchen: 5,
-    room_library: 0,
-    room_wine_cellar: 7,
-    room_room304: 3,
-    room_rooftop: 6,
-  },
-  room_wine_cellar: {
-    room_ballroom: 6,
-    room_kitchen: 4,
-    room_library: 7,
-    room_wine_cellar: 0,
-    room_room304: 5,
-    room_rooftop: 3,
-  },
-  room_room304: {
-    room_ballroom: 6,
-    room_kitchen: 7,
-    room_library: 3,
-    room_wine_cellar: 5,
-    room_room304: 0,
-    room_rooftop: 4,
-  },
-  room_rooftop: {
-    room_ballroom: 7,
-    room_kitchen: 5,
-    room_library: 6,
-    room_wine_cellar: 3,
-    room_room304: 4,
-    room_rooftop: 0,
-  },
-};
-
 // 비밀 통로 (Clue의 대표 요소: 모서리 방 간 직통 통로!)
 // 서재 <-> 주방, 연회장 <-> 옥상 정원
 export const SECRET_PASSAGES: Record<string, string> = {

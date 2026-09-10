@@ -7,9 +7,17 @@ import {
   findNextDisprovingPlayer, 
   makeAccusation 
 } from './engine';
+import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
 
 describe('Clueamos Core Game Engine', () => {
-  it('게임 초기화 시 정답 봉투(4요소)와 4인 플레이어에게 카드가 정상 분배되어야 한다', () => {
+  it('전체 카드 구성 검증 (용의자 6 + 장소 6 + 흉기 8 = 총 20장)', () => {
+    expect(SUSPECTS).toHaveLength(6);
+    expect(LOCATION_CARDS).toHaveLength(6);
+    expect(WEAPONS).toHaveLength(8);
+    expect(ALL_CARDS).toHaveLength(20);
+  });
+
+  it('게임 초기화 시 정답 봉투(3요소)와 4인 플레이어에게 카드가 정상 분배되어야 한다 (총 17장 분배)', () => {
     const state = initGame({ 
       player1CharacterId: 'suspect_scarlett', 
       player2CharacterId: 'suspect_mustard',
@@ -32,9 +40,13 @@ describe('Clueamos Core Game Engine', () => {
     expect(state.solution.locationId).toBeDefined();
     expect(state.solution.weaponId).toBeDefined();
 
-    // 3. 전체 카드 분배 검증 (18장 - 3장 = 15장이 4명에게 분배됨)
+    // 3. 전체 카드 분배 검증 (20장 - 3장 = 17장이 4명에게 분배됨: 5, 4, 4, 4)
     const totalDistributedCards = state.players.reduce((sum, p) => sum + p.hand.length, 0);
-    expect(totalDistributedCards).toBe(15);
+    expect(totalDistributedCards).toBe(17);
+    expect(state.players[0].hand.length).toBe(5);
+    expect(state.players[1].hand.length).toBe(4);
+    expect(state.players[2].hand.length).toBe(4);
+    expect(state.players[3].hand.length).toBe(4);
 
     // 4. 정답 카드는 어떤 플레이어의 손패에도 없어야 함
     const allHandCardIds = state.players.flatMap(p => p.hand.map(c => c.id));
@@ -43,7 +55,7 @@ describe('Clueamos Core Game Engine', () => {
     expect(allHandCardIds).not.toContain(state.solution.weaponId);
   });
 
-  it('AI 0명 설정 시 1:1 진검승부(2인 플레이)로 카드가 8장/7장 분배되어야 한다', () => {
+  it('AI 0명 설정 시 1:1 진검승부(2인 플레이)로 카드가 9장/8장 분배되어야 한다', () => {
     const state = initGame({
       player1CharacterId: 'suspect_scarlett',
       player2CharacterId: 'suspect_mustard',
@@ -58,12 +70,12 @@ describe('Clueamos Core Game Engine', () => {
     expect(state.players[1].type).toBe('human');
 
     const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
-    expect(totalDistributed).toBe(15);
-    expect(state.players[0].hand.length).toBe(8);
-    expect(state.players[1].hand.length).toBe(7);
+    expect(totalDistributed).toBe(17);
+    expect(state.players[0].hand.length).toBe(9);
+    expect(state.players[1].hand.length).toBe(8);
   });
 
-  it('AI 4명 설정 시 6인 풀파티로 모든 용의자가 참여해야 한다', () => {
+  it('AI 4명 설정 시 6인 풀파티로 모든 용의자가 참여해야 한다 (17장 분배: 3, 3, 3, 3, 3, 2)', () => {
     const state = initGame({
       player1CharacterId: 'suspect_scarlett',
       player2CharacterId: 'suspect_mustard',
@@ -80,10 +92,10 @@ describe('Clueamos Core Game Engine', () => {
     expect(state.players[5].roleType).toBe('ai4');
 
     const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
-    expect(totalDistributed).toBe(15);
+    expect(totalDistributed).toBe(17);
   });
 
-  it('싱글 플레이 기본 옵션은 1 Player vs 1 AI (총 2인, 8장/7장 분배)이어야 한다', () => {
+  it('싱글 플레이 기본 옵션은 1 Player vs 1 AI (총 2인, 9장/8장 분배)이어야 한다', () => {
     const state = initGame({
       isSinglePlayer: true,
       player1CharacterId: 'suspect_scarlett',
@@ -97,9 +109,9 @@ describe('Clueamos Core Game Engine', () => {
     expect(state.players[1].type.startsWith('ai_')).toBe(true);
 
     const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
-    expect(totalDistributed).toBe(15);
-    expect(state.players[0].hand.length).toBe(8);
-    expect(state.players[1].hand.length).toBe(7);
+    expect(totalDistributed).toBe(17);
+    expect(state.players[0].hand.length).toBe(9);
+    expect(state.players[1].hand.length).toBe(8);
   });
 
   it('싱글 플레이에서 AI 5명 설정 시 1 Player vs 5 AIs (총 6인 풀파티)로 생성되어야 한다', () => {
@@ -119,7 +131,7 @@ describe('Clueamos Core Game Engine', () => {
     }
 
     const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
-    expect(totalDistributed).toBe(15);
+    expect(totalDistributed).toBe(17);
   });
 
   it('주사위를 굴리고 도달 가능한 방으로 이동할 수 있어야 한다', () => {
@@ -165,7 +177,7 @@ describe('Clueamos Core Game Engine', () => {
       0, 
       suggestState.currentSuggestion!
     );
-    // 15장의 카드가 분배되어 있으므로 누군가 소지하거나 아무도 없을 수 있음
+    // 17장의 카드가 분배되어 있으므로 누군가 소지하거나 아무도 없을 수 있음
     if (disprover) {
       expect(disprover.playerIndex).toBeGreaterThan(0);
       expect(disprover.availableCards.length).toBeGreaterThan(0);

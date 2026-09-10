@@ -11,6 +11,7 @@ class SoundController {
   private dryGain: GainNode | null = null;
   private wetGain: GainNode | null = null;
   private reverbNode: ConvolverNode | null = null;
+  private reverbSplitterGain: GainNode | null = null;
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -71,10 +72,12 @@ class SoundController {
     this.setupAudioGraph(ctx);
 
     if (useReverb && this.reverbNode && this.dryGain) {
-      const splitter = ctx.createGain();
-      splitter.connect(this.dryGain);
-      splitter.connect(this.reverbNode);
-      return splitter;
+      if (!this.reverbSplitterGain) {
+        this.reverbSplitterGain = ctx.createGain();
+        this.reverbSplitterGain.connect(this.dryGain);
+        this.reverbSplitterGain.connect(this.reverbNode);
+      }
+      return this.reverbSplitterGain;
     }
     return this.dryGain || ctx.destination;
   }

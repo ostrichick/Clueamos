@@ -177,20 +177,20 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       <Smartphone className="w-4 h-4 text-indigo-400" /> {t.joinRoomTitle}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      {locale === 'ko' ? '전달받은 2자리 방 코드를 입력합니다.' : 'Enter the 2-digit room code sent by Player 1.'}
+                      {locale === 'ko' ? '전달받은 4자리 방 코드를 입력합니다.' : 'Enter the 4-digit room code sent by Player 1.'}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      maxLength={2}
-                      placeholder="48"
+                      maxLength={4}
+                      placeholder="1042"
                       value={inputRoomCode}
-                      onChange={(e) => setInputRoomCode(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                      className="w-20 text-center uppercase tracking-widest font-mono font-black text-base bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-indigo-400 focus:outline-none"
+                      onChange={(e) => setInputRoomCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      className="w-24 text-center uppercase tracking-widest font-mono font-black text-base bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-indigo-400 focus:outline-none"
                     />
                     <button
-                      disabled={isConnecting || inputRoomCode.length < 2}
+                      disabled={isConnecting || inputRoomCode.length < 4}
                       onClick={() => joinRoom(inputRoomCode.trim())}
                       className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow"
                     >
@@ -486,10 +486,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                           ? '💡 Presiona [Crear Sala] arriba para crear una sala o selecciona Un Jugador.'
                           : '💡 Tap [Host Room] above to create a room, or choose Option 2 for Solo Play.')
                     : (locale === 'ko'
-                        ? '💡 상대방(플레이어 2)이 2자리 코드로 접속하면 게임을 시작할 수 있습니다.'
+                        ? '💡 상대방(플레이어 2)이 4자리 코드로 접속하면 게임을 시작할 수 있습니다.'
                         : locale === 'es'
-                          ? '💡 Puedes comenzar cuando el Jugador 2 se una con el código de 2 dígitos.'
-                          : '💡 You can start once Player 2 joins with the 2-digit code.')}
+                          ? '💡 Puedes comenzar cuando el Jugador 2 se una con el código de 4 dígitos.'
+                          : '💡 You can start once Player 2 joins with the 4-digit code.')}
                 </span>
               </p>
             )}

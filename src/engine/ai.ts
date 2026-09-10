@@ -74,43 +74,62 @@ export function getRemainingCandidates(memory: AIMemory, category: 'suspect' | '
 
 /**
  * 가설 제기 시 아무도 반증하지 못했을 때(Nobody could disprove)
- * -> 자신이 가지고 있지 않은 카드는 100% 사건 봉투 속 정답이므로 CONFIRMED 확정!
+ * -> 질문자 본인이거나 질문자가 블러핑하지 않는 논리형 AI(아서)인 경우 100% CONFIRMED!
+ * -> 블러핑 가능성이 있는 상대(블레이크, 인간 플레이어)인 경우 낚시성 오인 탈락 방지를 위해 POSSIBLE 처리
  */
 export function recordUndisprovenSuggestion(
   memory: AIMemory,
   suggestion: Suggestion,
-  myHand: Card[]
+  myHand: Card[],
+  askerType?: Player['type']
 ): void {
   const myHandIds = new Set(myHand.map(c => c.id));
+  const isMeTheAsker = memory.playerId === suggestion.askerId;
+  const isNonBluffingAsker = askerType === 'ai_logic';
+  const canConfirmAbsolute = isMeTheAsker || isNonBluffingAsker;
 
-  // 1. 용의자: 내 손패에 없다면 정답 봉투에 있는 진범 확정!
-  if (!myHandIds.has(suggestion.suspectId)) {
-    memory.cardStatus.set(suggestion.suspectId, 'CONFIRMED');
-    SUSPECTS.forEach(s => {
-      if (s.id !== suggestion.suspectId) {
-        memory.cardStatus.set(s.id, 'IMPOSSIBLE');
-      }
-    });
-  }
+  if (canConfirmAbsolute) {
+    // 1. 용의자: 내 손패에 없다면 정답 봉투에 있는 진범 확정!
+    if (!myHandIds.has(suggestion.suspectId)) {
+      memory.cardStatus.set(suggestion.suspectId, 'CONFIRMED');
+      SUSPECTS.forEach(s => {
+        if (s.id !== suggestion.suspectId) {
+          memory.cardStatus.set(s.id, 'IMPOSSIBLE');
+        }
+      });
+    }
 
-  // 2. 살인 장소: 내 손패에 없다면 정답 봉투 속 장소 확정!
-  if (!myHandIds.has(suggestion.locationId)) {
-    memory.cardStatus.set(suggestion.locationId, 'CONFIRMED');
-    LOCATION_CARDS.forEach(l => {
-      if (l.id !== suggestion.locationId) {
-        memory.cardStatus.set(l.id, 'IMPOSSIBLE');
-      }
-    });
-  }
+    // 2. 살인 장소: 내 손패에 없다면 정답 봉투 속 장소 확정!
+    if (!myHandIds.has(suggestion.locationId)) {
+      memory.cardStatus.set(suggestion.locationId, 'CONFIRMED');
+      LOCATION_CARDS.forEach(l => {
+        if (l.id !== suggestion.locationId) {
+          memory.cardStatus.set(l.id, 'IMPOSSIBLE');
+        }
+      });
+    }
 
-  // 3. 흉기: 내 손패에 없다면 정답 봉투 속 흉기 확정!
-  if (!myHandIds.has(suggestion.weaponId)) {
-    memory.cardStatus.set(suggestion.weaponId, 'CONFIRMED');
-    WEAPONS.forEach(w => {
-      if (w.id !== suggestion.weaponId) {
-        memory.cardStatus.set(w.id, 'IMPOSSIBLE');
-      }
-    });
+    // 3. 흉기: 내 손패에 없다면 정답 봉투 속 흉기 확정!
+    if (!myHandIds.has(suggestion.weaponId)) {
+      memory.cardStatus.set(suggestion.weaponId, 'CONFIRMED');
+      WEAPONS.forEach(w => {
+        if (w.id !== suggestion.weaponId) {
+          memory.cardStatus.set(w.id, 'IMPOSSIBLE');
+        }
+      });
+    }
+  } else {
+    // 질문자가 블러핑(손패 카드를 섞어 질문)했을 가능성이 있으므로,
+    // 다른 사람들에게 없다는 것은 확실하나 성급히 모든 타 후보를 IMPOSSIBLE 처리하지 않음
+    if (!myHandIds.has(suggestion.suspectId) && memory.cardStatus.get(suggestion.suspectId) !== 'IMPOSSIBLE') {
+      memory.cardStatus.set(suggestion.suspectId, 'POSSIBLE');
+    }
+    if (!myHandIds.has(suggestion.locationId) && memory.cardStatus.get(suggestion.locationId) !== 'IMPOSSIBLE') {
+      memory.cardStatus.set(suggestion.locationId, 'POSSIBLE');
+    }
+    if (!myHandIds.has(suggestion.weaponId) && memory.cardStatus.get(suggestion.weaponId) !== 'IMPOSSIBLE') {
+      memory.cardStatus.set(suggestion.weaponId, 'POSSIBLE');
+    }
   }
 }
 
@@ -285,7 +304,7 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
  * - 아서(논리형): 3개 카테고리 후보가 1개씩 남았거나 2개 확정+1개 2개 이하
  * - 블레이크(직감형): 남은 후보 총합이 5개 이하인 경우
  */
-export function shouldAIAccuse(player: Player, memory: AIMemory): Solution | null {
+export function shouldAIAccuse(player: Player, memory: AIMemory, turnCount: number = 4): Solution | null {
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
@@ -303,8 +322,8 @@ export function shouldAIAccuse(player: Player, memory: AIMemory): Solution | nul
     };
   }
 
-  // 2. 아서(논리형): 2개 카테고리 확정(1개) & 나머지 1개가 2개 이하로 압축되었을 때
-  if (player.type === 'ai_logic') {
+  // 2. 아서(논리형): 2개 카테고리 확정(1개) & 나머지 1개가 2개 이하로 압축되었을 때 (4라운드 이상 경과 시)
+  if (player.type === 'ai_logic' && turnCount >= 4) {
     if (suspectCandidates.length === 1 && weaponCandidates.length === 1 && locationCandidates.length <= 2) {
       return {
         suspectId: suspectCandidates[0].id,

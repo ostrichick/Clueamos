@@ -32,7 +32,6 @@ export interface Room {
   id: string;
   name: string;
   description: string;
-  adjacentRoomIds: string[];
   gridCoord: { x: number; y: number };
   imageUrl?: string;
 }

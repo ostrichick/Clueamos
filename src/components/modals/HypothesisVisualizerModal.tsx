@@ -53,6 +53,8 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
     }
   }, [visual?.phase, visual]);
 
+  const isObserver = Boolean(myPlayerId && visual && visual.askerId !== myPlayerId && visual.responderId !== myPlayerId);
+
   // Countdown timer for completed phases: default action is auto-mark if card is shown!
   useEffect(() => {
     if (!visual) return;
@@ -64,7 +66,7 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         const next = prev - 0.1;
         if (next <= 0) {
           if (timerRef.current) clearInterval(timerRef.current);
-          if (visual.shownCardId && onMarkNotebookAndDismiss) {
+          if (!isObserver && visual.shownCardId && onMarkNotebookAndDismiss && visual.askerId === myPlayerId) {
             onMarkNotebookAndDismiss(visual.shownCardId);
           } else {
             onDismiss();
@@ -81,7 +83,7 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         timerRef.current = null;
       }
     };
-  }, [visual, onDismiss, onMarkNotebookAndDismiss]);
+  }, [visual, onDismiss, onMarkNotebookAndDismiss, isObserver, myPlayerId]);
 
   if (!visual) return null;
 
@@ -142,11 +144,11 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         <div className="flex items-center justify-center gap-2 sm:gap-3.5 py-1">
           {/* Suspect Card */}
           <div className={`relative transition-all duration-300 transform ${
-            visual.shownCardId === visual.suggestion.suspectId 
+            !isObserver && visual.shownCardId === visual.suggestion.suspectId 
               ? 'scale-105 z-10' 
               : isDisproved ? 'opacity-50 scale-95' : 'scale-100'
           }`}>
-            {visual.shownCardId === visual.suggestion.suspectId && (
+            {!isObserver && visual.shownCardId === visual.suggestion.suspectId && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 px-2 py-0.5 rounded-full bg-indigo-500 text-white font-extrabold text-[9px] shadow-lg shadow-indigo-500/50 whitespace-nowrap animate-bounce flex items-center gap-1">
                 <span>🛡️ {t.presentedClue}</span>
               </div>
@@ -155,18 +157,18 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
               cardId={visual.suggestion.suspectId}
               size="sm"
               getCardName={getCardName}
-              isSelected={visual.shownCardId === visual.suggestion.suspectId}
-              className={visual.shownCardId === visual.suggestion.suspectId ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}
+              isSelected={!isObserver && visual.shownCardId === visual.suggestion.suspectId}
+              className={!isObserver && visual.shownCardId === visual.suggestion.suspectId ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}
             />
           </div>
 
           {/* Location Card */}
           <div className={`relative transition-all duration-300 transform ${
-            visual.shownCardId === visual.suggestion.locationId 
+            !isObserver && visual.shownCardId === visual.suggestion.locationId 
               ? 'scale-105 z-10' 
               : isDisproved ? 'opacity-50 scale-95' : 'scale-100'
           }`}>
-            {visual.shownCardId === visual.suggestion.locationId && (
+            {!isObserver && visual.shownCardId === visual.suggestion.locationId && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 px-2 py-0.5 rounded-full bg-indigo-500 text-white font-extrabold text-[9px] shadow-lg shadow-indigo-500/50 whitespace-nowrap animate-bounce flex items-center gap-1">
                 <span>🛡️ {t.presentedClue}</span>
               </div>
@@ -175,18 +177,18 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
               cardId={visual.suggestion.locationId}
               size="sm"
               getCardName={getCardName}
-              isSelected={visual.shownCardId === visual.suggestion.locationId}
-              className={visual.shownCardId === visual.suggestion.locationId ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}
+              isSelected={!isObserver && visual.shownCardId === visual.suggestion.locationId}
+              className={!isObserver && visual.shownCardId === visual.suggestion.locationId ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}
             />
           </div>
 
           {/* Weapon Card */}
           <div className={`relative transition-all duration-300 transform ${
-            visual.shownCardId === visual.suggestion.weaponId 
+            !isObserver && visual.shownCardId === visual.suggestion.weaponId 
               ? 'scale-105 z-10' 
               : isDisproved ? 'opacity-50 scale-95' : 'scale-100'
           }`}>
-            {visual.shownCardId === visual.suggestion.weaponId && (
+            {!isObserver && visual.shownCardId === visual.suggestion.weaponId && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 px-2 py-0.5 rounded-full bg-indigo-500 text-white font-extrabold text-[9px] shadow-lg shadow-indigo-500/50 whitespace-nowrap animate-bounce flex items-center gap-1">
                 <span>🛡️ {t.presentedClue}</span>
               </div>
@@ -195,8 +197,8 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
               cardId={visual.suggestion.weaponId}
               size="sm"
               getCardName={getCardName}
-              isSelected={visual.shownCardId === visual.suggestion.weaponId}
-              className={visual.shownCardId === visual.suggestion.weaponId ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}
+              isSelected={!isObserver && visual.shownCardId === visual.suggestion.weaponId}
+              className={!isObserver && visual.shownCardId === visual.suggestion.weaponId ? 'ring-2 ring-indigo-400 shadow-indigo-500/40' : ''}
             />
           </div>
         </div>
@@ -232,7 +234,7 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
                   </span>
                 ) : (
                   <span>
-                    {visual.responderName} {t.cardShownNotice} <strong className="text-amber-300">[{shownCardName}]</strong>
+                    {visual.responderName} {t.cardShownNotice} <strong className="text-slate-200">[{visual.askerName}]</strong>
                     <span className="text-[10px] text-slate-500 block mt-0.5">({t.secretClueExchange})</span>
                   </span>
                 )}
@@ -265,8 +267,8 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
             </div>
 
             <div className="flex items-center justify-center gap-2">
-              {/* If a card was shown and can be marked: PRIMARY default action is auto-mark with countdown timer */}
-              {isDisproved && visual.shownCardId && onMarkNotebookAndDismiss ? (
+              {/* Only the asking player who received the secret card can mark it in notebook! */}
+              {!isObserver && visual.askerId === myPlayerId && visual.shownCardId && onMarkNotebookAndDismiss ? (
                 <>
                   <button
                     onClick={() => {
@@ -290,7 +292,7 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
                   </button>
                 </>
               ) : (
-                /* No card shown (e.g. undisproven) -> Normal continue button */
+                /* Observers, responders, or undisproven -> Normal continue button */
                 <button
                   onClick={onDismiss}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"

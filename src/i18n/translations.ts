@@ -125,6 +125,10 @@ export interface TranslationStrings {
   // Live Logs
   liveLogTitle: string;
   detectivesListTitle: string;
+  logFilterAll: string;
+  logFilterSuggestion: string;
+  logFilterDisprove: string;
+  logFilterAccusation: string;
 
   // New Features
   waitInHallway: string;
@@ -290,7 +294,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     hostRoomBtn: 'Create Room',
     joinRoomBtn: 'Join Room',
     roomCodeLabel: 'Room Code',
-    enterRoomCodePlaceholder: 'Enter 2-digit code (e.g. 42)',
+    enterRoomCodePlaceholder: 'Enter 4-digit code (e.g. 1042)',
     copyInviteLink: 'Copy Invite Link',
     inviteLinkCopied: 'Invite link copied to clipboard!',
     waitingForPlayer2: 'Waiting for Player 2 to join...',
@@ -360,6 +364,10 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
     liveLogTitle: 'Case Activity Log',
     detectivesListTitle: 'Detectives Roster',
+    logFilterAll: 'All',
+    logFilterSuggestion: 'Hypothesis',
+    logFilterDisprove: 'Disprove',
+    logFilterAccusation: 'Accusation',
 
     waitInHallway: 'Wait in Hallway',
     waitInHallwayDesc: 'Cannot reach any room with this roll. Wait in the corridor and pass turn.',
@@ -581,7 +589,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     hostRoomBtn: 'Crear Sala',
     joinRoomBtn: 'Unirse a Sala',
     roomCodeLabel: 'Código de Sala',
-    enterRoomCodePlaceholder: 'Ingresa código de 2 dígitos (ej. 42)',
+    enterRoomCodePlaceholder: 'Ingresa código de 4 dígitos (ej. 1042)',
     copyInviteLink: 'Copiar Enlace de Invitación',
     inviteLinkCopied: '¡Enlace de invitación copiado!',
     waitingForPlayer2: 'Esperando a que se una el Jugador 2...',
@@ -651,6 +659,10 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
     liveLogTitle: 'Registro de Actividad',
     detectivesListTitle: 'Detectives del Caso',
+    logFilterAll: 'Todo',
+    logFilterSuggestion: 'Hipótesis',
+    logFilterDisprove: 'Refutación',
+    logFilterAccusation: 'Acusación',
 
     waitInHallway: 'Esperar en el Pasillo',
     waitInHallwayDesc: 'No alcanzas ninguna habitación con esta tirada. Espera en el pasillo.',
@@ -872,7 +884,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     hostRoomBtn: '방 만들기',
     joinRoomBtn: '방 참여하기',
     roomCodeLabel: '방 코드',
-    enterRoomCodePlaceholder: '2자리 코드 입력 (예: 42)',
+    enterRoomCodePlaceholder: '4자리 코드 입력 (예: 1042)',
     copyInviteLink: '초대 링크 복사',
     inviteLinkCopied: '초대 링크가 복사되었습니다! 상대방에게 전달해주세요.',
     waitingForPlayer2: '플레이어 2의 접속을 기다리는 중...',
@@ -942,6 +954,10 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
     liveLogTitle: '실시간 사건 수사 일지',
     detectivesListTitle: '탐정 수사관 현황',
+    logFilterAll: '전체',
+    logFilterSuggestion: '가설',
+    logFilterDisprove: '반증',
+    logFilterAccusation: '고발',
 
     waitInHallway: '복도에서 대기 (턴 넘기기)',
     waitInHallwayDesc: '주사위 눈금이 부족하여 들어갈 수 있는 방이 없습니다. 복도에서 대기하고 턴을 넘기세요.',

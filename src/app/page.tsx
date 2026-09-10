@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { HelpCircle, ScrollText, ArrowRight, Flame } from 'lucide-react';
 import { SUSPECTS, WEAPONS } from '@/engine/data';
@@ -78,8 +78,14 @@ export default function Home() {
   } = useGameStore();
 
   // 언어 선택 상태: 영어 ('en'), 스페인어 ('es'), 한국어 ('ko')
-  const [locale, setLocaleState] = useState<SupportedLocale>('en');
+  const [locale, setLocaleState] = useState<SupportedLocale>('ko');
   const t = translations[locale];
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as unknown as { __gameStore: typeof useGameStore }).__gameStore = useGameStore;
+    }
+  }, []);
 
   const setLocale = (newLoc: SupportedLocale) => {
     setLocaleState(newLoc);
@@ -96,7 +102,7 @@ export default function Home() {
   const [inputRoomCode, setInputRoomCode] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('room')?.trim().replace(/\D/g, '').slice(0, 2) || '';
+      return params.get('room')?.trim().replace(/\D/g, '').slice(0, 4) || '';
     }
     return '';
   });
@@ -133,6 +139,9 @@ export default function Home() {
   // 메인 로비 나가기 확인 모달 상태
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const exitModalDraggable = useDraggableModal({ isOpen: isExitModalOpen });
+
+  // 수사 일지 카테고리 필터 상태
+  const [logFilter, setLogFilter] = useState<'all' | 'suggestion' | 'disprove' | 'accusation'>('all');
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
@@ -575,6 +584,13 @@ export default function Home() {
   const getCardName = (id: string) => t.cards[id]?.name || id;
   const getRoomName = (id: string) => t.rooms[id]?.name || id;
 
+  // 수사 일지 필터링 목록
+  const filteredLogs = useMemo(() => {
+    const reversed = gameState.logs.slice().reverse();
+    if (logFilter === 'all') return reversed;
+    return reversed.filter(log => log.type === logFilter);
+  }, [gameState.logs, logFilter]);
+
   // 로비 화면
   if (!isGameStarted) {
     return (
@@ -941,26 +957,59 @@ export default function Home() {
 
             {/* 사건 수사 일지 (Live Activity Log) */}
             <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px] shadow-md">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-                {t.liveLogTitle}
-              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-800/60 pb-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+                  {t.liveLogTitle}
+                </h3>
+                {/* 로그 카테고리 필터 탭 */}
+                <div className="flex items-center gap-1 bg-slate-950/60 p-0.5 rounded-lg border border-slate-800/80">
+                  {(['all', 'suggestion', 'disprove', 'accusation'] as const).map(filterKey => {
+                    const label = filterKey === 'all' ? t.logFilterAll
+                      : filterKey === 'suggestion' ? t.logFilterSuggestion
+                      : filterKey === 'disprove' ? t.logFilterDisprove
+                      : t.logFilterAccusation;
+                    const isActive = logFilter === filterKey;
+                    return (
+                      <button
+                        key={filterKey}
+                        onClick={() => setLogFilter(filterKey)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all ${
+                          isActive
+                            ? 'bg-amber-500/25 text-amber-300 font-bold border border-amber-500/40 shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex-1 overflow-y-auto max-h-[300px] flex flex-col gap-2 pr-1 text-xs">
-                {gameState.logs.slice().reverse().map(log => (
-                  <div 
-                    key={log.id} 
-                    className={`p-2.5 rounded-lg border leading-relaxed ${
-                      log.type === 'accusation'
-                        ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
-                        : log.type === 'disprove'
-                          ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
-                          : 'border-slate-800 bg-slate-900/50 text-slate-300'
-                    }`}
-                  >
-                    <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
-                    {log.message}
+                {filteredLogs.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600 text-xs italic">
+                    -
                   </div>
-                ))}
+                ) : (
+                  filteredLogs.map(log => (
+                    <div 
+                      key={log.id} 
+                      className={`p-2.5 rounded-lg border leading-relaxed ${
+                        log.type === 'accusation'
+                          ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
+                          : log.type === 'disprove'
+                            ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
+                            : log.type === 'suggestion'
+                              ? 'border-amber-500/30 bg-amber-950/10 text-amber-200/90'
+                              : 'border-slate-800 bg-slate-900/50 text-slate-300'
+                      }`}
+                    >
+                      <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
+                      {log.message}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

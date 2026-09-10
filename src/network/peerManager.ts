@@ -32,7 +32,7 @@ export interface PeerMessage {
 // Highly reliable global public MQTT WebSocket broker (WSS port 8084)
 // Bypasses all carrier NAT, cellular firewalls, and router restrictions with sub-50ms latency
 const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
-const TOPIC_PREFIX = 'clueamos/v3/';
+const TOPIC_PREFIX = 'clueamos/v4/';
 
 export class PeerManager {
   private client: MqttClient | null = null;
@@ -56,15 +56,15 @@ export class PeerManager {
   }
 
   /**
-   * Host: Create a new room with a 2-digit code (10-99)
+   * Host: Create a new room with a 4-digit code (1000-9999)
    */
   public async createRoom(desiredCode?: unknown): Promise<string> {
     this.cleanup();
     this.isHost = true;
     const sanitized = (typeof desiredCode === 'string') ? desiredCode.trim().replace(/\D/g, '') : '';
-    const code = (sanitized.length === 2)
+    const code = (sanitized.length === 4)
       ? sanitized
-      : Math.floor(10 + Math.random() * 90).toString();
+      : Math.floor(1000 + Math.random() * 9000).toString();
     this.roomCode = code;
 
     const myReceiveTopic = `${TOPIC_PREFIX}${code}/to_host`;
