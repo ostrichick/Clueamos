@@ -17,6 +17,8 @@ import {
   decideArthurAction, 
   decideBlakeAction, 
   recordShownCard,
+  recordUndisprovenSuggestion,
+  recordObservedDisprove,
   shouldAIAccuse
 } from '@/engine/ai';
 import { SupportedLocale, translations } from '@/i18n/translations';
@@ -25,6 +27,14 @@ import { sounds } from '@/utils/sounds';
 
 export type PlayMode = 'solo' | 'local' | 'host' | 'guest';
 export type PlayerRole = 'p1' | 'p2';
+
+export interface TurnReviewState {
+  active: boolean;
+  turnNumber: number;
+  lastPlayerName: string;
+  summary: string;
+  readyRoles: PlayerRole[];
+}
 
 export interface ActiveDialogue {
   speakerId: string;
@@ -131,6 +141,11 @@ interface GameStore {
   dismissSecretClue: () => void;
   dismissHypothesisVisual: () => void;
   exitToLobby: () => void;
+
+  // 턴 종료 확인 및 수첩 작성 대기 상태
+  turnReviewState: TurnReviewState | null;
+  confirmTurnReview: () => void;
+  proceedToNextTurn: () => void;
 
   // AFK 자동 대리 플레이 상태
   isAutoPlaying: boolean;
@@ -311,6 +326,32 @@ export const useGameStore = create<GameStore>((set, get) => {
         break;
       }
 
+      case 'TURN_REVIEW_UPDATE': {
+        set({ turnReviewState: (msg.payload?.turnReview as unknown as TurnReviewState) || null });
+        break;
+      }
+
+      case 'TURN_REVIEW_CONFIRM': {
+        if (playMode === 'host') {
+          const { turnReviewState } = get();
+          if (turnReviewState) {
+            const incomingRole = (msg.payload?.role as PlayerRole) || 'p2';
+            const updatedRoles = Array.from(new Set([...turnReviewState.readyRoles, incomingRole]));
+            if (updatedRoles.includes('p1') && updatedRoles.includes('p2')) {
+              get().proceedToNextTurn();
+            } else {
+              const updatedState = { ...turnReviewState, readyRoles: updatedRoles };
+              set({ turnReviewState: updatedState });
+              peerManager.sendMessage({
+                type: 'TURN_REVIEW_UPDATE',
+                payload: { turnReview: updatedState as unknown as Record<string, unknown> },
+              });
+            }
+          }
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -355,6 +396,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     activeHypothesisVisual: null,
     isAutoPlaying: false,
     setIsAutoPlaying: (active: boolean) => set({ isAutoPlaying: active }),
+    turnReviewState: null,
 
     setLocale: (loc) => {
       set({ currentLocale: loc });
@@ -627,6 +669,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         isRollingDice: false,
         activeHypothesisVisual: null,
         isAutoPlaying: false,
+        turnReviewState: null,
       });
 
       if (playMode === 'host') {
@@ -664,6 +707,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         guestSelectedCharacter: null,
         hostSelectedCharacter: null,
         isAutoPlaying: false,
+        turnReviewState: null,
       });
     },
 
@@ -825,6 +869,11 @@ export const useGameStore = create<GameStore>((set, get) => {
             if (aiMemories[asker.id]) {
               recordShownCard(aiMemories[asker.id], player.id, shownCard.id);
             }
+            nextState.players.forEach(p => {
+              if (p.type.startsWith('ai_') && p.id !== asker.id && p.id !== player.id && aiMemories[p.id]) {
+                recordObservedDisprove(aiMemories[p.id], { ...suggestion, askerId: asker.id }, player.id, p.hand);
+              }
+            });
 
             const disprovedVisual: HypothesisVisualState = {
               askerId: asker.id,
@@ -894,6 +943,14 @@ export const useGameStore = create<GameStore>((set, get) => {
 
           set({ activeHypothesisVisual: undisprovenVisual });
 
+          // 아무도 반증하지 못한 카드는 100% 정답 봉투 속 카드로 AI 메모리에 각인!
+          const { aiMemories: curMemories } = get();
+          nextState.players.forEach(p => {
+            if (p.type.startsWith('ai_') && curMemories[p.id]) {
+              recordUndisprovenSuggestion(curMemories[p.id], { ...suggestion, askerId: asker.id }, p.hand);
+            }
+          });
+
           if (playMode === 'host') {
             peerManager.sendMessage({
               type: 'HYPOTHESIS_VISUAL',
@@ -938,6 +995,13 @@ export const useGameStore = create<GameStore>((set, get) => {
         const { aiMemories } = get();
         if (aiMemories[asker.id]) {
           recordShownCard(aiMemories[asker.id], responder.id, cardId);
+        }
+        if (gameState.currentSuggestion) {
+          gameState.players.forEach(p => {
+            if (p.type.startsWith('ai_') && p.id !== asker.id && p.id !== responder.id && aiMemories[p.id]) {
+              recordObservedDisprove(aiMemories[p.id], gameState.currentSuggestion!, responder.id, p.hand);
+            }
+          });
         }
 
         const shownCard = responder.hand.find(c => c.id === cardId);
@@ -1034,8 +1098,98 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       const { gameState } = get();
+      if (gameState.phase === 'GAME_OVER') return;
+
+      const lastPlayer = gameState.players[gameState.currentPlayerIndex];
+      const lastLog = gameState.logs[gameState.logs.length - 1];
+      const summary = lastLog ? lastLog.message : `${lastPlayer?.name || 'Player'} turn finished`;
+
+      const reviewState: TurnReviewState = {
+        active: true,
+        turnNumber: gameState.turnCount,
+        lastPlayerName: lastPlayer?.name || '',
+        summary,
+        readyRoles: [],
+      };
+
+      set({ turnReviewState: reviewState, selectedRoomId: null });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'TURN_REVIEW_UPDATE',
+          payload: { turnReview: reviewState as unknown as Record<string, unknown> },
+        });
+      }
+    },
+
+    confirmTurnReview: () => {
+      const { playMode, turnReviewState, myPlayerRole, gameState } = get();
+      if (!turnReviewState || !turnReviewState.active) return;
+
+      if (playMode === 'guest') {
+        peerManager.sendMessage({
+          type: 'TURN_REVIEW_CONFIRM',
+          payload: { role: myPlayerRole },
+        });
+        set({
+          turnReviewState: {
+            ...turnReviewState,
+            readyRoles: Array.from(new Set([...turnReviewState.readyRoles, myPlayerRole])),
+          },
+        });
+        return;
+      }
+
+      if (playMode === 'host') {
+        const updatedRoles = Array.from(new Set([...turnReviewState.readyRoles, 'p1' as PlayerRole]));
+        const hasGuest = gameState.players.some(p => p.roleType === 'p2');
+        if (!hasGuest || updatedRoles.includes('p2')) {
+          get().proceedToNextTurn();
+        } else {
+          const updatedState = { ...turnReviewState, readyRoles: updatedRoles };
+          set({ turnReviewState: updatedState });
+          peerManager.sendMessage({
+            type: 'TURN_REVIEW_UPDATE',
+            payload: { turnReview: updatedState as unknown as Record<string, unknown> },
+          });
+        }
+      } else if (playMode === 'local') {
+        const humanPlayers = gameState.players.filter(p => p.type === 'human');
+        if (humanPlayers.length <= 1) {
+          get().proceedToNextTurn();
+        } else {
+          if (!turnReviewState.readyRoles.includes('p1')) {
+            set({
+              turnReviewState: {
+                ...turnReviewState,
+                readyRoles: ['p1'],
+              },
+            });
+          } else {
+            get().proceedToNextTurn();
+          }
+        }
+      } else {
+        // Solo mode: immediate proceed
+        get().proceedToNextTurn();
+      }
+    },
+
+    proceedToNextTurn: () => {
+      const { playMode, gameState } = get();
+      if (playMode === 'guest') return;
+
+      set({ turnReviewState: null, selectedRoomId: null });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'TURN_REVIEW_UPDATE',
+          payload: { turnReview: null },
+        });
+      }
+
       const nextState = nextTurn(gameState);
-      set({ gameState: nextState, selectedRoomId: null });
+      set({ gameState: nextState });
 
       if (playMode === 'host') {
         peerManager.sendMessage({
@@ -1051,10 +1205,10 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     runAITurnIfNeeded: async () => {
-      const { playMode, gameState, lastSecretClue, activeHypothesisVisual } = get();
+      const { playMode, gameState, lastSecretClue, activeHypothesisVisual, turnReviewState } = get();
       if (playMode === 'guest') return; // Host/Local/Solo handles AI execution
       if (gameState.phase === 'GAME_OVER') return;
-      if (lastSecretClue || activeHypothesisVisual) return; // Wait until human player dismisses visual modal
+      if (lastSecretClue || activeHypothesisVisual || (turnReviewState && turnReviewState.active)) return; // Wait until human player dismisses visual modal and confirms review
 
       const currentP = gameState.players[gameState.currentPlayerIndex];
       if (!currentP || !currentP.type.startsWith('ai_')) return;
@@ -1145,7 +1299,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     dismissSecretClue: () => {
       set({ lastSecretClue: null });
       setTimeout(() => {
-        if (!get().activeHypothesisVisual) {
+        if (!get().activeHypothesisVisual && !get().turnReviewState?.active) {
           get().runAITurnIfNeeded();
         }
       }, 400);
@@ -1160,15 +1314,21 @@ export const useGameStore = create<GameStore>((set, get) => {
         });
       }
       setTimeout(() => {
-        if (!get().lastSecretClue) {
+        if (!get().lastSecretClue && !get().turnReviewState?.active) {
           get().runAITurnIfNeeded();
         }
       }, 400);
     },
 
     executeAutoPlayTurn: async () => {
-      const { playMode, gameState, myPlayerRole, isRollingDice, pendingDisprovePrompt, lastSecretClue, activeHypothesisVisual } = get();
+      const { playMode, gameState, myPlayerRole, isRollingDice, pendingDisprovePrompt, lastSecretClue, activeHypothesisVisual, turnReviewState } = get();
       if (gameState.phase === 'GAME_OVER') return;
+
+      // 0. 턴 검토 대기 중인 경우 자동 확인
+      if (turnReviewState && turnReviewState.active) {
+        get().confirmTurnReview();
+        return;
+      }
 
       // 1. 비밀 반증 요청이 온 경우 즉시 첫 번째 카드로 자동 반증
       if (pendingDisprovePrompt && pendingDisprovePrompt.availableCards.length > 0) {

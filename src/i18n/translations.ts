@@ -174,6 +174,18 @@ export interface TranslationStrings {
   autoPlayingDesc: string;
   autoPlayingResume: string;
 
+  // Turn Review & Deduction Time
+  turnReviewTitle: string;
+  turnReviewSubtitle: string;
+  turnReviewConfirmBtn: string;
+  turnReviewWaitingPeer: string;
+  turnReviewP1Ready: string;
+  turnReviewP2Ready: string;
+  turnReviewP1Writing: string;
+  turnReviewP2Writing: string;
+  inHandBadge: string;
+  inHandTag: string;
+
   // Game Over
   investigationEnd: string;
   truthRevealed: string;
@@ -391,6 +403,17 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     autoPlayingBanner: 'AI Auto-Play Active (AFK)',
     autoPlayingDesc: 'AI is automatically making moves on your behalf while you are away.',
     autoPlayingResume: 'Resume Control (OK)',
+
+    turnReviewTitle: 'Turn Review & Deduction Time',
+    turnReviewSubtitle: 'Review clues and update your detective notebook. The next turn will begin when all players are ready.',
+    turnReviewConfirmBtn: 'Notes Ready / Next Turn (OK)',
+    turnReviewWaitingPeer: 'Waiting for other detective to finish notes...',
+    turnReviewP1Ready: 'P1 Ready ✓',
+    turnReviewP2Ready: 'P2 Ready ✓',
+    turnReviewP1Writing: 'P1 Reviewing ⏳',
+    turnReviewP2Writing: 'P2 Reviewing ⏳',
+    inHandBadge: 'IN HAND',
+    inHandTag: ' [✕ In Hand]',
 
     investigationEnd: 'Investigation Closed',
     truthRevealed: 'solved the mystery and brought justice!',
@@ -668,6 +691,17 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     autoPlayingDesc: 'La IA está jugando por ti mientras estás ausente.',
     autoPlayingResume: 'Retomar Control (OK)',
 
+    turnReviewTitle: 'Revisión de Turno y Cuaderno',
+    turnReviewSubtitle: 'Revisa las pistas y anota en tu cuaderno. El próximo turno comenzará cuando todos estén listos.',
+    turnReviewConfirmBtn: 'Notas Listas / Siguiente Turno (OK)',
+    turnReviewWaitingPeer: 'Esperando a que el otro detective termine de anotar...',
+    turnReviewP1Ready: 'P1 Listo ✓',
+    turnReviewP2Ready: 'P2 Listo ✓',
+    turnReviewP1Writing: 'P1 Anotando ⏳',
+    turnReviewP2Writing: 'P2 Anotando ⏳',
+    inHandBadge: 'EN MANO',
+    inHandTag: ' [✕ En Mano]',
+
     investigationEnd: 'Investigación Concluida',
     truthRevealed: '¡resolvió el misterio y triunfó!',
     mysteryUnsolved: 'El culpable escapó y el caso quedó sin resolver.',
@@ -943,6 +977,17 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     autoPlayingBanner: '🤖 AI 대리 플레이 중 (자리 비움)',
     autoPlayingDesc: '자리를 비우셔서 AI가 대신 행동을 진행하고 있습니다.',
     autoPlayingResume: '🎮 제어권 되찾기 (OK)',
+
+    turnReviewTitle: '턴 수사 정리 및 추리 시간',
+    turnReviewSubtitle: '상황과 단서를 확인하고 수첩을 작성하세요. 모든 플레이어가 확인하면 다음 턴이 시작됩니다.',
+    turnReviewConfirmBtn: '수첩 작성 완료 / 다음 턴 시작 (OK)',
+    turnReviewWaitingPeer: '상대 탐정이 수첩을 정리하는 중입니다...',
+    turnReviewP1Ready: 'P1 준비 완료 ✓',
+    turnReviewP2Ready: 'P2 준비 완료 ✓',
+    turnReviewP1Writing: 'P1 수첩 작성 중 ⏳',
+    turnReviewP2Writing: 'P2 수첩 작성 중 ⏳',
+    inHandBadge: '내 손패',
+    inHandTag: ' [✕ 내 손패]',
 
     investigationEnd: '수사 종료',
     truthRevealed: '님이 진실을 밝혀냈습니다!',

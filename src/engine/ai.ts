@@ -55,7 +55,7 @@ export function recordShownCard(memory: AIMemory, showerPlayerId: string, cardId
 }
 
 /**
- * 카테고리별로 아직 배제되지 않은(UNKNOWN / POSSIBLE) 카드 후보 반환
+ * 카테고리별로 아직 배제되지 않은(UNKNOWN / POSSIBLE / CONFIRMED) 카드 후보 반환
  */
 export function getRemainingCandidates(memory: AIMemory, category: 'suspect' | 'location' | 'weapon'): Card[] {
   let sourceList: Card[] = [];
@@ -63,7 +63,80 @@ export function getRemainingCandidates(memory: AIMemory, category: 'suspect' | '
   else if (category === 'location') sourceList = LOCATION_CARDS;
   else if (category === 'weapon') sourceList = WEAPONS;
 
+  // 이미 CONFIRMED(확정)된 카드가 있다면 해당 카드 1장만 단독 후보로 반환
+  const confirmedCard = sourceList.find(c => memory.cardStatus.get(c.id) === 'CONFIRMED');
+  if (confirmedCard) {
+    return [confirmedCard];
+  }
+
   return sourceList.filter(c => memory.cardStatus.get(c.id) !== 'IMPOSSIBLE');
+}
+
+/**
+ * 가설 제기 시 아무도 반증하지 못했을 때(Nobody could disprove)
+ * -> 자신이 가지고 있지 않은 카드는 100% 사건 봉투 속 정답이므로 CONFIRMED 확정!
+ */
+export function recordUndisprovenSuggestion(
+  memory: AIMemory,
+  suggestion: Suggestion,
+  myHand: Card[]
+): void {
+  const myHandIds = new Set(myHand.map(c => c.id));
+
+  // 1. 용의자: 내 손패에 없다면 정답 봉투에 있는 진범 확정!
+  if (!myHandIds.has(suggestion.suspectId)) {
+    memory.cardStatus.set(suggestion.suspectId, 'CONFIRMED');
+    SUSPECTS.forEach(s => {
+      if (s.id !== suggestion.suspectId) {
+        memory.cardStatus.set(s.id, 'IMPOSSIBLE');
+      }
+    });
+  }
+
+  // 2. 살인 장소: 내 손패에 없다면 정답 봉투 속 장소 확정!
+  if (!myHandIds.has(suggestion.locationId)) {
+    memory.cardStatus.set(suggestion.locationId, 'CONFIRMED');
+    LOCATION_CARDS.forEach(l => {
+      if (l.id !== suggestion.locationId) {
+        memory.cardStatus.set(l.id, 'IMPOSSIBLE');
+      }
+    });
+  }
+
+  // 3. 흉기: 내 손패에 없다면 정답 봉투 속 흉기 확정!
+  if (!myHandIds.has(suggestion.weaponId)) {
+    memory.cardStatus.set(suggestion.weaponId, 'CONFIRMED');
+    WEAPONS.forEach(w => {
+      if (w.id !== suggestion.weaponId) {
+        memory.cardStatus.set(w.id, 'IMPOSSIBLE');
+      }
+    });
+  }
+}
+
+/**
+ * 다른 플레이어 간의 질문 및 반증 관찰 추리:
+ * - 플레이어 A가 질문하고 플레이어 B가 반증했을 때,
+ * - AI 자신이 이미 질문 속 3개 카드 중 2개를 알고(보유하고) 있다면,
+ * - 플레이어 B가 보여준 카드는 나머지 1개 카드임이 명백하므로 IMPOSSIBLE 처리
+ */
+export function recordObservedDisprove(
+  memory: AIMemory,
+  suggestion: Suggestion,
+  responderId: string,
+  myHand: Card[]
+): void {
+  const myHandIds = new Set(myHand.map(c => c.id));
+  const suggestedCardIds = [suggestion.suspectId, suggestion.locationId, suggestion.weaponId];
+
+  // AI 자신이 손패에 쥐고 있는 카드는 반증자가 보여줄 수 없음
+  const candidatesShown = suggestedCardIds.filter(cardId => !myHandIds.has(cardId));
+
+  // 1개만 남았다면 그 카드를 responder가 가지고 있는 것이 100% 확실함!
+  if (candidatesShown.length === 1) {
+    const revealedCardId = candidatesShown[0];
+    recordShownCard(memory, responderId, revealedCardId);
+  }
 }
 
 /**
@@ -84,11 +157,11 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
 
-  // 확신도 검사: 3개 카테고리 후보가 1개씩만 남았다면 즉시 최종 고발!
+  // 확신도 검사: 3개 카테고리 후보가 1개씩만 남았거나, 2개 카테고리가 확정되고 1개가 2개 이하로 좁혀진 경우 고발!
   if (
-    suspectCandidates.length === 1 &&
-    locationCandidates.length === 1 &&
-    weaponCandidates.length === 1
+    (suspectCandidates.length === 1 && locationCandidates.length === 1 && weaponCandidates.length === 1) ||
+    (suspectCandidates.length === 1 && weaponCandidates.length === 1 && locationCandidates.length <= 2 && state.turnCount >= 4) ||
+    (suspectCandidates.length === 1 && locationCandidates.length === 1 && weaponCandidates.length <= 2 && state.turnCount >= 4)
   ) {
     return {
       type: 'ACCUSE',
@@ -110,9 +183,32 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
     locationCandidates.some(c => c.id === roomId)
   ) || accessible[Math.floor(Math.random() * accessible.length)] || me.currentRoomId;
 
-  // 질문할 카드 조합: 아직 모르는 후보 중에서 선별
-  const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
-  const weapon = weaponCandidates[Math.floor(Math.random() * weaponCandidates.length)] || WEAPONS[0];
+  // 질문할 카드 조합: 과거에 이미 질문했던 동일한 조합 회피
+  let suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
+  let weapon = weaponCandidates[Math.floor(Math.random() * weaponCandidates.length)] || WEAPONS[0];
+
+  // 과거 동일 질문 회피 필터링
+  const unusedSuspects = suspectCandidates.filter(s => 
+    !memory.pastSuggestions.some(p => p.suspectId === s.id && p.locationId === targetRoomId)
+  );
+  if (unusedSuspects.length > 0) {
+    suspect = unusedSuspects[Math.floor(Math.random() * unusedSuspects.length)];
+  }
+
+  const unusedWeapons = weaponCandidates.filter(w =>
+    !memory.pastSuggestions.some(p => p.weaponId === w.id && p.locationId === targetRoomId)
+  );
+  if (unusedWeapons.length > 0) {
+    weapon = unusedWeapons[Math.floor(Math.random() * unusedWeapons.length)];
+  }
+
+  // 질문 히스토리에 기록
+  memory.pastSuggestions.push({
+    askerId: me.id,
+    suspectId: suspect.id,
+    locationId: targetRoomId,
+    weaponId: weapon.id,
+  });
 
   return {
     type: 'MOVE_AND_SUGGEST',
@@ -136,9 +232,9 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
 
-  // 과감한 승부수: 총 후보 수 합이 4 이하(거의 좁혀짐)면 바로 최종 고발 시도!
+  // 과감한 승부수: 총 후보 수 합이 5 이하(거의 좁혀짐)면 바로 최종 고발 시도!
   const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length;
-  if (totalCandidates <= 4) {
+  if (totalCandidates <= 5) {
     return {
       type: 'ACCUSE',
       accusation: {
@@ -166,6 +262,13 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
 
   const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
 
+  memory.pastSuggestions.push({
+    askerId: me.id,
+    suspectId: suspect.id,
+    locationId: targetRoomId,
+    weaponId: weapon.id,
+  });
+
   return {
     type: 'MOVE_AND_SUGGEST',
     targetRoomId,
@@ -179,29 +282,49 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
 
 /**
  * 행동 완료 후(PLAYING_ACTION_DONE) AI가 최종 고발을 단행해야 하는지 판단
- * - 아서(논리형): 3개 카테고리 후보가 1개씩만 남은 경우(100% 확신)
- * - 블레이크(직감형): 남은 후보 총합이 4개 이하인 경우
+ * - 아서(논리형): 3개 카테고리 후보가 1개씩 남았거나 2개 확정+1개 2개 이하
+ * - 블레이크(직감형): 남은 후보 총합이 5개 이하인 경우
  */
 export function shouldAIAccuse(player: Player, memory: AIMemory): Solution | null {
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
 
+  // 1. 3개 카테고리 후보가 1개씩만 남은 경우 (100% 확신) -> 즉시 최종 고발!
+  if (
+    suspectCandidates.length === 1 &&
+    locationCandidates.length === 1 &&
+    weaponCandidates.length === 1
+  ) {
+    return {
+      suspectId: suspectCandidates[0].id,
+      locationId: locationCandidates[0].id,
+      weaponId: weaponCandidates[0].id,
+    };
+  }
+
+  // 2. 아서(논리형): 2개 카테고리 확정(1개) & 나머지 1개가 2개 이하로 압축되었을 때
   if (player.type === 'ai_logic') {
-    if (
-      suspectCandidates.length === 1 &&
-      locationCandidates.length === 1 &&
-      weaponCandidates.length === 1
-    ) {
+    if (suspectCandidates.length === 1 && weaponCandidates.length === 1 && locationCandidates.length <= 2) {
       return {
         suspectId: suspectCandidates[0].id,
         locationId: locationCandidates[0].id,
         weaponId: weaponCandidates[0].id,
       };
     }
-  } else if (player.type === 'ai_instinct') {
+    if (suspectCandidates.length === 1 && locationCandidates.length === 1 && weaponCandidates.length <= 2) {
+      return {
+        suspectId: suspectCandidates[0].id,
+        locationId: locationCandidates[0].id,
+        weaponId: weaponCandidates[0].id,
+      };
+    }
+  }
+
+  // 3. 블레이크(직감형): 남은 후보 총합이 5개 이하인 경우 승부수 고발
+  if (player.type === 'ai_instinct') {
     const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length;
-    if (totalCandidates <= 4) {
+    if (totalCandidates <= 5) {
       return {
         suspectId: suspectCandidates[0]?.id || SUSPECTS[0].id,
         locationId: locationCandidates[0]?.id || LOCATION_CARDS[0].id,

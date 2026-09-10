@@ -18,6 +18,8 @@ export type PeerMessageType =
   | 'EVENT_DIALOGUE'
   | 'EVENT_EMOTE'
   | 'HYPOTHESIS_VISUAL'
+  | 'TURN_REVIEW_UPDATE'
+  | 'TURN_REVIEW_CONFIRM'
   | 'HEARTBEAT'
   | 'PING'
   | 'PONG';

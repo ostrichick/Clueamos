@@ -21,6 +21,8 @@ import {
   decideArthurAction, 
   decideBlakeAction, 
   recordShownCard,
+  recordUndisprovenSuggestion,
+  recordObservedDisprove,
   shouldAIAccuse,
   AIMemory
 } from '../src/engine/ai';
@@ -182,11 +184,22 @@ function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCou
         // Update human detective's notes
         brain.notes[revealedCard.id] = 'NO';
 
+        state.players.forEach(p => {
+          if (p.type.startsWith('ai_') && p.id !== disproverPlayer.id && aiMemories[p.id]) {
+            recordObservedDisprove(aiMemories[p.id], state.currentSuggestion!, disproverPlayer.id, p.hand);
+          }
+        });
+
         state = resolveDisprove(state, disproverPlayer.id, revealedCard.id);
       } else {
         if (verbose) {
           console.log(`   ✨ No one could disprove this claim!`);
         }
+        state.players.forEach(p => {
+          if (p.type.startsWith('ai_') && aiMemories[p.id]) {
+            recordUndisprovenSuggestion(aiMemories[p.id], state.currentSuggestion!, p.hand);
+          }
+        });
         state = resolveDisprove(state, 'none', undefined);
       }
 
@@ -248,8 +261,20 @@ function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCou
           const disproverPlayer = state.players[disprover.playerIndex];
           const revealedCard = disprover.availableCards[0];
           recordShownCard(memory, disproverPlayer.id, revealedCard.id);
+
+          state.players.forEach(p => {
+            if (p.type.startsWith('ai_') && p.id !== currentP.id && p.id !== disproverPlayer.id && aiMemories[p.id]) {
+              recordObservedDisprove(aiMemories[p.id], state.currentSuggestion!, disproverPlayer.id, p.hand);
+            }
+          });
+
           state = resolveDisprove(state, disproverPlayer.id, revealedCard.id);
         } else {
+          state.players.forEach(p => {
+            if (p.type.startsWith('ai_') && aiMemories[p.id]) {
+              recordUndisprovenSuggestion(aiMemories[p.id], state.currentSuggestion!, p.hand);
+            }
+          });
           state = resolveDisprove(state, 'none', undefined);
         }
 

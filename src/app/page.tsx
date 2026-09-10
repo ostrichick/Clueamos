@@ -19,6 +19,7 @@ import { TurnPhaseStepper } from '@/components/board/TurnPhaseStepper';
 import { TableEmotesBar } from '@/components/board/TableEmotesBar';
 import { AfkWarningModal } from '@/components/modals/AfkWarningModal';
 import { AutoPlayBanner } from '@/components/game/AutoPlayBanner';
+import { TurnReviewBanner } from '@/components/game/TurnReviewBanner';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
@@ -70,6 +71,8 @@ export default function Home() {
     isAutoPlaying,
     setIsAutoPlaying,
     executeAutoPlayTurn,
+    turnReviewState,
+    confirmTurnReview,
     setLocale: setStoreLocale,
   } = useGameStore();
 
@@ -141,10 +144,36 @@ export default function Home() {
     : (myPlayerRole === 'p1' && currentPlayer?.roleType === 'p1') ||
       (myPlayerRole === 'p2' && currentPlayer?.roleType === 'p2');
 
+  // 카드 추리 상태 판별 헬퍼 (스마트 수첩 및 내 손패와 드롭다운 완벽 일치 동기화)
+  const getEffectiveCardStatus = (cardId: string): { mark: 'YES' | 'NO' | 'UNKNOWN'; tag: string; label: string } => {
+    const isMyCard = myPlayer?.hand?.some(c => c.id === cardId);
+    if (isMyCard) {
+      return { mark: 'NO', tag: ` [${t.handBadge} ✕]`, label: `✕ (${t.handBadge})` };
+    }
+    const note = userNotes[cardId] || 'UNKNOWN';
+    if (note === 'NO') {
+      return { mark: 'NO', tag: ' [✕ 제외]', label: '✕ 제외됨' };
+    }
+    if (note === 'YES') {
+      return { mark: 'YES', tag: ' [◯ 확정]', label: '◯ 확정' };
+    }
+    return { mark: 'UNKNOWN', tag: ' [❓ 미확인]', label: '❓ 미확인' };
+  };
+
+  // 이미 배제된(내 손패/X 표시) 카드가 기본 선택되어 있을 경우 미확인 후보로 스마트 자동 전환
+  const activeSuspect = (getEffectiveCardStatus(selectedSuspect).mark === 'NO')
+    ? (SUSPECTS.find(s => getEffectiveCardStatus(s.id).mark === 'UNKNOWN')?.id || selectedSuspect)
+    : selectedSuspect;
+
+  const activeWeapon = (getEffectiveCardStatus(selectedWeapon).mark === 'NO')
+    ? (WEAPONS.find(w => getEffectiveCardStatus(w.id).mark === 'UNKNOWN')?.id || selectedWeapon)
+    : selectedWeapon;
+
   // AI 턴 자동 실행 감지 (상태 변경 및 턴 전환 시 안전하게 AI 실행 보장)
   useEffect(() => {
     if (!isGameStarted) return;
     if (gameState.phase === 'GAME_OVER') return;
+    if (turnReviewState && turnReviewState.active) return;
 
     if (gameState.phase === 'PLAYING_ROLL' && !isRollingDice) {
       const currentP = gameState.players[gameState.currentPlayerIndex];
@@ -155,7 +184,7 @@ export default function Home() {
         return () => clearTimeout(timer);
       }
     }
-  }, [isGameStarted, gameState.phase, gameState.currentPlayerIndex, gameState.players, isRollingDice, runAITurnIfNeeded]);
+  }, [isGameStarted, gameState.phase, gameState.currentPlayerIndex, gameState.players, isRollingDice, runAITurnIfNeeded, turnReviewState]);
 
   // AFK(자리 비움) 감지 타이머 및 대리 플레이 상태
   const lastActivityTime = useRef<number>(0);
@@ -377,9 +406,9 @@ export default function Home() {
   const handleSuggestion = () => {
     sounds.playQuestion();
     performSuggestion({
-      suspectId: selectedSuspect,
+      suspectId: activeSuspect,
       locationId: currentPlayer.currentRoomId,
-      weaponId: selectedWeapon,
+      weaponId: activeWeapon,
     });
   };
 
@@ -511,6 +540,16 @@ export default function Home() {
         t={t}
       />
 
+      {/* 턴 종료 후 수첩 정리 및 플레이어 확인 배너 */}
+      <TurnReviewBanner
+        review={turnReviewState}
+        playMode={playMode}
+        myPlayerRole={myPlayerRole}
+        isAutoPlaying={isAutoPlaying}
+        onConfirm={confirmTurnReview}
+        t={t}
+      />
+
       {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
       {(lastSecretClue || isPassingCard) && (
         <CardPassModal
@@ -595,20 +634,19 @@ export default function Home() {
                   <label className="text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
                     <span>{t.selectSuspect}</span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      {userNotes[selectedSuspect] === 'NO' ? '✕ 제외됨' : userNotes[selectedSuspect] === 'YES' ? '◯ 확정' : '❓ 미확인'}
+                      {getEffectiveCardStatus(activeSuspect).label}
                     </span>
                   </label>
                   <select 
-                    value={selectedSuspect} 
+                    value={activeSuspect} 
                     onChange={e => setSelectedSuspect(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl p-2.5 text-slate-100 font-medium transition-colors cursor-pointer"
                   >
                     {SUSPECTS.map(s => {
-                      const note = userNotes[s.id];
-                      const tag = note === 'NO' ? ' [✕ 제외]' : note === 'YES' ? ' [◯ 확정]' : ' [❓ 미확인]';
+                      const status = getEffectiveCardStatus(s.id);
                       return (
                         <option key={s.id} value={s.id}>
-                          {getCardName(s.id)}{tag}
+                          {getCardName(s.id)}{status.tag}
                         </option>
                       );
                     })}
@@ -619,20 +657,19 @@ export default function Home() {
                   <label className="text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
                     <span>{t.selectWeapon}</span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      {userNotes[selectedWeapon] === 'NO' ? '✕ 제외됨' : userNotes[selectedWeapon] === 'YES' ? '◯ 확정' : '❓ 미확인'}
+                      {getEffectiveCardStatus(activeWeapon).label}
                     </span>
                   </label>
                   <select 
-                    value={selectedWeapon} 
+                    value={activeWeapon} 
                     onChange={e => setSelectedWeapon(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl p-2.5 text-slate-100 font-medium transition-colors cursor-pointer"
                   >
                     {WEAPONS.map(w => {
-                      const note = userNotes[w.id];
-                      const tag = note === 'NO' ? ' [✕ 제외]' : note === 'YES' ? ' [◯ 확정]' : ' [❓ 미확인]';
+                      const status = getEffectiveCardStatus(w.id);
                       return (
                         <option key={w.id} value={w.id}>
-                          {getCardName(w.id)}{tag}
+                          {getCardName(w.id)}{status.tag}
                         </option>
                       );
                     })}
@@ -643,13 +680,13 @@ export default function Home() {
               {/* 빠른 후보 칩 (아직 배제되지 않은 미확인 ? 후보들 원터치 선택) */}
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                 <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider mr-1">미확인 후보:</span>
-                {SUSPECTS.filter(s => userNotes[s.id] === 'UNKNOWN').slice(0, 3).map(s => (
+                {SUSPECTS.filter(s => getEffectiveCardStatus(s.id).mark === 'UNKNOWN').slice(0, 3).map(s => (
                   <button
                     key={s.id}
                     type="button"
                     onClick={() => setSelectedSuspect(s.id)}
                     className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
-                      selectedSuspect === s.id 
+                      activeSuspect === s.id 
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
                         : 'bg-slate-800/80 text-amber-200/90 border-slate-700 hover:bg-slate-700'
                     }`}
@@ -657,13 +694,13 @@ export default function Home() {
                     {getCardName(s.id)}
                   </button>
                 ))}
-                {WEAPONS.filter(w => userNotes[w.id] === 'UNKNOWN').slice(0, 3).map(w => (
+                {WEAPONS.filter(w => getEffectiveCardStatus(w.id).mark === 'UNKNOWN').slice(0, 3).map(w => (
                   <button
                     key={w.id}
                     type="button"
                     onClick={() => setSelectedWeapon(w.id)}
                     className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
-                      selectedWeapon === w.id 
+                      activeWeapon === w.id 
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
                         : 'bg-slate-800/80 text-amber-200/90 border-slate-700 hover:bg-slate-700'
                     }`}
