@@ -823,6 +823,11 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       if (cardId && responder) {
+        const { aiMemories } = get();
+        if (aiMemories[asker.id]) {
+          recordShownCard(aiMemories[asker.id], responder.id, cardId);
+        }
+
         const shownCard = responder.hand.find(c => c.id === cardId);
         if (shownCard) {
           if (asker.roleType === 'p2' && playMode === 'host') {
@@ -885,9 +890,10 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     runAITurnIfNeeded: async () => {
-      const { playMode, gameState } = get();
+      const { playMode, gameState, lastSecretClue } = get();
       if (playMode === 'guest') return; // Host/Local/Solo handles AI execution
       if (gameState.phase === 'GAME_OVER') return;
+      if (lastSecretClue) return; // Wait until human player dismisses private clue modal
 
       const currentP = gameState.players[gameState.currentPlayerIndex];
       if (!currentP || !currentP.type.startsWith('ai_')) return;
@@ -964,6 +970,9 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     dismissSecretClue: () => {
       set({ lastSecretClue: null });
+      setTimeout(() => {
+        get().runAITurnIfNeeded();
+      }, 400);
     },
   };
 });

@@ -55,12 +55,22 @@ export interface DisproveResponse {
   shownCard?: Card; // 오직 질문자(asker)에게만 보임
 }
 
+export interface LogMetadata {
+  askerId?: string;
+  responderId?: string;
+  suspectId?: string;
+  locationId?: string;
+  weaponId?: string;
+  shownCardId?: string;
+}
+
 export interface LogEntry {
   id: string;
   turn: number;
   message: string;
   type: 'move' | 'suggestion' | 'disprove' | 'accusation' | 'event';
   timestamp: number;
+  metadata?: LogMetadata;
 }
 
 export type GamePhase = 

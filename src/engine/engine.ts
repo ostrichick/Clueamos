@@ -336,6 +336,12 @@ export function makeSuggestion(
     message: `${asker.name} suggests: "${suspect} in the ${location} with the ${weapon}."`,
     type: 'suggestion',
     timestamp: Date.now(),
+    metadata: {
+      askerId: asker.id,
+      suspectId: suggestion.suspectId,
+      locationId: suggestion.locationId,
+      weaponId: suggestion.weaponId,
+    },
   };
 
   const logs = [...state.logs, newLog];
@@ -442,6 +448,14 @@ export function resolveDisprove(
       message: `${responder.name} secretly showed 1 clue to ${asker.name} to disprove the claim.`,
       type: 'disprove',
       timestamp: Date.now(),
+      metadata: {
+        askerId: asker.id,
+        responderId: responder.id,
+        shownCardId,
+        suspectId: state.currentSuggestion?.suspectId,
+        locationId: state.currentSuggestion?.locationId,
+        weaponId: state.currentSuggestion?.weaponId,
+      },
     };
   } else {
     newLog = {
@@ -450,6 +464,13 @@ export function resolveDisprove(
       message: 'Nobody could disprove this hypothesis! (Very close to truth)',
       type: 'disprove',
       timestamp: Date.now(),
+      metadata: {
+        askerId: asker.id,
+        responderId: 'none',
+        suspectId: state.currentSuggestion?.suspectId,
+        locationId: state.currentSuggestion?.locationId,
+        weaponId: state.currentSuggestion?.weaponId,
+      },
     };
   }
 

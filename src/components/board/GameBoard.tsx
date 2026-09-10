@@ -76,6 +76,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // Touch swipe detection for dice roll
   const touchStartY = useRef<number | null>(null);
+  const walkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up walk interval on unmount
+  useEffect(() => {
+    return () => {
+      if (walkIntervalRef.current) {
+        clearInterval(walkIntervalRef.current);
+        walkIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // DeviceMotion shake detection on mobile
   useEffect(() => {
@@ -128,6 +139,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     // Corridor path walk
     const path = findShortestCorridorPath(currentPlayer.currentRoomId, targetRoomId);
     if (path.length > 0) {
+      if (walkIntervalRef.current) {
+        clearInterval(walkIntervalRef.current);
+        walkIntervalRef.current = null;
+      }
+
       setWalkingState({
         playerId: currentPlayer.id,
         path,
@@ -147,11 +163,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             stepIndex: currentStep,
           });
         } else {
-          clearInterval(stepInterval);
+          if (walkIntervalRef.current) {
+            clearInterval(walkIntervalRef.current);
+            walkIntervalRef.current = null;
+          }
           setWalkingState(null);
           onMoveToRoom(targetRoomId);
         }
       }, 70);
+
+      walkIntervalRef.current = stepInterval;
     } else {
       onMoveToRoom(targetRoomId);
     }
@@ -236,12 +257,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     <div className="flex flex-col gap-4 w-full">
       {/* 1. 상단 주사위 굴리기 & 진행 상태 대시보드 */}
       <div 
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
         className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl backdrop-blur-md relative overflow-hidden"
       >
         <div className="flex items-center gap-3.5">
           <div 
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             onClick={() => {
               if (isRollPhase && !isRollingDice) onRollDice();
             }}

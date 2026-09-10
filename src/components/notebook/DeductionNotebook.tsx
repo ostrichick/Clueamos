@@ -59,26 +59,25 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
 
     const map = new Map<string, Set<string>>();
     logs.forEach(log => {
-      if (log.type === 'disprove' && log.message) {
-        // Find which player disproved which cards
-        // Any player mentioned who showed a card has at least 1 of the hypothesis items
-        players.forEach(p => {
-          if (log.message.includes(p.name)) {
-            if (!map.has(p.id)) map.set(p.id, new Set());
-            const set = map.get(p.id)!;
-            // Check all known cards
-            [...SUSPECTS, ...LOCATIONS, ...WEAPONS].forEach(c => {
-              const cardName = t.cards[c.id]?.name || c.name;
-              if (log.message.includes(cardName)) {
-                set.add(c.id);
-              }
-            });
+      if (log.type === 'disprove') {
+        const responderId = log.metadata?.responderId;
+        if (responderId && responderId !== 'none') {
+          if (!map.has(responderId)) map.set(responderId, new Set());
+          const set = map.get(responderId)!;
+
+          // If this player showed a card in response to a suggestion:
+          if (log.metadata?.shownCardId && (log.metadata.askerId === myPlayer?.id || !myPlayer)) {
+            set.add(log.metadata.shownCardId);
+          } else {
+            if (log.metadata?.suspectId) set.add(log.metadata.suspectId);
+            if (log.metadata?.locationId) set.add(log.metadata.locationId);
+            if (log.metadata?.weaponId) set.add(log.metadata.weaponId);
           }
-        });
+        }
       }
     });
     return map;
-  }, [logs, players, smartAssist, t]);
+  }, [logs, smartAssist, myPlayer]);
 
   const renderSimpleRow = (id: string, name: string) => {
     const isMyCard = myPlayer?.hand?.some(c => c.id === id);
