@@ -152,7 +152,7 @@ export const LOCATION_CARDS: Card[] = LOCATIONS.map(r => ({
   description: r.description,
 }));
 
-// 3. 흉기 도구 6개 (존재하는 실제 유니코드 이모지만 적용)
+// 3. 흉기 도구 8개 (존재하는 실제 유니코드 이모지만 적용)
 export const WEAPONS: Card[] = [
   { 
     id: 'weapon_candlestick', 
@@ -190,9 +190,21 @@ export const WEAPONS: Card[] = [
     name: '🧪 독약병 (Poison)', 
     description: '라벨이 뜯겨나간 치명적인 청산가리 유리병.' 
   },
+  { 
+    id: 'weapon_pipe', 
+    category: 'weapon', 
+    name: '🦯 쇠파이프 (Lead Pipe)', 
+    description: '지하 배관실에서 강제로 뜯겨나간 묵직한 납 쇠파이프.' 
+  },
+  { 
+    id: 'weapon_trophy', 
+    category: 'weapon', 
+    name: '🏆 황금 트로피 (Trophy)', 
+    description: '연회장 진열장에 전시되어 있던 묵직한 황동 우승 트로피.' 
+  },
 ];
 
-// 정통 Clue 18장 카드 (용의자 6 + 살인 장소 6 + 흉기 6)
+// 정통 Clue 20장 카드 (용의자 6 + 살인 장소 6 + 흉기 8)
 export const ALL_CARDS: Card[] = [
   ...SUSPECTS,
   ...LOCATION_CARDS,

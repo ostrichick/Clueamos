@@ -463,6 +463,8 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
       weapon_rope: { name: '🪢 Rope', description: 'Strong golden braided curtain cord from the terrace suite.' },
       weapon_wrench: { name: '🔧 Wrench', description: 'Heavy steel pipe wrench from the basement utility room.' },
       weapon_poison: { name: '🧪 Poison', description: 'Lethal bottle of cyanide with a scratched prescription label.' },
+      weapon_pipe: { name: '🦯 Lead Pipe', description: 'Heavy plumbing pipe torn from the basement maintenance conduits.' },
+      weapon_trophy: { name: '🏆 Golden Trophy', description: 'Heavy solid brass championship trophy taken from the ballroom display.' },
     },
     rooms: {
       room_ballroom: { name: '💃 Grand Ballroom', description: 'Opulent first floor ballroom with crystal chandeliers.' },
@@ -752,6 +754,8 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
       weapon_rope: { name: '🪢 Cuerda', description: 'Fuerte cordón dorado de las cortinas de la suite.' },
       weapon_wrench: { name: '🔧 Llave Inglesa', description: 'Pesada llave de acero del cuarto de calderas del sótano.' },
       weapon_poison: { name: '🧪 Veneno', description: 'Letal frasco de cianuro con la etiqueta arrancada.' },
+      weapon_pipe: { name: '🦯 Tubería de Plomo', description: 'Pesada tubería arrancada de los conductos de fontanería del sótano.' },
+      weapon_trophy: { name: '🏆 Trofeo Dorado', description: 'Pesado trofeo de latón macizo sustraído de la vitrina del salón.' },
     },
     rooms: {
       room_ballroom: { name: '💃 Gran Salón', description: 'Lujoso salón de baile con candelabros de cristal titilantes.' },
@@ -1041,6 +1045,8 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
       weapon_rope: { name: '🪢 밧줄', description: '스위트룸 테라스 커튼을 묶어두었던 금색 매듭 밧줄.' },
       weapon_wrench: { name: '🔧 렌치', description: '지하 보일러 배관 점검에 사용된 묵직한 강철 렌치.' },
       weapon_poison: { name: '🧪 독약병', description: '라벨이 뜯겨나간 치명적인 청산가리 유리병.' },
+      weapon_pipe: { name: '🦯 쇠파이프', description: '지하 배관실에서 강제로 뜯겨나간 묵직한 납 쇠파이프.' },
+      weapon_trophy: { name: '🏆 황금 트로피', description: '연회장 진열장에 전시되어 있던 묵직한 황동 우승 트로피.' },
     },
     rooms: {
       room_ballroom: { name: '💃 연회장', description: '샹들리에가 희미하게 흔들리는 1층 대연회장.' },

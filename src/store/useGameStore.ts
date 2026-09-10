@@ -55,12 +55,12 @@ export interface ActiveEmote {
 }
 
 export const INITIAL_ROOM_WEAPONS: Record<string, string[]> = {
-  room_ballroom: ['weapon_candlestick'],
+  room_ballroom: ['weapon_candlestick', 'weapon_trophy'],
   room_kitchen: ['weapon_knife'],
   room_library: ['weapon_revolver'],
-  room_wine_cellar: ['weapon_rope'],
-  room_room304: ['weapon_pipe'],
-  room_rooftop: ['weapon_wrench'],
+  room_wine_cellar: ['weapon_poison'],
+  room_room304: ['weapon_rope'],
+  room_rooftop: ['weapon_wrench', 'weapon_pipe'],
 };
 
 const SESSION_KEY = 'clueamos_session_v1';

@@ -24,8 +24,10 @@ const WEAPON_ICONS: Record<string, string> = {
   weapon_knife: '🔪',
   weapon_revolver: '🔫',
   weapon_rope: '🪢',
-  weapon_pipe: '🚰',
   weapon_wrench: '🔧',
+  weapon_poison: '🧪',
+  weapon_pipe: '🦯',
+  weapon_trophy: '🏆',
 };
 
 interface GameBoardProps {
