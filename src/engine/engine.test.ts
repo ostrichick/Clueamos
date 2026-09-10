@@ -47,11 +47,17 @@ describe('Clueamos Core Game Engine', () => {
     const state = initGame();
     expect(state.phase).toBe('PLAYING_ROLL');
 
-    // 주사위 굴리기
+    // 주사위 굴리기 (주사위 2개)
     const rolledState = rollDice(state);
     expect(rolledState.phase).toBe('PLAYING_MOVE');
-    expect(rolledState.currentDiceRoll).toBeGreaterThanOrEqual(1);
-    expect(rolledState.currentDiceRoll).toBeLessThanOrEqual(6);
+    expect(rolledState.currentDiceRoll).toBeGreaterThanOrEqual(2);
+    expect(rolledState.currentDiceRoll).toBeLessThanOrEqual(12);
+    expect(rolledState.diceRolls).toHaveLength(2);
+    expect(rolledState.diceRolls![0]).toBeGreaterThanOrEqual(1);
+    expect(rolledState.diceRolls![0]).toBeLessThanOrEqual(6);
+    expect(rolledState.diceRolls![1]).toBeGreaterThanOrEqual(1);
+    expect(rolledState.diceRolls![1]).toBeLessThanOrEqual(6);
+    expect(rolledState.currentDiceRoll).toBe(rolledState.diceRolls![0] + rolledState.diceRolls![1]);
     expect(rolledState.accessibleRoomIds?.length).toBeGreaterThan(0);
 
     // 도달 가능한 첫 번째 방으로 이동

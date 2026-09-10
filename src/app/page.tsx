@@ -416,6 +416,7 @@ export default function Home() {
                 currentPlayerIndex={gameState.currentPlayerIndex}
                 phase={gameState.phase}
                 currentDiceRoll={gameState.currentDiceRoll}
+                diceRolls={gameState.diceRolls}
                 accessibleRoomIds={gameState.accessibleRoomIds}
                 isRollingDice={isRollingDice}
                 roomWeapons={roomWeapons}

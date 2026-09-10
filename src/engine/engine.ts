@@ -253,19 +253,21 @@ export function initGame(options?: InitGameOptions): GameState {
 }
 
 /**
- * 주사위 굴리기 (1~6 눈금)
+ * 주사위 굴리기 (주사위 2개, 2~12 눈금 합산)
  * 13x13 복도 그리드 BFS 경로 탐색으로 도달 가능한 방 목록 및 비밀 통로 계산
  */
 export function rollDice(state: GameState): GameState {
   const currentPlayer = state.players[state.currentPlayerIndex];
-  const diceValue = Math.floor(Math.random() * 6) + 1;
+  const d1 = Math.floor(Math.random() * 6) + 1;
+  const d2 = Math.floor(Math.random() * 6) + 1;
+  const diceValue = d1 + d2;
 
   const { reachableRoomIds } = calculateReachablePaths(currentPlayer.currentRoomId, diceValue);
 
   const newLog: LogEntry = {
     id: `log_${Date.now()}_dice`,
     turn: state.turnCount,
-    message: `🎲 ${currentPlayer.name} rolled a ${diceValue}! (${reachableRoomIds.length} destinations reachable)`,
+    message: `🎲 ${currentPlayer.name} rolled [${d1}, ${d2}] = ${diceValue}! (${reachableRoomIds.length} destinations reachable)`,
     type: 'event',
     timestamp: Date.now(),
   };
@@ -274,6 +276,7 @@ export function rollDice(state: GameState): GameState {
     ...state,
     phase: 'PLAYING_MOVE',
     currentDiceRoll: diceValue,
+    diceRolls: [d1, d2],
     accessibleRoomIds: reachableRoomIds,
     logs: [...state.logs, newLog],
   };
@@ -423,6 +426,7 @@ export function waitInHallway(state: GameState): GameState {
   return nextTurn({
     ...state,
     currentDiceRoll: undefined,
+    diceRolls: undefined,
     accessibleRoomIds: undefined,
     logs: [...state.logs, waitLog],
   });
@@ -478,6 +482,7 @@ export function resolveDisprove(
     ...state,
     currentSuggestion: undefined,
     currentDiceRoll: undefined,
+    diceRolls: undefined,
     accessibleRoomIds: undefined,
     logs: [...state.logs, newLog],
   });
@@ -594,6 +599,7 @@ export function nextTurn(state: GameState): GameState {
     currentPlayerIndex: nextIndex,
     phase: 'PLAYING_ROLL', // 다음 차례는 주사위 굴리기부터 시작
     currentDiceRoll: undefined,
+    diceRolls: undefined,
     accessibleRoomIds: undefined,
   };
 }

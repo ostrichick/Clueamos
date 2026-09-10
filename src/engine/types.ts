@@ -94,6 +94,7 @@ export interface GameState {
   solution: Solution;
   currentSuggestion?: Suggestion;
   currentDiceRoll?: number;
+  diceRolls?: [number, number];
   accessibleRoomIds?: string[];
   logs: LogEntry[];
   winnerId?: string;

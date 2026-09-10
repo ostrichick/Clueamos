@@ -31,6 +31,7 @@ interface GameBoardProps {
   currentPlayerIndex: number;
   phase: string;
   currentDiceRoll?: number;
+  diceRolls?: [number, number];
   accessibleRoomIds?: string[];
   isRollingDice: boolean;
   roomWeapons?: Record<string, string[]>;
@@ -47,6 +48,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   currentPlayerIndex,
   phase,
   currentDiceRoll,
+  diceRolls,
   accessibleRoomIds = [],
   isRollingDice,
   roomWeapons = {},
@@ -278,7 +280,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 {isRollPhase 
                   ? t.rollDiceBtn 
                   : isMovePhase && currentDiceRoll 
-                    ? `${t.rolledNumber}: ${currentDiceRoll} 🎲` 
+                    ? `${t.rolledNumber}: 🎲 ${diceRolls ? `${diceRolls[0]} + ${diceRolls[1]} = ${currentDiceRoll}` : currentDiceRoll}` 
                     : `${getPlayerDisplayName(currentPlayer, locale)}${t.turn}`}
               </span>
               {currentSecretTarget && (
@@ -594,6 +596,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <OnBoardDiceOverlay
             isRolling={isRollingDice}
             rolledValue={currentDiceRoll}
+            diceRolls={diceRolls}
             currentRollerName={currentPlayer ? getPlayerDisplayName(currentPlayer, locale) : 'Detective'}
             isAITurn={!isHumanTurn}
             t={t}
@@ -605,10 +608,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* 하단 안내 캡션 */}
         <div className="text-center pt-3 text-[11px] text-amber-200/50 font-sans">
           {locale === 'ko' 
-            ? '💡 주사위를 굴리면 복도 타일에 걸음 수가 표시되며, 방에 마우스를 올리면 발자국 경로가 안내됩니다.'
+            ? '💡 주사위 2개를 굴리면 복도 타일에 걸음 수가 표시되며, 방에 마우스를 올리면 발자국 경로가 안내됩니다.'
             : locale === 'es'
-              ? '💡 Al lanzar el dado, se muestran los pasos en las casillas y las huellas guían el camino.'
-              : '💡 Rolling the die illuminates reachable hallway steps and preview footsteps route.'}
+              ? '💡 Al lanzar los 2 dados, se muestran los pasos en las casillas y las huellas guían el camino.'
+              : '💡 Rolling two dice illuminates reachable hallway steps and preview footsteps route.'}
         </div>
       </div>
 
