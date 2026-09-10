@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, Solution, Suggestion, Card, Player } from '@/engine/types';
+import { GameState, Solution, Suggestion, Card, Player, HypothesisVisualState } from '@/engine/types';
 import { 
   initGame, 
   rollDice, 
@@ -98,6 +98,9 @@ interface GameStore {
   pendingDisprovePrompt: { availableCards: Card[]; askerId: string } | null;
   lastSecretClue: { card: Card; fromName: string } | null;
 
+  // 가설 추리 및 반증 시각화 오버레이 상태
+  activeHypothesisVisual: HypothesisVisualState | null;
+
   // 액션
   setLocale: (locale: SupportedLocale) => void;
   showDialogue: (speaker: Player, text: string) => void;
@@ -121,6 +124,7 @@ interface GameStore {
   performAccusation: (accusation: Solution) => boolean;
   runAITurnIfNeeded: () => Promise<void>;
   dismissSecretClue: () => void;
+  dismissHypothesisVisual: () => void;
   exitToLobby: () => void;
 }
 
@@ -281,6 +285,11 @@ export const useGameStore = create<GameStore>((set, get) => {
         break;
       }
 
+      case 'HYPOTHESIS_VISUAL': {
+        set({ activeHypothesisVisual: (msg.payload?.visual as HypothesisVisualState) || null });
+        break;
+      }
+
       default:
         break;
     }
@@ -321,6 +330,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     activeEmote: null,
     pendingDisprovePrompt: null,
     lastSecretClue: null,
+    activeHypothesisVisual: null,
 
     setLocale: (loc) => {
       set({ currentLocale: loc });
@@ -575,6 +585,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         activeEmote: null,
         selectedRoomId: null,
         isRollingDice: false,
+        activeHypothesisVisual: null,
       });
 
       if (playMode === 'host') {
@@ -602,6 +613,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         activeEmote: null,
         pendingDisprovePrompt: null,
         lastSecretClue: null,
+        activeHypothesisVisual: null,
         activeDialogue: null,
         roomCode: null,
         isConnected: false,
@@ -717,7 +729,22 @@ export const useGameStore = create<GameStore>((set, get) => {
       curWeapons[suggestion.locationId].push(suggestion.weaponId);
       sounds.playWeaponDrop();
 
-      set({ gameState: nextState, roomWeapons: curWeapons });
+      const asker = nextState.players[nextState.currentPlayerIndex];
+
+      // 가설 발표 시각화 상태 생성
+      const initialVisual: HypothesisVisualState = {
+        askerId: asker.id,
+        askerName: asker.name,
+        askerAvatar: asker.avatar,
+        suggestion,
+        phase: 'asking',
+      };
+
+      set({ 
+        gameState: nextState, 
+        roomWeapons: curWeapons,
+        activeHypothesisVisual: initialVisual,
+      });
 
       // If an AI suspect was summoned to the room for questioning, trigger dialogue reaction
       const summonedP = nextState.players.find(p => p.characterId === suggestion.suspectId);
@@ -730,6 +757,10 @@ export const useGameStore = create<GameStore>((set, get) => {
           type: 'STATE_SYNC',
           payload: { gameState: nextState, roomWeapons: curWeapons },
         });
+        peerManager.sendMessage({
+          type: 'HYPOTHESIS_VISUAL',
+          payload: { visual: initialVisual as unknown as Record<string, unknown> },
+        });
       }
 
       // Check disprover clockwise
@@ -738,8 +769,6 @@ export const useGameStore = create<GameStore>((set, get) => {
         nextState.currentPlayerIndex,
         nextState.currentSuggestion!
       );
-
-      const asker = nextState.players[nextState.currentPlayerIndex];
 
       if (disprover) {
         const player = nextState.players[disprover.playerIndex];
@@ -750,6 +779,27 @@ export const useGameStore = create<GameStore>((set, get) => {
             const shownCard = disprover.availableCards[0];
             if (aiMemories[asker.id]) {
               recordShownCard(aiMemories[asker.id], player.id, shownCard.id);
+            }
+
+            const disprovedVisual: HypothesisVisualState = {
+              askerId: asker.id,
+              askerName: asker.name,
+              askerAvatar: asker.avatar,
+              suggestion,
+              phase: 'disproved',
+              responderId: player.id,
+              responderName: player.name,
+              responderAvatar: player.avatar,
+              shownCardId: shownCard.id,
+            };
+
+            set({ activeHypothesisVisual: disprovedVisual });
+
+            if (playMode === 'host') {
+              peerManager.sendMessage({
+                type: 'HYPOTHESIS_VISUAL',
+                payload: { visual: disprovedVisual as unknown as Record<string, unknown> },
+              });
             }
 
             // If asker is Guest (Player 2 in multi-device), send private clue
@@ -765,7 +815,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             }
 
             get().performDisprove(shownCard.id);
-          }, 1200);
+          }, 1500);
         }
         // Case 2: Guest (Player 2) must disprove
         else if (playMode === 'host' && player.roleType === 'p2') {
@@ -789,8 +839,25 @@ export const useGameStore = create<GameStore>((set, get) => {
       } else {
         // Nobody could disprove
         setTimeout(() => {
+          const undisprovenVisual: HypothesisVisualState = {
+            askerId: asker.id,
+            askerName: asker.name,
+            askerAvatar: asker.avatar,
+            suggestion,
+            phase: 'undisproven',
+          };
+
+          set({ activeHypothesisVisual: undisprovenVisual });
+
+          if (playMode === 'host') {
+            peerManager.sendMessage({
+              type: 'HYPOTHESIS_VISUAL',
+              payload: { visual: undisprovenVisual as unknown as Record<string, unknown> },
+            });
+          }
+
           get().performDisprove(undefined);
-        }, 1200);
+        }, 1500);
       }
     },
 
@@ -840,6 +907,28 @@ export const useGameStore = create<GameStore>((set, get) => {
               lastSecretClue: { card: shownCard, fromName: responder.name },
             });
           }
+
+          // If human responder disproved: update activeHypothesisVisual
+          if (!responder.type.startsWith('ai_') && gameState.currentSuggestion) {
+            const disprovedVisual: HypothesisVisualState = {
+              askerId: asker.id,
+              askerName: asker.name,
+              askerAvatar: asker.avatar,
+              suggestion: gameState.currentSuggestion,
+              phase: 'disproved',
+              responderId: responder.id,
+              responderName: responder.name,
+              responderAvatar: responder.avatar,
+              shownCardId: cardId,
+            };
+            set({ activeHypothesisVisual: disprovedVisual });
+            if (playMode === 'host') {
+              peerManager.sendMessage({
+                type: 'HYPOTHESIS_VISUAL',
+                payload: { visual: disprovedVisual as unknown as Record<string, unknown> },
+              });
+            }
+          }
         }
       }
 
@@ -853,10 +942,12 @@ export const useGameStore = create<GameStore>((set, get) => {
         });
       }
 
-      // Trigger AI turn if next
-      setTimeout(() => {
-        get().runAITurnIfNeeded();
-      }, 1000);
+      // If activeHypothesisVisual is displayed, wait until dismissed before triggering AI turn
+      if (!get().activeHypothesisVisual && !get().lastSecretClue) {
+        setTimeout(() => {
+          get().runAITurnIfNeeded();
+        }, 1000);
+      }
     },
 
     performAccusation: (accusation) => {
@@ -890,10 +981,10 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     runAITurnIfNeeded: async () => {
-      const { playMode, gameState, lastSecretClue } = get();
+      const { playMode, gameState, lastSecretClue, activeHypothesisVisual } = get();
       if (playMode === 'guest') return; // Host/Local/Solo handles AI execution
       if (gameState.phase === 'GAME_OVER') return;
-      if (lastSecretClue) return; // Wait until human player dismisses private clue modal
+      if (lastSecretClue || activeHypothesisVisual) return; // Wait until human player dismisses visual modal
 
       const currentP = gameState.players[gameState.currentPlayerIndex];
       if (!currentP || !currentP.type.startsWith('ai_')) return;
@@ -971,7 +1062,24 @@ export const useGameStore = create<GameStore>((set, get) => {
     dismissSecretClue: () => {
       set({ lastSecretClue: null });
       setTimeout(() => {
-        get().runAITurnIfNeeded();
+        if (!get().activeHypothesisVisual) {
+          get().runAITurnIfNeeded();
+        }
+      }, 400);
+    },
+
+    dismissHypothesisVisual: () => {
+      set({ activeHypothesisVisual: null });
+      if (get().playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'HYPOTHESIS_VISUAL',
+          payload: { visual: null },
+        });
+      }
+      setTimeout(() => {
+        if (!get().lastSecretClue) {
+          get().runAITurnIfNeeded();
+        }
       }, 400);
     },
   };

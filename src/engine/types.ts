@@ -97,3 +97,15 @@ export interface GameState {
   logs: LogEntry[];
   winnerId?: string;
 }
+
+export interface HypothesisVisualState {
+  askerId: string;
+  askerName: string;
+  askerAvatar: string;
+  suggestion: Omit<Suggestion, 'askerId'>;
+  phase: 'asking' | 'disproved' | 'undisproven';
+  responderId?: string;
+  responderName?: string;
+  responderAvatar?: string;
+  shownCardId?: string;
+}

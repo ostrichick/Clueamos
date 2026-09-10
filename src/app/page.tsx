@@ -13,6 +13,7 @@ import { DeductionNotebook } from '@/components/notebook/DeductionNotebook';
 import { AccusationModal } from '@/components/modals/AccusationModal';
 import { GameOverModal } from '@/components/modals/GameOverModal';
 import { DisprovePromptModal } from '@/components/modals/DisprovePromptModal';
+import { HypothesisVisualizerModal } from '@/components/modals/HypothesisVisualizerModal';
 import { SpeechBubble } from '@/components/board/SpeechBubble';
 import { TurnPhaseStepper } from '@/components/board/TurnPhaseStepper';
 import { TableEmotesBar } from '@/components/board/TableEmotesBar';
@@ -56,6 +57,8 @@ export default function Home() {
     pendingDisprovePrompt,
     lastSecretClue,
     dismissSecretClue,
+    activeHypothesisVisual,
+    dismissHypothesisVisual,
     activeDialogue,
     dismissDialogue,
     exitToLobby,
@@ -558,6 +561,20 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* 가설 추리 및 반증 카드 시각화 모달 창 */}
+      <HypothesisVisualizerModal
+        visual={activeHypothesisVisual}
+        getCardName={getCardName}
+        getRoomName={getRoomName}
+        onDismiss={dismissHypothesisVisual}
+        onMarkNotebookAndDismiss={(cardId) => {
+          setUserNotes(prev => ({ ...prev, [cardId]: 'NO' }));
+          dismissHypothesisVisual();
+        }}
+        t={t}
+        myPlayerId={myPlayer?.id}
+      />
 
       {/* 비밀 반증 요청 모달 창 */}
       <DisprovePromptModal

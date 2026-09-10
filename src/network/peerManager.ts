@@ -16,6 +16,7 @@ export type PeerMessageType =
   | 'ACTION_ACCUSE'
   | 'EVENT_DIALOGUE'
   | 'EVENT_EMOTE'
+  | 'HYPOTHESIS_VISUAL'
   | 'HEARTBEAT'
   | 'PING'
   | 'PONG';

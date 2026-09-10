@@ -161,6 +161,21 @@ export interface TranslationStrings {
   solutionWeapon: string;
   playAgain: string;
 
+  // Hypothesis Visualizer
+  hypothesisTitle: string;
+  hypothesisSubtitle: string;
+  checkingDisprovers: string;
+  disprovedBy: string;
+  cardShownNotice: string;
+  cardShownToYou: string;
+  youShowedCard: string;
+  nobodyDisproved: string;
+  nobodyDisprovedSub: string;
+  continueBtn: string;
+  markNotebookAndClose: string;
+  presentedClue: string;
+  secretClueExchange: string;
+
   // Cards & Rooms names
   cards: Record<string, { name: string; description: string }>;
   rooms: Record<string, { name: string; description: string }>;
@@ -340,6 +355,20 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     solutionLocation: 'Murder Location',
     solutionWeapon: 'Murder Weapon',
     playAgain: 'Investigate New Case',
+
+    hypothesisTitle: "'s Hypothesis",
+    hypothesisSubtitle: "Investigating the incident in the",
+    checkingDisprovers: "Questioning other detectives for evidence...",
+    disprovedBy: "disproved the hypothesis!",
+    cardShownNotice: "revealed a clue to",
+    cardShownToYou: "secretly showed you this clue:",
+    youShowedCard: "You showed this clue to",
+    nobodyDisproved: "Nobody could disprove this hypothesis!",
+    nobodyDisprovedSub: "These 3 clues are highly likely inside the confidential case file!",
+    continueBtn: "Continue",
+    markNotebookAndClose: "Mark in Notebook & Close",
+    presentedClue: "Presented Clue",
+    secretClueExchange: "Secret AI Exchange",
 
     cards: {
       suspect_scarlett: { name: '🔴 Miss Scarlett', description: 'Glamorous actress in a striking crimson gown with many secrets.' },
@@ -581,6 +610,20 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     solutionWeapon: 'Arma Homicida',
     playAgain: 'Investigar Nuevo Caso',
 
+    hypothesisTitle: " - Hipótesis",
+    hypothesisSubtitle: "Investigando el incidente en",
+    checkingDisprovers: "Interrogando a otros detectives por pistas...",
+    disprovedBy: "¡ha refutado la hipótesis!",
+    cardShownNotice: "mostró una pista a",
+    cardShownToYou: "te mostró secretamente esta pista:",
+    youShowedCard: "Mostraste esta pista a",
+    nobodyDisproved: "¡Nadie pudo refutar esta hipótesis!",
+    nobodyDisprovedSub: "¡Estas 3 pistas probablemente estén dentro del sobre confidencial!",
+    continueBtn: "Continuar",
+    markNotebookAndClose: "Anotar en Cuaderno y Cerrar",
+    presentedClue: "Pista Presentada",
+    secretClueExchange: "Intercambio Secreto de IA",
+
     cards: {
       suspect_scarlett: { name: '🔴 Señorita Escarlata', description: 'Glamurosa actriz vestida de rojo carmesí llena de secretos.' },
       suspect_mustard: { name: '🟡 Coronel Mostaza', description: 'Veterano militar con uniforme mostaza, experto en tácticas y armas.' },
@@ -820,6 +863,20 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     solutionLocation: '살인 장소',
     solutionWeapon: '흉기',
     playAgain: '새로운 사건 수사하기',
+
+    hypothesisTitle: "님의 가설 제기",
+    hypothesisSubtitle: "에서 발생한 사건의 가설을 제기했습니다:",
+    checkingDisprovers: "다른 탐정들의 반증 단서를 확인하는 중...",
+    disprovedBy: "님이 가설을 반증했습니다!",
+    cardShownNotice: "님이 다음 단서를 제시했습니다:",
+    cardShownToYou: "님이 당신에게 다음 단서를 은밀히 보여주었습니다:",
+    youShowedCard: "님에게 다음 단서를 보여주었습니다:",
+    nobodyDisproved: "아무도 이 가설을 반증하지 못했습니다!",
+    nobodyDisprovedSub: "이 3가지 단서는 기밀 사건 봉투 속 진실일 가능성이 매우 높습니다!",
+    continueBtn: "계속 진행",
+    markNotebookAndClose: "수첩에 표시하고 닫기",
+    presentedClue: "제시된 단서",
+    secretClueExchange: "AI 간 비밀 제시",
 
     cards: {
       suspect_scarlett: { name: '🔴 미스 스칼렛', description: '매혹적인 붉은 드레스를 입은 유명 배우. 호텔 곳곳의 비밀을 알고 있다.' },
