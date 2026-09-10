@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { HelpCircle, ScrollText, ArrowRight, Flame } from 'lucide-react';
 import { SUSPECTS, WEAPONS } from '@/engine/data';
@@ -17,6 +17,8 @@ import { HypothesisVisualizerModal } from '@/components/modals/HypothesisVisuali
 import { SpeechBubble } from '@/components/board/SpeechBubble';
 import { TurnPhaseStepper } from '@/components/board/TurnPhaseStepper';
 import { TableEmotesBar } from '@/components/board/TableEmotesBar';
+import { AfkWarningModal } from '@/components/modals/AfkWarningModal';
+import { AutoPlayBanner } from '@/components/game/AutoPlayBanner';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
@@ -65,6 +67,9 @@ export default function Home() {
     activeDialogue,
     dismissDialogue,
     exitToLobby,
+    isAutoPlaying,
+    setIsAutoPlaying,
+    executeAutoPlayTurn,
     setLocale: setStoreLocale,
   } = useGameStore();
 
@@ -151,6 +156,124 @@ export default function Home() {
       }
     }
   }, [isGameStarted, gameState.phase, gameState.currentPlayerIndex, gameState.players, isRollingDice, runAITurnIfNeeded]);
+
+  // AFK(자리 비움) 감지 타이머 및 대리 플레이 상태
+  const lastActivityTime = useRef<number>(0);
+  const [afkSecondsRemaining, setAfkSecondsRemaining] = useState<number | null>(null);
+
+  // 사용자 인터랙션 감지 (화면 터치, 클릭, 키보드)
+  useEffect(() => {
+    lastActivityTime.current = Date.now();
+    const handleUserActivity = () => {
+      lastActivityTime.current = Date.now();
+    };
+    window.addEventListener('pointerdown', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    window.addEventListener('touchstart', handleUserActivity);
+    return () => {
+      window.removeEventListener('pointerdown', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      window.removeEventListener('touchstart', handleUserActivity);
+    };
+  }, []);
+
+  // 턴 전환 시 활동 기준 시간 갱신
+  useEffect(() => {
+    lastActivityTime.current = Date.now();
+  }, [isMyTurn, gameState.currentPlayerIndex, gameState.phase]);
+
+  // AFK 타이머 주기 검사 (매 초마다 비동기 인터벌로 동작)
+  useEffect(() => {
+    if (!isGameStarted || gameState.phase === 'GAME_OVER') {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // 이미 AI 대리 플레이 중인 경우
+      if (isAutoPlaying) {
+        setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
+        if (isMyTurn) {
+          executeAutoPlayTurn();
+        }
+        return;
+      }
+
+      // 내 턴이 아닐 때는 경고를 띄우지 않음
+      if (!isMyTurn) {
+        setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
+        return;
+      }
+
+      if (lastActivityTime.current === 0) {
+        lastActivityTime.current = Date.now();
+      }
+
+      const elapsedSec = (Date.now() - lastActivityTime.current) / 1000;
+
+      // 1분(60초) + 30초 = 90초 경과 시 AI 자동 대리 플레이 시작
+      if (elapsedSec >= 90) {
+        setAfkSecondsRemaining(null);
+        setIsAutoPlaying(true);
+        executeAutoPlayTurn();
+      } else if (elapsedSec >= 60) {
+        // 60초 경과 시 30초 카운트다운 팝업 노출
+        const remaining = Math.max(0, Math.ceil(90 - elapsedSec));
+        setAfkSecondsRemaining(remaining);
+      } else {
+        setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isGameStarted, gameState.phase, isMyTurn, isAutoPlaying, setIsAutoPlaying, executeAutoPlayTurn]);
+
+  // AI 대리 플레이 상태에서 단계 전환 시 자동 수행
+  useEffect(() => {
+    if (!isGameStarted || gameState.phase === 'GAME_OVER') return;
+    if (!isAutoPlaying || !isMyTurn) return;
+
+    const timer = setTimeout(() => {
+      executeAutoPlayTurn();
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [isGameStarted, gameState.phase, isAutoPlaying, isMyTurn, executeAutoPlayTurn]);
+
+  // 대리 플레이 중 반증 요청 발생 시 자동 처리
+  useEffect(() => {
+    if (!isGameStarted || gameState.phase === 'GAME_OVER' || !isAutoPlaying) return;
+
+    if (pendingDisprovePrompt && pendingDisprovePrompt.availableCards.length > 0) {
+      const timer = setTimeout(() => {
+        executeAutoPlayTurn();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isGameStarted, gameState.phase, isAutoPlaying, pendingDisprovePrompt, executeAutoPlayTurn]);
+
+  // 대리 플레이 중 모달 팝업 자동 닫기 (2.5초 후)
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    if (activeHypothesisVisual || lastSecretClue) {
+      const timer = setTimeout(() => {
+        if (lastSecretClue) dismissSecretClue();
+        if (activeHypothesisVisual) dismissHypothesisVisual();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAutoPlaying, activeHypothesisVisual, lastSecretClue, dismissSecretClue, dismissHypothesisVisual]);
+
+  // 직접 조작으로 제어권 되찾기
+  const handleResumeControl = () => {
+    setIsAutoPlaying(false);
+    lastActivityTime.current = Date.now();
+    setAfkSecondsRemaining(null);
+  };
+
+  // AFK 경고 모달 확인 (저 여기 있어요!)
+  const handleDismissAfkWarning = () => {
+    lastActivityTime.current = Date.now();
+    setAfkSecondsRemaining(null);
+  };
 
   // 메인 설정 화면으로 나가기 핸들러
   const handleExitToLobby = () => {
@@ -381,6 +504,13 @@ export default function Home() {
         onExitToLobby={() => setIsExitModalOpen(true)}
       />
 
+      {/* AI 대리 플레이 중 플로팅 배너 */}
+      <AutoPlayBanner
+        isActive={isAutoPlaying}
+        onResumeControl={handleResumeControl}
+        t={t}
+      />
+
       {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
       {(lastSecretClue || isPassingCard) && (
         <CardPassModal
@@ -411,11 +541,11 @@ export default function Home() {
         />
       </div>
 
-      {/* 메인 대시보드: 좌측(보드 & 탐정명단/로그) | 우측(추측/액션패널, 추리수첩, 내 손패) */}
+      {/* 메인 대시보드: 모바일(보드 -> 추리수첩/손패 -> 로스터/로그) | 데스크톱(좌측 보드+로스터/로그, 우측 추리수첩/손패) */}
       <div className="flex-1 max-w-[1700px] w-full mx-auto p-3 sm:p-5 grid grid-cols-1 xl:grid-cols-12 gap-6">
         
-        {/* 좌측 영역 (7열): 스텝퍼, 보드판, 탐정 현황 & 실시간 사건 일지 */}
-        <div className="xl:col-span-7 flex flex-col gap-4">
+        {/* 1. 보드판 영역 (모바일 1순위 / 데스크톱 1행 1~7열) */}
+        <div className="xl:col-start-1 xl:col-span-7 xl:row-start-1 flex flex-col gap-4 order-1">
           {/* 턴 진행 가이드 스텝 바 (Turn Phase Stepper) */}
           <TurnPhaseStepper
             phase={gameState.phase}
@@ -442,67 +572,10 @@ export default function Home() {
             onMoveToRoom={handleMove}
             onWaitInHallway={performWaitInHallway}
           />
-
-          {/* 하단 2열 서브 그리드: 탐정 명단 & 실시간 사건 일지 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 탐정 현황 (Detectives Roster) */}
-            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-md">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.detectivesListTitle}</h3>
-              <div className="flex flex-col gap-2">
-                {gameState.players.map((p, idx) => (
-                  <div 
-                    key={p.id}
-                    className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                      idx === gameState.currentPlayerIndex
-                        ? 'border-amber-500/60 bg-amber-500/10'
-                        : 'border-slate-800 bg-slate-900/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{p.avatar}</span>
-                      <span className="font-semibold text-slate-200">{getPlayerDisplayName(p, locale)}</span>
-                    </div>
-                    {p.isEliminated ? (
-                      <span className="text-[10px] text-rose-400 font-bold">{t.eliminated}</span>
-                    ) : (
-                      <span className="text-[11px] text-slate-500">
-                        {p.hand.length} {t.cardsCount}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 사건 수사 일지 (Live Activity Log) */}
-            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px] shadow-md">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-                {t.liveLogTitle}
-              </h3>
-              <div className="flex-1 overflow-y-auto max-h-[300px] flex flex-col gap-2 pr-1 text-xs">
-                {gameState.logs.slice().reverse().map(log => (
-                  <div 
-                    key={log.id} 
-                    className={`p-2.5 rounded-lg border leading-relaxed ${
-                      log.type === 'accusation'
-                        ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
-                        : log.type === 'disprove'
-                          ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
-                          : 'border-slate-800 bg-slate-900/50 text-slate-300'
-                    }`}
-                  >
-                    <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
-                    {log.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* 우측 영역 (5열): 추리 스테이션 (추측 패널 / 행동 결정 패널 + 탐정 수첩 + 내 손패) */}
-        <div className="xl:col-span-5 flex flex-col gap-4">
+        {/* 2. 추리 스테이션 (모바일 2순위: 보드 바로 밑에서 추측/수첩/손패 확인 / 데스크톱 우측 8~12열 2행 높이) */}
+        <div className="xl:col-start-8 xl:col-span-5 xl:row-start-1 xl:row-span-2 flex flex-col gap-4 order-2">
           {/* 1. 플레이어 질문 작성 패널 (내 차례일 때 수첩 바로 위에 노출) */}
           {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_SUGGEST' && (
             <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/95 to-amber-950/40 border-2 border-amber-500/60 rounded-2xl p-4 sm:p-5 flex flex-col gap-3.5 shadow-xl shadow-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -682,6 +755,65 @@ export default function Home() {
           )}
         </div>
 
+        {/* 3. 탐정 명단 & 실시간 사건 일지 (모바일 3순위 / 데스크톱 2행 1~7열) */}
+        <div className="xl:col-start-1 xl:col-span-7 xl:row-start-2 flex flex-col gap-4 order-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 탐정 현황 (Detectives Roster) */}
+            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-md">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.detectivesListTitle}</h3>
+              <div className="flex flex-col gap-2">
+                {gameState.players.map((p, idx) => (
+                  <div 
+                    key={p.id}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
+                      idx === gameState.currentPlayerIndex
+                        ? 'border-amber-500/60 bg-amber-500/10'
+                        : 'border-slate-800 bg-slate-900/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{p.avatar}</span>
+                      <span className="font-semibold text-slate-200">{getPlayerDisplayName(p, locale)}</span>
+                    </div>
+                    {p.isEliminated ? (
+                      <span className="text-[10px] text-rose-400 font-bold">{t.eliminated}</span>
+                    ) : (
+                      <span className="text-[11px] text-slate-500">
+                        {p.hand.length} {t.cardsCount}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 사건 수사 일지 (Live Activity Log) */}
+            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px] shadow-md">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+                {t.liveLogTitle}
+              </h3>
+              <div className="flex-1 overflow-y-auto max-h-[300px] flex flex-col gap-2 pr-1 text-xs">
+                {gameState.logs.slice().reverse().map(log => (
+                  <div 
+                    key={log.id} 
+                    className={`p-2.5 rounded-lg border leading-relaxed ${
+                      log.type === 'accusation'
+                        ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
+                        : log.type === 'disprove'
+                          ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
+                          : 'border-slate-800 bg-slate-900/50 text-slate-300'
+                    }`}
+                  >
+                    <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
+                    {log.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* 가설 추리 및 반증 카드 시각화 모달 창 */}
@@ -734,6 +866,14 @@ export default function Home() {
           startNewGame(effectiveP1, effectiveP2, locale);
         }}
         onExitToLobby={handleExitToLobby}
+      />
+
+      {/* 자리 비움(AFK) 경고 모달 창 */}
+      <AfkWarningModal
+        isOpen={afkSecondsRemaining !== null}
+        secondsRemaining={afkSecondsRemaining ?? 30}
+        onDismiss={handleDismissAfkWarning}
+        t={t}
       />
 
       {/* 게임 나가기 확인 모달 창 */}

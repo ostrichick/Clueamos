@@ -165,6 +165,15 @@ export interface TranslationStrings {
   secretPassagePrompt: string;
   backToBoard: string;
 
+  // AFK & Auto-Play
+  afkWarningTitle: string;
+  afkWarningDesc: string;
+  afkSecondsRemaining: string;
+  afkImHere: string;
+  autoPlayingBanner: string;
+  autoPlayingDesc: string;
+  autoPlayingResume: string;
+
   // Game Over
   investigationEnd: string;
   truthRevealed: string;
@@ -374,6 +383,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     quickNotes: 'Notebook',
     secretPassagePrompt: 'Take Secret Passage to',
     backToBoard: 'Back to Board',
+
+    afkWarningTitle: 'Inactivity Warning',
+    afkWarningDesc: 'No action for 1 minute. AI will take over your turn in 30 seconds.',
+    afkSecondsRemaining: 'seconds left',
+    afkImHere: "I'm Here! (OK)",
+    autoPlayingBanner: 'AI Auto-Play Active (AFK)',
+    autoPlayingDesc: 'AI is automatically making moves on your behalf while you are away.',
+    autoPlayingResume: 'Resume Control (OK)',
 
     investigationEnd: 'Investigation Closed',
     truthRevealed: 'solved the mystery and brought justice!',
@@ -643,6 +660,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     secretPassagePrompt: 'Usar Pasaje Secreto a',
     backToBoard: 'Volver al Tablero',
 
+    afkWarningTitle: 'Aviso de Inactividad',
+    afkWarningDesc: 'Sin acción durante 1 minuto. La IA jugará tu turno en 30 segundos.',
+    afkSecondsRemaining: 'segundos restantes',
+    afkImHere: '¡Sigo aquí! (OK)',
+    autoPlayingBanner: 'IA en Juego Automático (Ausente)',
+    autoPlayingDesc: 'La IA está jugando por ti mientras estás ausente.',
+    autoPlayingResume: 'Retomar Control (OK)',
+
     investigationEnd: 'Investigación Concluida',
     truthRevealed: '¡resolvió el misterio y triunfó!',
     mysteryUnsolved: 'El culpable escapó y el caso quedó sin resolver.',
@@ -910,6 +935,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     quickNotes: '수첩 보기',
     secretPassagePrompt: '비밀통로를 통해 이동:',
     backToBoard: '보드판으로 돌아가기',
+
+    afkWarningTitle: '자리 비움 감지',
+    afkWarningDesc: '1분 동안 조작이 없습니다. 30초 후 AI가 대신 턴을 진행합니다.',
+    afkSecondsRemaining: '초 남음',
+    afkImHere: '🙋 저 여기 있어요! (OK)',
+    autoPlayingBanner: '🤖 AI 대리 플레이 중 (자리 비움)',
+    autoPlayingDesc: '자리를 비우셔서 AI가 대신 행동을 진행하고 있습니다.',
+    autoPlayingResume: '🎮 제어권 되찾기 (OK)',
 
     investigationEnd: '수사 종료',
     truthRevealed: '님이 진실을 밝혀냈습니다!',

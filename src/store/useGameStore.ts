@@ -131,6 +131,11 @@ interface GameStore {
   dismissSecretClue: () => void;
   dismissHypothesisVisual: () => void;
   exitToLobby: () => void;
+
+  // AFK 자동 대리 플레이 상태
+  isAutoPlaying: boolean;
+  setIsAutoPlaying: (active: boolean) => void;
+  executeAutoPlayTurn: () => Promise<void>;
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
@@ -348,6 +353,8 @@ export const useGameStore = create<GameStore>((set, get) => {
     pendingDisprovePrompt: null,
     lastSecretClue: null,
     activeHypothesisVisual: null,
+    isAutoPlaying: false,
+    setIsAutoPlaying: (active: boolean) => set({ isAutoPlaying: active }),
 
     setLocale: (loc) => {
       set({ currentLocale: loc });
@@ -619,6 +626,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         selectedRoomId: null,
         isRollingDice: false,
         activeHypothesisVisual: null,
+        isAutoPlaying: false,
       });
 
       if (playMode === 'host') {
@@ -655,6 +663,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         peerOnline: false,
         guestSelectedCharacter: null,
         hostSelectedCharacter: null,
+        isAutoPlaying: false,
       });
     },
 
@@ -1155,6 +1164,146 @@ export const useGameStore = create<GameStore>((set, get) => {
           get().runAITurnIfNeeded();
         }
       }, 400);
+    },
+
+    executeAutoPlayTurn: async () => {
+      const { playMode, gameState, myPlayerRole, isRollingDice, pendingDisprovePrompt, lastSecretClue, activeHypothesisVisual } = get();
+      if (gameState.phase === 'GAME_OVER') return;
+
+      // 1. 비밀 반증 요청이 온 경우 즉시 첫 번째 카드로 자동 반증
+      if (pendingDisprovePrompt && pendingDisprovePrompt.availableCards.length > 0) {
+        get().performDisprove(pendingDisprovePrompt.availableCards[0].id);
+        return;
+      }
+
+      // 2. 팝업이 열려 있는 경우 닫기
+      if (lastSecretClue) {
+        get().dismissSecretClue();
+      }
+      if (activeHypothesisVisual) {
+        get().dismissHypothesisVisual();
+      }
+
+      // 3. 현재 턴 플레이어 확인
+      const currentP = gameState.players[gameState.currentPlayerIndex];
+      if (!currentP) return;
+
+      const isHuman = currentP.type === 'human';
+      const isMyTurn = (playMode === 'solo' || playMode === 'local')
+        ? isHuman
+        : (myPlayerRole === 'p1' && currentP.roleType === 'p1') ||
+          (myPlayerRole === 'p2' && currentP.roleType === 'p2');
+
+      if (!isMyTurn) return;
+
+      // AI 메모리 확보
+      let memory = get().aiMemories[currentP.id];
+      if (!memory) {
+        memory = initAIMemory(currentP);
+        set({ aiMemories: { ...get().aiMemories, [currentP.id]: memory } });
+      }
+
+      // 4. 행동 완료 단계: 최종 고발 가능 여부 확인 후 턴 넘기기
+      if (gameState.phase === 'PLAYING_ACTION_DONE') {
+        const accusation = shouldAIAccuse(currentP, memory);
+        if (accusation) {
+          get().performAccusation(accusation);
+        } else {
+          get().performEndTurn();
+        }
+        return;
+      }
+
+      // 5. 가설 제기 단계
+      if (gameState.phase === 'PLAYING_SUGGEST') {
+        try {
+          const action = decideArthurAction(gameState, memory);
+          if (action.type === 'MOVE_AND_SUGGEST') {
+            get().performSuggestion(action.suggestion);
+          }
+        } catch (err) {
+          console.error('AutoPlay suggest error:', err);
+          get().performEndTurn();
+        }
+        return;
+      }
+
+      // 6. 이동 단계
+      if (gameState.phase === 'PLAYING_MOVE') {
+        try {
+          const action = decideArthurAction(gameState, memory);
+          if (action.type === 'ACCUSE') {
+            get().performAccusation(action.accusation);
+          } else {
+            const accessible = gameState.accessibleRoomIds || [currentP.currentRoomId];
+            const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
+              ? action.targetRoomId
+              : accessible[0];
+            if (!targetRoomId) {
+              get().performWaitInHallway();
+              return;
+            }
+            get().performMove(targetRoomId);
+            setTimeout(() => {
+              try {
+                const stateAfterMove = get().gameState;
+                if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
+                  get().performSuggestion(action.suggestion);
+                }
+              } catch (e) {
+                console.error('AutoPlay after move suggest error:', e);
+              }
+            }, 900);
+          }
+        } catch (err) {
+          console.error('AutoPlay move error:', err);
+          get().performWaitInHallway();
+        }
+        return;
+      }
+
+      // 7. 주사위 굴리기 단계
+      if (gameState.phase === 'PLAYING_ROLL') {
+        if (isRollingDice) return;
+        sounds.playDice();
+        get().performRollDice();
+
+        setTimeout(() => {
+          try {
+            const stateAfterRoll = get().gameState;
+            if (stateAfterRoll.phase !== 'PLAYING_MOVE') return;
+
+            const action = decideArthurAction(stateAfterRoll, memory);
+            if (action.type === 'ACCUSE') {
+              get().performAccusation(action.accusation);
+            } else {
+              const accessible = stateAfterRoll.accessibleRoomIds || [currentP.currentRoomId];
+              const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
+                ? action.targetRoomId
+                : accessible[0];
+              if (!targetRoomId) {
+                get().performWaitInHallway();
+                return;
+              }
+              get().performMove(targetRoomId);
+
+              setTimeout(() => {
+                try {
+                  const stateAfterMove = get().gameState;
+                  if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
+                    get().performSuggestion(action.suggestion);
+                  }
+                } catch (err) {
+                  console.error('AutoPlay suggestion error:', err);
+                }
+              }, 900);
+            }
+          } catch (err) {
+            console.error('AutoPlay turn decision error:', err);
+            get().performWaitInHallway();
+          }
+        }, 1100);
+      }
     },
   };
 });
