@@ -176,3 +176,39 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
     },
   };
 }
+
+/**
+ * 행동 완료 후(PLAYING_ACTION_DONE) AI가 최종 고발을 단행해야 하는지 판단
+ * - 아서(논리형): 3개 카테고리 후보가 1개씩만 남은 경우(100% 확신)
+ * - 블레이크(직감형): 남은 후보 총합이 4개 이하인 경우
+ */
+export function shouldAIAccuse(player: Player, memory: AIMemory): Solution | null {
+  const suspectCandidates = getRemainingCandidates(memory, 'suspect');
+  const locationCandidates = getRemainingCandidates(memory, 'location');
+  const weaponCandidates = getRemainingCandidates(memory, 'weapon');
+
+  if (player.type === 'ai_logic') {
+    if (
+      suspectCandidates.length === 1 &&
+      locationCandidates.length === 1 &&
+      weaponCandidates.length === 1
+    ) {
+      return {
+        suspectId: suspectCandidates[0].id,
+        locationId: locationCandidates[0].id,
+        weaponId: weaponCandidates[0].id,
+      };
+    }
+  } else if (player.type === 'ai_instinct') {
+    const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length;
+    if (totalCandidates <= 4) {
+      return {
+        suspectId: suspectCandidates[0]?.id || SUSPECTS[0].id,
+        locationId: locationCandidates[0]?.id || LOCATION_CARDS[0].id,
+        weaponId: weaponCandidates[0]?.id || WEAPONS[0].id,
+      };
+    }
+  }
+
+  return null;
+}

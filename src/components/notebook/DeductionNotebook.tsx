@@ -191,7 +191,7 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
   };
 
   return (
-    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
+    <div id="deduction-notebook" className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
         <div className="flex items-center gap-2.5">
           {onBackToBoard && (

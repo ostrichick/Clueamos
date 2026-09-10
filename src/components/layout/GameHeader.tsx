@@ -8,7 +8,6 @@ import {
   ScrollText, 
   Flame, 
   RotateCcw,
-  MapPin,
   LogOut 
 } from 'lucide-react';
 import { Player } from '@/engine/types';
@@ -32,6 +31,7 @@ interface GameHeaderProps {
   toggleBgm: () => void;
   activeTab: 'board' | 'notes';
   setActiveTab: (tab: 'board' | 'notes') => void;
+  onScrollToNotes?: () => void;
   isHumanTurn: boolean;
   isMyTurn: boolean;
   onOpenAccuse: () => void;
@@ -55,6 +55,7 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   toggleBgm,
   activeTab,
   setActiveTab,
+  onScrollToNotes,
   isHumanTurn,
   isMyTurn,
   onOpenAccuse,
@@ -149,15 +150,12 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
         </button>
 
         <button 
-          onClick={() => setActiveTab(activeTab === 'board' ? 'notes' : 'board')}
-          className={`text-xs font-bold px-3 py-2 rounded-lg border transition-all flex items-center gap-1.5 ${
-            activeTab === 'notes'
-              ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-500/30 ring-2 ring-amber-400/80 scale-105'
-              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-400'
-          }`}
+          onClick={onScrollToNotes || (() => setActiveTab(activeTab === 'board' ? 'notes' : 'board'))}
+          className="text-xs font-bold px-3 py-2 rounded-lg border bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-400 hover:text-amber-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+          title={t.viewNotes}
         >
-          {activeTab === 'board' ? <ScrollText className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
-          <span>{activeTab === 'board' ? t.viewNotes : t.backToBoard}</span>
+          <ScrollText className="w-4 h-4 text-amber-400" />
+          <span>{t.viewNotes}</span>
         </button>
 
         {isHumanTurn && isMyTurn && !currentPlayer.isEliminated && (

@@ -8,14 +8,16 @@ import {
   makeSuggestion, 
   findNextDisprovingPlayer, 
   resolveDisprove, 
-  makeAccusation 
+  makeAccusation,
+  nextTurn
 } from '@/engine/engine';
 import { 
   AIMemory, 
   initAIMemory, 
   decideArthurAction, 
   decideBlakeAction, 
-  recordShownCard 
+  recordShownCard,
+  shouldAIAccuse
 } from '@/engine/ai';
 import { SupportedLocale, translations } from '@/i18n/translations';
 import { peerManager, PeerMessage } from '@/network/peerManager';
@@ -122,6 +124,7 @@ interface GameStore {
   performSuggestion: (suggestion: Omit<Suggestion, 'askerId'>) => void;
   performDisprove: (cardId?: string) => void;
   performAccusation: (accusation: Solution) => boolean;
+  performEndTurn: () => void;
   runAITurnIfNeeded: () => Promise<void>;
   dismissSecretClue: () => void;
   dismissHypothesisVisual: () => void;
@@ -221,6 +224,13 @@ export const useGameStore = create<GameStore>((set, get) => {
       case 'ACTION_WAIT_HALLWAY': {
         if (playMode === 'host') {
           get().performWaitInHallway();
+        }
+        break;
+      }
+
+      case 'ACTION_END_TURN': {
+        if (playMode === 'host') {
+          get().performEndTurn();
         }
         break;
       }
@@ -700,10 +710,13 @@ export const useGameStore = create<GameStore>((set, get) => {
         });
       }
 
-      // Trigger AI turn if next
-      setTimeout(() => {
-        get().runAITurnIfNeeded();
-      }, 1000);
+      // If active player is AI, trigger AI decision in PLAYING_ACTION_DONE
+      const currentP = nextState.players[nextState.currentPlayerIndex];
+      if (currentP && currentP.type.startsWith('ai_')) {
+        setTimeout(() => {
+          get().runAITurnIfNeeded();
+        }, 800);
+      }
     },
 
     performSuggestion: (suggestion) => {
@@ -980,6 +993,31 @@ export const useGameStore = create<GameStore>((set, get) => {
       return isCorrect;
     },
 
+    performEndTurn: () => {
+      const { playMode } = get();
+
+      if (playMode === 'guest') {
+        peerManager.sendMessage({ type: 'ACTION_END_TURN' });
+        return;
+      }
+
+      const { gameState } = get();
+      const nextState = nextTurn(gameState);
+      set({ gameState: nextState, selectedRoomId: null });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'STATE_SYNC',
+          payload: { gameState: nextState, roomWeapons: get().roomWeapons },
+        });
+      }
+
+      // Trigger AI turn if next player is AI
+      setTimeout(() => {
+        get().runAITurnIfNeeded();
+      }, 800);
+    },
+
     runAITurnIfNeeded: async () => {
       const { playMode, gameState, lastSecretClue, activeHypothesisVisual } = get();
       if (playMode === 'guest') return; // Host/Local/Solo handles AI execution
@@ -994,6 +1032,19 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (!memory) {
         memory = initAIMemory(currentP);
         set({ aiMemories: { ...get().aiMemories, [currentP.id]: memory } });
+      }
+
+      // If in PLAYING_ACTION_DONE phase: AI evaluates final accusation or ends turn
+      if (gameState.phase === 'PLAYING_ACTION_DONE') {
+        const accusation = shouldAIAccuse(currentP, memory);
+        if (accusation) {
+          get().performAccusation(accusation);
+        } else {
+          setTimeout(() => {
+            get().performEndTurn();
+          }, 800);
+        }
+        return;
       }
 
       // If already in PLAYING_SUGGEST phase:

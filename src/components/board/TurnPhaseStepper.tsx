@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Dices, Footprints, Search, Hourglass } from 'lucide-react';
+import { Dices, Footprints, Search, Hourglass, CheckCircle2 } from 'lucide-react';
 import { TranslationStrings } from '@/i18n/translations';
 
 interface TurnPhaseStepperProps {
@@ -21,16 +21,18 @@ export const TurnPhaseStepper: React.FC<TurnPhaseStepperProps> = ({
   isAITurn = false,
   className = '',
 }) => {
-  // Determine current active step index (1, 2, or 3)
+  // Determine current active step index (1, 2, 3, or 4)
   let currentStep = 1;
   if (phase === 'PLAYING_ROLL') currentStep = 1;
   else if (phase === 'PLAYING_MOVE') currentStep = 2;
   else if (phase === 'PLAYING_SUGGEST' || phase === 'WAITING_DISPROVE') currentStep = 3;
+  else if (phase === 'PLAYING_ACTION_DONE') currentStep = 4;
 
   const steps = [
     { num: 1, label: t.stepRollDice, icon: Dices },
     { num: 2, label: t.stepMoveRoom, icon: Footprints },
     { num: 3, label: t.stepSuggest, icon: Search },
+    { num: 4, label: t.stepEndTurn, icon: CheckCircle2 },
   ];
 
   return (
@@ -42,7 +44,15 @@ export const TurnPhaseStepper: React.FC<TurnPhaseStepperProps> = ({
           <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
             <span className="text-[11px] sm:text-xs text-cyan-200 truncate max-w-[200px] sm:max-w-none">
-              🤖 {activePlayerName}: {phase === 'PLAYING_ROLL' ? t.aiRolling : phase === 'PLAYING_MOVE' ? t.aiMoving : t.aiSuggesting}
+              🤖 {activePlayerName}: {
+                phase === 'PLAYING_ROLL' 
+                  ? t.aiRolling 
+                  : phase === 'PLAYING_MOVE' 
+                    ? t.aiMoving 
+                    : phase === 'PLAYING_ACTION_DONE'
+                      ? t.aiActionDone
+                      : t.aiSuggesting
+              }
             </span>
           </div>
         ) : !isMyTurn ? (
@@ -52,7 +62,7 @@ export const TurnPhaseStepper: React.FC<TurnPhaseStepperProps> = ({
           </div>
         ) : (
           <span className="text-[10px] sm:text-[11px] font-black tracking-wider text-amber-400 uppercase font-mono">
-            PHASE {currentStep}/3
+            PHASE {currentStep}/4
           </span>
         )}
       </div>

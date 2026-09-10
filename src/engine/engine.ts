@@ -421,22 +421,23 @@ export function waitInHallway(state: GameState): GameState {
   const waitLog: LogEntry = {
     id: `log_${Date.now()}_wait`,
     turn: state.turnCount,
-    message: `🚶 ${player.name} waited in the hallway and ended their turn.`,
+    message: `🚶 ${player.name} waited in the hallway.`,
     type: 'event',
     timestamp: Date.now(),
   };
 
-  return nextTurn({
+  return {
     ...state,
+    phase: 'PLAYING_ACTION_DONE',
     currentDiceRoll: undefined,
     diceRolls: undefined,
     accessibleRoomIds: undefined,
     logs: [...state.logs, waitLog],
-  });
+  };
 }
 
 /**
- * 반증 수행 및 턴 종료/다음 턴 전환
+ * 반증 수행 및 행동 완료(PLAYING_ACTION_DONE) 전환
  */
 export function resolveDisprove(
   state: GameState, 
@@ -481,14 +482,15 @@ export function resolveDisprove(
     };
   }
 
-  return nextTurn({
+  return {
     ...state,
+    phase: 'PLAYING_ACTION_DONE',
     currentSuggestion: undefined,
     currentDiceRoll: undefined,
     diceRolls: undefined,
     accessibleRoomIds: undefined,
     logs: [...state.logs, newLog],
-  });
+  };
 }
 
 /**

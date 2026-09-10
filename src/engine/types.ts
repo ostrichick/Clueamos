@@ -80,6 +80,7 @@ export type GamePhase =
   | 'PLAYING_MOVE'
   | 'PLAYING_SUGGEST'
   | 'WAITING_DISPROVE'
+  | 'PLAYING_ACTION_DONE'
   | 'ACCUSATION_MODAL'
   | 'GAME_OVER';
 

@@ -13,13 +13,15 @@ import {
   findNextDisprovingPlayer, 
   resolveDisprove, 
   makeAccusation,
-  getPlayerDisplayName
+  getPlayerDisplayName,
+  nextTurn
 } from '../src/engine/engine';
 import { 
   initAIMemory, 
   decideArthurAction, 
   decideBlakeAction, 
   recordShownCard,
+  shouldAIAccuse,
   AIMemory
 } from '../src/engine/ai';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS } from '../src/engine/data';
@@ -187,6 +189,30 @@ function runSingleGame(gameNumber: number, verbose: boolean = false): { winner: 
         }
         state = resolveDisprove(state, 'none', undefined);
       }
+
+      // Phase: PLAYING_ACTION_DONE (Human chooses to accuse or end turn)
+      if (state.phase === 'PLAYING_ACTION_DONE') {
+        const solvedSuspect = SUSPECTS.filter(s => brain.notes[s.id] === 'UNKNOWN');
+        const solvedLocation = LOCATION_CARDS.filter(l => brain.notes[l.id] === 'UNKNOWN');
+        const solvedWeapon = WEAPONS.filter(w => brain.notes[w.id] === 'UNKNOWN');
+
+        if (solvedSuspect.length === 1 && solvedLocation.length === 1 && solvedWeapon.length === 1) {
+          if (verbose) {
+            console.log(`🎯 [POST-ACTION FINAL ACCUSATION!] ${pDisplayName} accuses!`);
+          }
+          const res = makeAccusation(state, {
+            suspectId: solvedSuspect[0].id,
+            locationId: solvedLocation[0].id,
+            weaponId: solvedWeapon[0].id,
+          });
+          state = res.state;
+          if (verbose) {
+            console.log(res.isCorrect ? `   🎉 ${pDisplayName} WON THE GAME!` : `   ❌ Accusation failed!`);
+          }
+        } else {
+          state = nextTurn(state);
+        }
+      }
     } 
     // ----------------------------------------------------
     // AI Turn: Arthur or Blake
@@ -225,6 +251,23 @@ function runSingleGame(gameNumber: number, verbose: boolean = false): { winner: 
           state = resolveDisprove(state, disproverPlayer.id, revealedCard.id);
         } else {
           state = resolveDisprove(state, 'none', undefined);
+        }
+
+        // Phase: PLAYING_ACTION_DONE (AI evaluates final accusation or ends turn)
+        if (state.phase === 'PLAYING_ACTION_DONE') {
+          const accusation = shouldAIAccuse(currentP, memory);
+          if (accusation) {
+            if (verbose) {
+              console.log(`🎯 [AI POST-ACTION ACCUSATION!] ${pDisplayName} accuses!`);
+            }
+            const res = makeAccusation(state, accusation);
+            state = res.state;
+            if (verbose) {
+              console.log(res.isCorrect ? `   ✅ AI Won!` : `   ❌ AI Failed!`);
+            }
+          } else {
+            state = nextTurn(state);
+          }
         }
       }
     }

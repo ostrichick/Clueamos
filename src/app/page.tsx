@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/useGameStore';
-import { HelpCircle, ScrollText, ArrowRight } from 'lucide-react';
+import { HelpCircle, ScrollText, ArrowRight, Flame } from 'lucide-react';
 import { SUSPECTS, WEAPONS } from '@/engine/data';
 import { GameBoard } from '@/components/board/GameBoard';
 import { CardHandTray } from '@/components/cards/CardHandTray';
@@ -32,6 +32,7 @@ export default function Home() {
     performSuggestion,
     performDisprove,
     performAccusation,
+    performEndTurn,
     runAITurnIfNeeded,
     isRollingDice,
     roomWeapons,
@@ -356,6 +357,9 @@ export default function Home() {
         }}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onScrollToNotes={() => {
+          document.getElementById('deduction-notebook')?.scrollIntoView({ behavior: 'smooth' });
+        }}
         isHumanTurn={isHumanTurn}
         isMyTurn={isMyTurn}
         onOpenAccuse={() => setIsAccuseModalOpen(true)}
@@ -395,102 +399,112 @@ export default function Home() {
         />
       </div>
 
-      {/* 메인 대시보드 */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 메인 대시보드 (보드판과 추리 수첩을 한 화면에 동시 배치) */}
+      <div className="flex-1 max-w-[1700px] w-full mx-auto p-3 sm:p-5 grid grid-cols-1 xl:grid-cols-12 gap-6">
         
-        {/* 좌측 2열: 맵 또는 추리 수첩 */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          {activeTab === 'board' ? (
-            <div className="flex flex-col gap-4">
-              {/* 턴 진행 가이드 스텝 바 (Turn Phase Stepper) */}
-              <TurnPhaseStepper
-                phase={gameState.phase}
-                isMyTurn={isMyTurn}
-                t={t}
-                activePlayerName={currentPlayer ? getPlayerDisplayName(currentPlayer, locale) : undefined}
-                isAITurn={!isHumanTurn}
-              />
+        {/* 좌측 영역 (7열): 스텝퍼, 보드판, 행동 결정 패널, 가설 추리 패널, 내 손패 */}
+        <div className="xl:col-span-7 flex flex-col gap-4">
+          {/* 턴 진행 가이드 스텝 바 (Turn Phase Stepper) */}
+          <TurnPhaseStepper
+            phase={gameState.phase}
+            isMyTurn={isMyTurn}
+            t={t}
+            activePlayerName={currentPlayer ? getPlayerDisplayName(currentPlayer, locale) : undefined}
+            isAITurn={!isHumanTurn}
+          />
 
-              <GameBoard
-                players={gameState.players}
-                currentPlayerIndex={gameState.currentPlayerIndex}
-                phase={gameState.phase}
-                currentDiceRoll={gameState.currentDiceRoll}
-                diceRolls={gameState.diceRolls}
-                accessibleRoomIds={gameState.accessibleRoomIds}
-                isRollingDice={isRollingDice}
-                roomWeapons={roomWeapons}
-                t={t}
-                locale={locale}
-                isMyTurn={isMyTurn}
-                onRollDice={handleRollDice}
-                onMoveToRoom={handleMove}
-                onWaitInHallway={performWaitInHallway}
-              />
+          <GameBoard
+            players={gameState.players}
+            currentPlayerIndex={gameState.currentPlayerIndex}
+            phase={gameState.phase}
+            currentDiceRoll={gameState.currentDiceRoll}
+            diceRolls={gameState.diceRolls}
+            accessibleRoomIds={gameState.accessibleRoomIds}
+            isRollingDice={isRollingDice}
+            roomWeapons={roomWeapons}
+            t={t}
+            locale={locale}
+            isMyTurn={isMyTurn}
+            onRollDice={handleRollDice}
+            onMoveToRoom={handleMove}
+            onWaitInHallway={performWaitInHallway}
+          />
 
-              {/* 플레이어 질문 작성 패널 (내 차례일 때만 활성화) */}
-              {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_SUGGEST' && (
-                <div className="mt-2 bg-slate-800/60 border border-amber-500/40 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
-                  <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                    <HelpCircle className="w-4 h-4" /> {t.askHypothesis} ({t.currentRoom}: {getRoomName(currentPlayer.currentRoomId)})
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <label className="text-slate-400 block mb-1">{t.selectSuspect}</label>
-                      <select 
-                        value={selectedSuspect} 
-                        onChange={e => setSelectedSuspect(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
-                      >
-                        {SUSPECTS.map(s => <option key={s.id} value={s.id}>{getCardName(s.id)}</option>)}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-slate-400 block mb-1">{t.selectWeapon}</label>
-                      <select 
-                        value={selectedWeapon} 
-                        onChange={e => setSelectedWeapon(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
-                      >
-                        {WEAPONS.map(w => <option key={w.id} value={w.id}>{getCardName(w.id)}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-end mt-2">
-                    <button
-                      onClick={handleSuggestion}
-                      className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-colors flex items-center gap-1.5 shadow-md shadow-amber-500/20"
-                    >
-                      <span>{t.askQuestionBtn}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
+          {/* 플레이어 질문 작성 패널 (내 차례일 때만 활성화) */}
+          {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_SUGGEST' && (
+            <div className="bg-slate-800/60 border border-amber-500/40 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
+              <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4" /> {t.askHypothesis} ({t.currentRoom}: {getRoomName(currentPlayer.currentRoomId)})
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-slate-400 block mb-1">{t.selectSuspect}</label>
+                  <select 
+                    value={selectedSuspect} 
+                    onChange={e => setSelectedSuspect(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
+                  >
+                    {SUSPECTS.map(s => <option key={s.id} value={s.id}>{getCardName(s.id)}</option>)}
+                  </select>
                 </div>
-              )}
+
+                <div>
+                  <label className="text-slate-400 block mb-1">{t.selectWeapon}</label>
+                  <select 
+                    value={selectedWeapon} 
+                    onChange={e => setSelectedWeapon(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
+                  >
+                    {WEAPONS.map(w => <option key={w.id} value={w.id}>{getCardName(w.id)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-2">
+                <button
+                  onClick={handleSuggestion}
+                  className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-colors flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                >
+                  <span>{t.askQuestionBtn}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          ) : (
-            /* 사건 추리 수첩 (스마트 어시스트 & 로그 연동) */
-            <DeductionNotebook
-              t={t}
-              locale={locale}
-              myPlayer={myPlayer}
-              players={gameState.players}
-              userNotes={userNotes}
-              toggleNote={toggleNote}
-              matrixNotes={matrixNotes}
-              toggleMatrixCell={toggleMatrixCell}
-              getCardName={getCardName}
-              getRoomName={getRoomName}
-              logs={gameState.logs}
-              onResetNotes={() => {
-                setUserNotes({});
-                setMatrixNotes({});
-              }}
-              onBackToBoard={() => setActiveTab('board')}
-            />
+          )}
+
+          {/* 플레이어 행동 완료 후 턴 넘기기 vs 최종 고발 결정 패널 */}
+          {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_ACTION_DONE' && (
+            <div className="bg-gradient-to-r from-slate-900/95 via-slate-850 to-slate-900/95 border-2 border-amber-500/60 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-extrabold text-amber-300 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {t.actionDoneTitle}
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-xl">
+                  {t.actionDoneDesc}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <button
+                  onClick={performEndTurn}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95"
+                >
+                  <span>{t.endTurnBtn}</span>
+                </button>
+
+                {!currentPlayer.isEliminated && (
+                  <button
+                    onClick={() => setIsAccuseModalOpen(true)}
+                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-rose-900/40 cursor-pointer active:scale-95 ring-1 ring-rose-400/50"
+                  >
+                    <Flame className="w-4 h-4 text-rose-200" />
+                    <span>{t.makeAccusationBtn}</span>
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           {/* 내 비공개 손패 영역 (실물 카드 보관함 랙) */}
@@ -499,14 +513,39 @@ export default function Home() {
               cards={myPlayer.hand}
               playerName={getPlayerDisplayName(myPlayer, locale)}
               getCardName={getCardName}
-              onOpenNotebook={() => setActiveTab('notes')}
+              onOpenNotebook={() => {
+                document.getElementById('deduction-notebook')?.scrollIntoView({ behavior: 'smooth' });
+              }}
               t={t}
             />
           )}
         </div>
 
-        {/* 우측 1열: 탐정 현황 & 실시간 사건 일지 */}
-        <div className="flex flex-col gap-4">
+        {/* 우측 영역 (5열): 사건 추리 수첩 (항상 표시), 탐정 현황 & 실시간 사건 일지 */}
+        <div className="xl:col-span-5 flex flex-col gap-4">
+          {/* 사건 추리 수첩 (스마트 어시스트 & 로그 연동) */}
+          <DeductionNotebook
+            t={t}
+            locale={locale}
+            myPlayer={myPlayer}
+            players={gameState.players}
+            userNotes={userNotes}
+            toggleNote={toggleNote}
+            matrixNotes={matrixNotes}
+            toggleMatrixCell={toggleMatrixCell}
+            getCardName={getCardName}
+            getRoomName={getRoomName}
+            logs={gameState.logs}
+            onResetNotes={() => {
+              setUserNotes({});
+              setMatrixNotes({});
+            }}
+            onBackToBoard={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+
+          {/* 탐정 현황 */}
           <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.detectivesListTitle}</h3>
             <div className="flex flex-col gap-2">
@@ -536,12 +575,12 @@ export default function Home() {
           </div>
 
           {/* 사건 수사 일지 */}
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[300px]">
+          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px]">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               <ScrollText className="w-3.5 h-3.5 text-amber-400" />
               {t.liveLogTitle}
             </h3>
-            <div className="flex-1 overflow-y-auto max-h-[360px] flex flex-col gap-2 pr-1 text-xs">
+            <div className="flex-1 overflow-y-auto max-h-[320px] flex flex-col gap-2 pr-1 text-xs">
               {gameState.logs.slice().reverse().map(log => (
                 <div 
                   key={log.id} 

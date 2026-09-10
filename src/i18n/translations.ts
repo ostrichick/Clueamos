@@ -131,7 +131,13 @@ export interface TranslationStrings {
   stepRollDice: string;
   stepMoveRoom: string;
   stepSuggest: string;
+  stepEndTurn: string;
   stepWaiting: string;
+  actionDoneTitle: string;
+  actionDoneDesc: string;
+  endTurnBtn: string;
+  makeAccusationBtn: string;
+  aiActionDone: string;
   smartAssistTitle: string;
   smartAssistDesc: string;
   smartClueDisprovedTag: string;
@@ -327,7 +333,13 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     stepRollDice: 'Roll Die',
     stepMoveRoom: 'Move to Room',
     stepSuggest: 'Investigate',
+    stepEndTurn: 'End Turn / Accuse',
     stepWaiting: 'Waiting...',
+    actionDoneTitle: 'Action Completed',
+    actionDoneDesc: 'You can now pass your turn to the next detective, or make a bold Final Accusation if you know the truth!',
+    endTurnBtn: 'Pass Turn ⏭️',
+    makeAccusationBtn: 'Final Accusation 🔍',
+    aiActionDone: 'Wrapping up turn...',
     smartAssistTitle: 'Smart Clue Assist',
     smartAssistDesc: 'Auto-marks your hand and flags clues disproved by other detectives',
     smartClueDisprovedTag: 'Disproved',
@@ -581,7 +593,13 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     stepRollDice: 'Lanzar Dado',
     stepMoveRoom: 'Mover a Habitación',
     stepSuggest: 'Investigar',
+    stepEndTurn: 'Terminar / Acusar',
     stepWaiting: 'Esperando...',
+    actionDoneTitle: 'Acción Completada',
+    actionDoneDesc: 'Puedes pasar el turno al siguiente detective, o hacer una Acusación Final si conoces la verdad.',
+    endTurnBtn: 'Pasar Turno ⏭️',
+    makeAccusationBtn: 'Acusación Final 🔍',
+    aiActionDone: 'Finalizando turno...',
     smartAssistTitle: 'Asistente de Pistas',
     smartAssistDesc: 'Marca automáticamente tu mano y resalta pistas desmentidas por otros detectives',
     smartClueDisprovedTag: 'Desmentido',
@@ -835,7 +853,13 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     stepRollDice: '주사위 굴리기',
     stepMoveRoom: '방으로 이동',
     stepSuggest: '가설 추리',
+    stepEndTurn: '턴 종료 / 고발',
     stepWaiting: '대기 중...',
+    actionDoneTitle: '이번 턴의 행동 완료',
+    actionDoneDesc: '다음 탐정에게 턴을 넘기거나, 진실을 확신한다면 최종 고발을 단행할 수 있습니다.',
+    endTurnBtn: '턴 넘기기 ⏭️',
+    makeAccusationBtn: '최종 추측하기 🔍',
+    aiActionDone: '턴 마무리 중...',
     smartAssistTitle: '스마트 단서 어시스트',
     smartAssistDesc: '내 손패를 자동 표시하고 다른 탐정들의 반증 기록을 단서 태그로 각인합니다',
     smartClueDisprovedTag: '반증됨',
