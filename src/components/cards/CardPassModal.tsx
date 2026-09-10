@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/engine/types';
 import { ClueCard } from './ClueCard';
 import { Sparkles, CheckCheck, X } from 'lucide-react';
@@ -64,6 +64,8 @@ const SecretClueRevealView: React.FC<{
 }> = ({ secretClue, getCardName, onDismiss, onMarkNotebookAndDismiss, t }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [slideIn, setSlideIn] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState<number>(5.0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     sounds.playCardSlide();
@@ -73,9 +75,40 @@ const SecretClueRevealView: React.FC<{
     return () => clearTimeout(timer);
   }, []);
 
+  // 5.0초 카운트다운 타이머: 뒤집은 후 시간이 다 되면 자동으로 수첩에 마크하고 닫기
+  useEffect(() => {
+    if (!isFlipped) return;
+
+    const interval = 100;
+    timerRef.current = setInterval(() => {
+      setSecondsLeft(prev => {
+        const next = prev - 0.1;
+        if (next <= 0) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          if (onMarkNotebookAndDismiss) {
+            sounds.playDisprove();
+            onMarkNotebookAndDismiss(secretClue.card.id);
+          } else {
+            onDismiss();
+          }
+          return 0;
+        }
+        return next;
+      });
+    }, interval);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isFlipped, onMarkNotebookAndDismiss, onDismiss, secretClue.card.id]);
+
   const handleCardFlip = () => {
     if (!isFlipped) {
       setIsFlipped(true);
+      setSecondsLeft(5.0);
       sounds.playCardFlip();
       setTimeout(() => {
         sounds.playClue();
@@ -142,26 +175,45 @@ const SecretClueRevealView: React.FC<{
 
         {/* Post-reveal Actions */}
         {isFlipped && (
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full max-w-xs mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300 z-10">
-            {onMarkNotebookAndDismiss && (
-              <button
-                onClick={() => {
-                  sounds.playDisprove();
-                  onMarkNotebookAndDismiss(secretClue.card.id);
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <CheckCheck className="w-4 h-4 text-slate-950" />
-                <span>{t.markInNotesAndClose}</span>
-              </button>
-            )}
+          <div className="flex flex-col items-center gap-2.5 w-full max-w-xs mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300 z-10">
+            {/* Progress line */}
+            <div className="w-full bg-slate-800/80 rounded-full h-1 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-amber-500 to-indigo-500 h-full transition-all duration-100 ease-linear rounded-full"
+                style={{ width: `${Math.max(0, Math.min(100, (secondsLeft / 5.0) * 100))}%` }}
+              />
+            </div>
 
-            <button
-              onClick={onDismiss}
-              className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold transition-colors"
-            >
-              OK
-            </button>
+            <div className="flex items-center gap-2 w-full">
+              {onMarkNotebookAndDismiss ? (
+                <>
+                  <button
+                    onClick={() => {
+                      sounds.playDisprove();
+                      onMarkNotebookAndDismiss(secretClue.card.id);
+                    }}
+                    className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCheck className="w-4 h-4 text-slate-950" />
+                    <span>{t.markInNotesAndClose} ({Math.max(1, Math.ceil(secondsLeft))}s)</span>
+                  </button>
+
+                  <button
+                    onClick={onDismiss}
+                    className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    OK
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={onDismiss}
+                  className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold transition-colors"
+                >
+                  OK ({Math.max(1, Math.ceil(secondsLeft))}s)
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

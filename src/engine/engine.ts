@@ -5,7 +5,8 @@ import {
   GameState, 
   GamePhase,
   Suggestion, 
-  LogEntry 
+  LogEntry,
+  PlayerRoleType 
 } from './types';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS, CHARACTER_PROFILES } from './data';
 import { calculateReachablePaths } from './boardGrid';
@@ -92,11 +93,12 @@ export interface InitGameOptions {
   player2Name?: string;
   locale?: SupportedLocale;
   maxTurns?: number;
+  aiPlayerCount?: number;
 }
 
 /**
  * 플레이어 표시 이름 헬퍼 (로케일별 실시간 포맷팅)
- * 형식: 캐릭터이름+이모지(player 1), (player 2), (AI 1), (AI 2)
+ * 형식: 캐릭터이름+이모지(player 1), (player 2), (AI 1), (AI 2), (AI 3), (AI 4), (AI 5)
  */
 export function getPlayerDisplayName(player: Player, locale: SupportedLocale = 'en'): string {
   const t = translations[locale] || translations.en;
@@ -117,6 +119,12 @@ export function getPlayerDisplayName(player: Player, locale: SupportedLocale = '
   }
   if (player.roleType === 'ai3') {
     return `${charName} (${t.aiLabel} 3)`;
+  }
+  if (player.roleType === 'ai4') {
+    return `${charName} (${t.aiLabel} 4)`;
+  }
+  if (player.roleType === 'ai5') {
+    return `${charName} (${t.aiLabel} 5)`;
   }
   return player.name;
 }
@@ -157,75 +165,102 @@ export function initGame(options?: InitGameOptions): GameState {
   const shuffledDeck = shuffle(remainingCards);
 
   // 2. 플레이어 캐릭터 및 AI 무작위 캐릭터 할당
-  // 남은 4명의 용의자 중 2명을 AI 1, AI 2로 무작위 선발
-  const remainingSuspects = shuffle(
-    SUSPECTS.filter(s => s.id !== p1CharId && s.id !== p2CharId)
-  );
-  const ai1CharId = remainingSuspects[0].id;
-  const ai2CharId = remainingSuspects[1].id;
+  const rawPlayers: Omit<Player, 'name'>[] = [];
 
   const p1Profile = CHARACTER_PROFILES[p1CharId] || CHARACTER_PROFILES.suspect_scarlett;
-  const p2Profile = CHARACTER_PROFILES[p2CharId] || CHARACTER_PROFILES.suspect_mustard;
-  const ai1Profile = CHARACTER_PROFILES[ai1CharId] || CHARACTER_PROFILES.suspect_green;
-  const ai2Profile = CHARACTER_PROFILES[ai2CharId] || CHARACTER_PROFILES.suspect_peacock;
+  rawPlayers.push({
+    id: 'p1',
+    characterId: p1CharId,
+    roleType: 'p1',
+    type: 'human',
+    avatar: p1Profile.avatar,
+    color: p1Profile.color,
+    currentRoomId: p1Profile.defaultRoomId,
+    hand: [],
+    isEliminated: false,
+    score: 0,
+  });
 
-  const rawPlayers: Omit<Player, 'name'>[] = [
-    {
-      id: 'p1',
-      characterId: p1CharId,
-      roleType: 'p1',
-      type: 'human',
-      avatar: p1Profile.avatar,
-      color: p1Profile.color,
-      currentRoomId: p1Profile.defaultRoomId,
-      hand: [],
-      isEliminated: false,
-      score: 0,
-    },
-    {
+  if (!isSingle) {
+    // 멀티플레이어 / 로컬 2인: P1(사람), P2(사람), 그리고 0~4명의 AI 탐정 추가
+    const p2Profile = CHARACTER_PROFILES[p2CharId] || CHARACTER_PROFILES.suspect_mustard;
+    rawPlayers.push({
       id: 'p2',
       characterId: p2CharId,
-      roleType: isSingle ? 'ai1' : 'p2',
-      type: isSingle ? 'ai_logic' : 'human',
+      roleType: 'p2',
+      type: 'human',
       avatar: p2Profile.avatar,
       color: p2Profile.color,
       currentRoomId: p2Profile.defaultRoomId,
       hand: [],
       isEliminated: false,
       score: 0,
-    },
-    {
-      id: 'ai_1',
-      characterId: ai1CharId,
-      roleType: isSingle ? 'ai2' : 'ai1',
-      type: 'ai_logic',
-      avatar: ai1Profile.avatar,
-      color: ai1Profile.color,
-      currentRoomId: ai1Profile.defaultRoomId,
-      hand: [],
-      isEliminated: false,
-      score: 0,
-    },
-    {
-      id: 'ai_2',
-      characterId: ai2CharId,
-      roleType: isSingle ? 'ai3' : 'ai2',
-      type: 'ai_instinct',
-      avatar: ai2Profile.avatar,
-      color: ai2Profile.color,
-      currentRoomId: ai2Profile.defaultRoomId,
-      hand: [],
-      isEliminated: false,
-      score: 0,
-    },
-  ];
+    });
+
+    const remainingSuspects = shuffle(
+      SUSPECTS.filter(s => s.id !== p1CharId && s.id !== p2CharId)
+    );
+
+    const defaultAiCount = 2;
+    const aiCount = typeof options?.aiPlayerCount === 'number'
+      ? Math.max(0, Math.min(4, options.aiPlayerCount))
+      : defaultAiCount;
+
+    for (let i = 0; i < aiCount; i++) {
+      const aiChar = remainingSuspects[i];
+      if (!aiChar) break;
+      const aiProfile = CHARACTER_PROFILES[aiChar.id] || CHARACTER_PROFILES.suspect_green;
+      const aiNum = i + 1;
+      rawPlayers.push({
+        id: `ai_${aiNum}`,
+        characterId: aiChar.id,
+        roleType: `ai${aiNum}` as PlayerRoleType,
+        type: i % 2 === 0 ? 'ai_logic' : 'ai_instinct',
+        avatar: aiProfile.avatar,
+        color: aiProfile.color,
+        currentRoomId: aiProfile.defaultRoomId,
+        hand: [],
+        isEliminated: false,
+        score: 0,
+      });
+    }
+  } else {
+    // 1인 싱글 플레이: P1(사람), 그리고 1~5명의 AI 탐정 (기본 3명)
+    const remainingSuspects = shuffle(
+      SUSPECTS.filter(s => s.id !== p1CharId)
+    );
+
+    const defaultAiCount = 3;
+    const aiCount = typeof options?.aiPlayerCount === 'number'
+      ? Math.max(1, Math.min(5, options.aiPlayerCount))
+      : defaultAiCount;
+
+    for (let i = 0; i < aiCount; i++) {
+      const aiChar = remainingSuspects[i];
+      if (!aiChar) break;
+      const aiProfile = CHARACTER_PROFILES[aiChar.id] || CHARACTER_PROFILES.suspect_green;
+      const aiNum = i + 1;
+      rawPlayers.push({
+        id: `ai_${aiNum}`,
+        characterId: aiChar.id,
+        roleType: `ai${aiNum}` as PlayerRoleType,
+        type: i % 2 === 0 ? 'ai_logic' : 'ai_instinct',
+        avatar: aiProfile.avatar,
+        color: aiProfile.color,
+        currentRoomId: aiProfile.defaultRoomId,
+        hand: [],
+        isEliminated: false,
+        score: 0,
+      });
+    }
+  }
 
   const initialPlayers: Player[] = rawPlayers.map(p => ({
     ...p,
     name: getPlayerDisplayName(p as Player, locale),
   }));
 
-  // 18장의 카드를 4명에게 분배
+  // 15장의 카드를 n명에게 골고루 분배
   shuffledDeck.forEach((card, index) => {
     const playerIndex = index % initialPlayers.length;
     initialPlayers[playerIndex].hand.push(card);

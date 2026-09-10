@@ -43,10 +43,10 @@ function initDetectiveBrain(playerId: string, hand: { id: string }[]): HumanDete
   return { playerId, notes };
 }
 
-function runSingleGame(gameNumber: number, verbose: boolean = false): { winner: string; turns: number; success: boolean } {
+function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCount: number = 2): { winner: string; turns: number; success: boolean } {
   if (verbose) {
     console.log(`\n======================================================`);
-    console.log(`  🕵️ GAME #${gameNumber} SIMULATION (Agent as Player 1 & Player 2)`);
+    console.log(`  🕵️ GAME #${gameNumber} SIMULATION (AI Count: ${aiPlayerCount}, Total Players: ${2 + aiPlayerCount})`);
     console.log(`======================================================\n`);
   }
 
@@ -55,20 +55,18 @@ function runSingleGame(gameNumber: number, verbose: boolean = false): { winner: 
     player1CharacterId: 'suspect_scarlett',
     player2CharacterId: 'suspect_mustard',
     locale: 'ko',
-    maxTurns: 20
+    maxTurns: 25,
+    aiPlayerCount,
   });
 
   const p1 = state.players[0];
   const p2 = state.players[1];
-  const ai1 = state.players[2];
-  const ai2 = state.players[3];
 
   if (verbose) {
-    console.log(`[Roster Initialized]`);
-    console.log(`  - P1: ${p1.name} (Room: ${p1.currentRoomId})`);
-    console.log(`  - P2: ${p2.name} (Room: ${p2.currentRoomId})`);
-    console.log(`  - AI 1: ${ai1.name} (Room: ${ai1.currentRoomId})`);
-    console.log(`  - AI 2: ${ai2.name} (Room: ${ai2.currentRoomId})`);
+    console.log(`[Roster Initialized: ${state.players.length} Players]`);
+    state.players.forEach(p => {
+      console.log(`  - ${p.name} (Role: ${p.roleType}, Type: ${p.type}, Cards: ${p.hand.length})`);
+    });
     console.log(`  - Secret Envelope: [${state.solution.suspectId}, ${state.solution.locationId}, ${state.solution.weaponId}]\n`);
   }
 
@@ -78,10 +76,12 @@ function runSingleGame(gameNumber: number, verbose: boolean = false): { winner: 
     p2: initDetectiveBrain('p2', p2.hand),
   };
 
-  const aiMemories: Record<string, AIMemory> = {
-    ai_1: initAIMemory(ai1),
-    ai_2: initAIMemory(ai2),
-  };
+  const aiMemories: Record<string, AIMemory> = {};
+  state.players.forEach(p => {
+    if (p.type.startsWith('ai_')) {
+      aiMemories[p.id] = initAIMemory(p);
+    }
+  });
 
   let loopSafety = 0;
   while (state.phase !== 'GAME_OVER' && loopSafety < 150) {
@@ -288,16 +288,25 @@ function runSingleGame(gameNumber: number, verbose: boolean = false): { winner: 
   };
 }
 
-// Run 1 detailed verbose game
-console.log('>>> RUNNING DETAILED VERIFICATION GAME (P1 & P2 AGENT SELF-PLAY)...');
-runSingleGame(1, true);
+// 1. Detailed verification for 0 AIs (1v1 Duel)
+console.log('>>> 1. RUNNING 1v1 DUEL SIMULATION (0 AIs, P1 vs P2)...');
+const duelRes = runSingleGame(1, true, 0);
+console.log(`Duel Result: Winner = ${duelRes.winner}, Turns = ${duelRes.turns}`);
 
-// Run 50 automated games batch
-console.log('\n>>> RUNNING 50 STRESS-TEST GAME SIMULATIONS...');
+// 2. Detailed verification for 4 AIs (6-Player Full Party)
+console.log('\n>>> 2. RUNNING 6-PLAYER FULL PARTY SIMULATION (4 AIs)...');
+const partyRes = runSingleGame(2, true, 4);
+console.log(`Full Party Result: Winner = ${partyRes.winner}, Turns = ${partyRes.turns}`);
+
+// 3. Batch simulation across all AI counts (0, 1, 2, 3, 4 AIs)
+console.log('\n>>> 3. RUNNING 50 STRESS-TEST GAME SIMULATIONS ACROSS ALL AI COUNTS (0~4 AIs)...');
 let successCount = 0;
 let solvedCount = 0;
+const aiCountsToTest = [0, 1, 2, 3, 4];
+
 for (let i = 1; i <= 50; i++) {
-  const res = runSingleGame(i, false);
+  const aiCount = aiCountsToTest[i % aiCountsToTest.length];
+  const res = runSingleGame(i, false, aiCount);
   if (res.success) successCount++;
   if (res.winner !== 'None (Timeout/Culprit escaped)') solvedCount++;
 }

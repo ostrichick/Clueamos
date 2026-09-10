@@ -51,6 +51,8 @@ export default function Home() {
     connectionError,
     peerOnline,
     myPlayerRole,
+    aiPlayerCount,
+    setAiPlayerCount,
     syncGuestCharacterChoice,
     syncHostCharacterChoice,
     guestSelectedCharacter,
@@ -122,10 +124,10 @@ export default function Home() {
   const isGameStarted = hasStarted || 
     (playMode === 'guest' && gameState.phase !== 'LOBBY' && (gameState.players[1]?.hand?.length ?? 0) > 0);
 
-  // 멀티플레이어 기기별 관점 (호스트=p1, 게스트=p2, 로컬=현재 차례)
+  // 멀티플레이어 기기별 관점 (호스트=p1, 게스트=p2, 솔로=p1 human, 로컬=현재 차례)
   const myPlayer = playMode === 'guest'
-    ? gameState.players[1]
-    : playMode === 'host'
+    ? (gameState.players.find(p => p.roleType === 'p2') || gameState.players[1])
+    : (playMode === 'host' || playMode === 'solo')
       ? gameState.players[0]
       : currentPlayer;
 
@@ -330,6 +332,8 @@ export default function Home() {
         copySuccessToast={copySuccessToast}
         handleStartGame={handleStartGame}
         getCardName={getCardName}
+        aiPlayerCount={aiPlayerCount}
+        setAiPlayerCount={setAiPlayerCount}
       />
     );
   }

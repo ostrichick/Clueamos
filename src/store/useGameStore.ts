@@ -88,6 +88,7 @@ interface GameStore {
   peerOnline: boolean;
   guestSelectedCharacter: string | null;
   hostSelectedCharacter: string | null;
+  aiPlayerCount: number;
 
   // AI 대사 및 말풍선 인터랙션
   activeDialogue: ActiveDialogue | null;
@@ -105,6 +106,7 @@ interface GameStore {
 
   // 액션
   setLocale: (locale: SupportedLocale) => void;
+  setAiPlayerCount: (count: number) => void;
   showDialogue: (speaker: Player, text: string) => void;
   dismissDialogue: () => void;
   triggerEmote: (emoteKey: string) => void;
@@ -144,6 +146,9 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (msg.payload?.p2Character) {
           set({ guestSelectedCharacter: msg.payload.p2Character as string });
         }
+        if (typeof msg.payload?.aiCount === 'number') {
+          set({ aiPlayerCount: msg.payload.aiCount });
+        }
         break;
       }
 
@@ -156,6 +161,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             payload: {
               p1Character: get().hostSelectedCharacter,
               p2Character: msg.payload.characterId as string,
+              aiCount: get().aiPlayerCount,
             },
           });
         }
@@ -335,6 +341,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     peerOnline: false,
     guestSelectedCharacter: null,
     hostSelectedCharacter: null,
+    aiPlayerCount: 2,
     activeDialogue: null,
     roomWeapons: INITIAL_ROOM_WEAPONS,
     activeEmote: null,
@@ -344,6 +351,20 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     setLocale: (loc) => {
       set({ currentLocale: loc });
+    },
+
+    setAiPlayerCount: (count: number) => {
+      set({ aiPlayerCount: count });
+      if (get().playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'LOBBY_UPDATE',
+          payload: {
+            p1Character: get().hostSelectedCharacter,
+            p2Character: get().guestSelectedCharacter,
+            aiCount: count,
+          },
+        });
+      }
     },
 
     triggerEmote: (emoteKey: string) => {
@@ -452,6 +473,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             payload: {
               p1Character: get().hostSelectedCharacter || 'suspect_scarlett',
               p2Character: get().guestSelectedCharacter || 'suspect_mustard',
+              aiCount: get().aiPlayerCount,
             },
           });
         }
@@ -556,37 +578,36 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     syncHostCharacterChoice: (charId: string) => {
       set({ hostSelectedCharacter: charId });
-      const { playMode, guestSelectedCharacter } = get();
+      const { playMode, guestSelectedCharacter, aiPlayerCount } = get();
       if (playMode === 'host') {
         peerManager.sendMessage({
           type: 'LOBBY_UPDATE',
           payload: {
             p1Character: charId,
             p2Character: guestSelectedCharacter,
+            aiCount: aiPlayerCount,
           },
         });
       }
     },
 
     startNewGame: (p1CharacterId, p2CharacterId, locale) => {
-      const { playMode } = get();
+      const { playMode, aiPlayerCount } = get();
       const isSinglePlayer = playMode === 'solo';
       const newState = initGame({ 
         isSinglePlayer,
         player1CharacterId: p1CharacterId, 
         player2CharacterId: p2CharacterId, 
-        locale 
+        locale,
+        aiPlayerCount,
       });
-      const p2Player = newState.players.find(p => p.id === 'p2');
-      const ai1Player = newState.players.find(p => p.id === 'ai_1');
-      const ai2Player = newState.players.find(p => p.id === 'ai_2');
       
       const memories: Record<string, AIMemory> = {};
-      if (p2Player && p2Player.type.startsWith('ai_')) {
-        memories.p2 = initAIMemory(p2Player);
-      }
-      if (ai1Player) memories.ai_1 = initAIMemory(ai1Player);
-      if (ai2Player) memories.ai_2 = initAIMemory(ai2Player);
+      newState.players.forEach(p => {
+        if (p.type.startsWith('ai_')) {
+          memories[p.id] = initAIMemory(p);
+        }
+      });
 
       set({
         gameState: newState,
@@ -610,12 +631,12 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem(SESSION_KEY);
       }
-      const { isConnected, currentLocale, playMode } = get();
+      const { isConnected, currentLocale, playMode, aiPlayerCount } = get();
       if (isConnected) {
         get().disconnectRoom();
       }
       set({
-        gameState: initGame({ initialPhase: 'LOBBY', locale: currentLocale, isSinglePlayer: playMode === 'solo' }),
+        gameState: initGame({ initialPhase: 'LOBBY', locale: currentLocale, isSinglePlayer: playMode === 'solo', aiPlayerCount }),
         aiMemories: {},
         selectedRoomId: null,
         isRollingDice: false,

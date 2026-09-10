@@ -26,7 +26,7 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
   t,
   myPlayerId,
 }) => {
-  const [secondsLeft, setSecondsLeft] = useState<number>(3.5);
+  const [secondsLeft, setSecondsLeft] = useState<number>(5.0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const soundPlayedRef = useRef<string>('');
 
@@ -37,19 +37,19 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
     if (visual.phase === 'asking' && soundPlayedRef.current !== 'asking') {
       sounds.playQuestion();
       soundPlayedRef.current = 'asking';
-      setSecondsLeft(3.5);
+      setSecondsLeft(5.0);
     } else if (visual.phase === 'disproved' && soundPlayedRef.current !== 'disproved') {
       sounds.playDisprove();
       soundPlayedRef.current = 'disproved';
-      setSecondsLeft(3.5);
+      setSecondsLeft(5.0);
     } else if (visual.phase === 'undisproven' && soundPlayedRef.current !== 'undisproven') {
       sounds.playFail();
       soundPlayedRef.current = 'undisproven';
-      setSecondsLeft(3.5);
+      setSecondsLeft(5.0);
     }
   }, [visual?.phase, visual]);
 
-  // Countdown timer for completed phases
+  // Countdown timer for completed phases: default action is auto-mark if card is shown!
   useEffect(() => {
     if (!visual) return;
     if (visual.phase === 'asking') return; // Don't auto-dismiss while still waiting for disprove response
@@ -60,7 +60,11 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         const next = prev - 0.1;
         if (next <= 0) {
           if (timerRef.current) clearInterval(timerRef.current);
-          onDismiss();
+          if (visual.shownCardId && onMarkNotebookAndDismiss) {
+            onMarkNotebookAndDismiss(visual.shownCardId);
+          } else {
+            onDismiss();
+          }
           return 0;
         }
         return next;
@@ -73,7 +77,7 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         timerRef.current = null;
       }
     };
-  }, [visual?.phase, onDismiss, visual]);
+  }, [visual, onDismiss, onMarkNotebookAndDismiss]);
 
   if (!visual) return null;
 
@@ -84,8 +88,8 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
   const roomDisplayName = getRoomName(visual.suggestion.locationId);
   const shownCardName = visual.shownCardId ? getCardName(visual.shownCardId) : '';
 
-  // Calculate timer percentage (3.5s -> 0%)
-  const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 3.5) * 100));
+  // Calculate timer percentage (5.0s -> 0%)
+  const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 5.0) * 100));
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
@@ -251,29 +255,40 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
             </div>
 
             <div className="flex items-center justify-center gap-2">
-              {/* Optional Quick Mark Notebook button if disproved card is known */}
-              {isDisproved && visual.shownCardId && onMarkNotebookAndDismiss && (
+              {/* If a card was shown and can be marked: PRIMARY default action is auto-mark with countdown timer */}
+              {isDisproved && visual.shownCardId && onMarkNotebookAndDismiss ? (
+                <>
+                  <button
+                    onClick={() => {
+                      if (visual.shownCardId && onMarkNotebookAndDismiss) {
+                        onMarkNotebookAndDismiss(visual.shownCardId);
+                      } else {
+                        onDismiss();
+                      }
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                  >
+                    <BookMarked className="w-3.5 h-3.5 text-slate-950" />
+                    <span>{t.markNotebookAndClose} ({Math.max(1, Math.ceil(secondsLeft))}s)</span>
+                  </button>
+
+                  <button
+                    onClick={onDismiss}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                  >
+                    <span>OK</span>
+                  </button>
+                </>
+              ) : (
+                /* No card shown (e.g. undisproven) -> Normal continue button */
                 <button
-                  onClick={() => {
-                    if (visual.shownCardId) {
-                      onMarkNotebookAndDismiss(visual.shownCardId);
-                    }
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm"
+                  onClick={onDismiss}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                 >
-                  <BookMarked className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{t.markNotebookAndClose}</span>
+                  <span>{t.continueBtn} ({Math.max(1, Math.ceil(secondsLeft))}s)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               )}
-
-              {/* Continue button */}
-              <button
-                onClick={onDismiss}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-              >
-                <span>{t.continueBtn} ({Math.max(1, Math.ceil(secondsLeft))}s)</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
             </div>
           </div>
         )}

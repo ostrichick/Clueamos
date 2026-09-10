@@ -22,6 +22,14 @@ export interface TranslationStrings {
   player1Choice: string;
   player2Choice: string;
   aiDetectivesPreview: string;
+  aiCountTitle: string;
+  aiCountSubtitle: string;
+  aiCount0: string;
+  aiCount1: string;
+  aiCount2: string;
+  aiCount3: string;
+  aiCount4: string;
+  aiCountGuestNote: string;
   characterAlreadyChosen: string;
   startGame: string;
   playModeLocal: string;
@@ -231,6 +239,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     player1Choice: 'Player 1 Character',
     player2Choice: 'Player 2 Character',
     aiDetectivesPreview: 'AI Detectives (Randomly Assigned)',
+    aiCountTitle: 'Additional AI Detectives',
+    aiCountSubtitle: 'Choose how many AI detectives to include alongside the 2 human players (Total: 2 to 6 players)',
+    aiCount0: '0 AIs (1v1 Duel)',
+    aiCount1: '1 AI (3 Players)',
+    aiCount2: '2 AIs (4 Players - Default)',
+    aiCount3: '3 AIs (5 Players)',
+    aiCount4: '4 AIs (6 Players - Full Party)',
+    aiCountGuestNote: 'Set by Host',
     characterAlreadyChosen: 'Chosen by Player 1',
     startGame: 'Start Investigation',
     playModeLocal: 'Single Screen (Pass & Play)',
@@ -491,6 +507,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     player1Choice: 'Personaje del Jugador 1',
     player2Choice: 'Personaje del Jugador 2',
     aiDetectivesPreview: 'Detectives de IA (Asignados al azar)',
+    aiCountTitle: 'Detectives de IA Adicionales',
+    aiCountSubtitle: 'Elige cuántos detectives de IA agregar junto a los 2 jugadores humanos (Total: 2 a 6 jugadores)',
+    aiCount0: '0 IA (Duelo 1v1)',
+    aiCount1: '1 IA (3 Jugadores)',
+    aiCount2: '2 IA (4 Jugadores - Por defecto)',
+    aiCount3: '3 IA (5 Jugadores)',
+    aiCount4: '4 IA (6 Jugadores - Mansión Completa)',
+    aiCountGuestNote: 'Configurado por el Anfitrión',
     characterAlreadyChosen: 'Elegido por Jugador 1',
     startGame: 'Iniciar Investigación',
     playModeLocal: 'Una Pantalla (Pass & Play)',
@@ -751,6 +775,14 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     player1Choice: '플레이어 1 캐릭터',
     player2Choice: '플레이어 2 캐릭터',
     aiDetectivesPreview: 'AI 탐정 (남은 캐릭터 중 자동 배정)',
+    aiCountTitle: 'AI 탐정 인원 설정',
+    aiCountSubtitle: '두 명의 사람 플레이어 외에 참가할 AI 탐정 수를 설정하세요 (총 2~6인 플레이)',
+    aiCount0: '0명 (1:1 결투)',
+    aiCount1: '1명 (총 3인)',
+    aiCount2: '2명 (총 4인 - 기본)',
+    aiCount3: '3명 (총 5인)',
+    aiCount4: '4명 (총 6인 풀파티)',
+    aiCountGuestNote: '방장이 설정 중',
     characterAlreadyChosen: '플레이어 1 선택 완료',
     startGame: '사건 수사 시작',
     playModeLocal: '한 화면에서 플레이 (Pass & Play)',

@@ -43,6 +43,46 @@ describe('Clueamos Core Game Engine', () => {
     expect(allHandCardIds).not.toContain(state.solution.weaponId);
   });
 
+  it('AI 0명 설정 시 1:1 진검승부(2인 플레이)로 카드가 8장/7장 분배되어야 한다', () => {
+    const state = initGame({
+      player1CharacterId: 'suspect_scarlett',
+      player2CharacterId: 'suspect_mustard',
+      aiPlayerCount: 0,
+      locale: 'ko',
+    });
+
+    expect(state.players).toHaveLength(2);
+    expect(state.players[0].roleType).toBe('p1');
+    expect(state.players[1].roleType).toBe('p2');
+    expect(state.players[0].type).toBe('human');
+    expect(state.players[1].type).toBe('human');
+
+    const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
+    expect(totalDistributed).toBe(15);
+    expect(state.players[0].hand.length).toBe(8);
+    expect(state.players[1].hand.length).toBe(7);
+  });
+
+  it('AI 4명 설정 시 6인 풀파티로 모든 용의자가 참여해야 한다', () => {
+    const state = initGame({
+      player1CharacterId: 'suspect_scarlett',
+      player2CharacterId: 'suspect_mustard',
+      aiPlayerCount: 4,
+      locale: 'ko',
+    });
+
+    expect(state.players).toHaveLength(6);
+    expect(state.players[0].roleType).toBe('p1');
+    expect(state.players[1].roleType).toBe('p2');
+    expect(state.players[2].roleType).toBe('ai1');
+    expect(state.players[3].roleType).toBe('ai2');
+    expect(state.players[4].roleType).toBe('ai3');
+    expect(state.players[5].roleType).toBe('ai4');
+
+    const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
+    expect(totalDistributed).toBe(15);
+  });
+
   it('주사위를 굴리고 도달 가능한 방으로 이동할 수 있어야 한다', () => {
     const state = initGame();
     expect(state.phase).toBe('PLAYING_ROLL');
