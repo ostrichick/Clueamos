@@ -306,7 +306,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     isRollingDice: false,
     currentLocale: 'en',
 
-    playMode: 'solo',
+    playMode: 'host',
     myPlayerRole: 'p1',
     roomCode: null,
     isConnected: false,

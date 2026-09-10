@@ -107,22 +107,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </p>
         </div>
 
-        {/* 1. 플레이 모드 선택 (1인 플레이 vs 각자 폰으로 플레이) */}
+        {/* 1. 플레이 모드 선택 (1번 멀티플레이 vs 2번 싱글플레이) */}
         <div className="flex items-center justify-center p-1 bg-slate-800/90 rounded-2xl border border-slate-700 w-full max-w-md shadow-inner">
-          <button
-            onClick={() => {
-              setPlayMode('solo');
-              disconnectRoom();
-            }}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              playMode === 'solo'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>{t.playModeSolo}</span>
-          </button>
           <button
             onClick={() => {
               if (playMode === 'solo') {
@@ -131,12 +117,26 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             }}
             className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               playMode !== 'solo'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Smartphone className="w-4 h-4" />
             <span>{t.playModeMulti}</span>
+          </button>
+          <button
+            onClick={() => {
+              setPlayMode('solo');
+              disconnectRoom();
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              playMode === 'solo'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>{t.playModeSolo}</span>
           </button>
         </div>
 
@@ -376,14 +376,34 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <span>{locale === 'ko' ? '방장(플레이어 1)이 게임을 시작하기를 기다리고 있습니다...' : 'Waiting for Player 1 to start the investigation...'}</span>
           </div>
         ) : (
-          <button
-            disabled={playMode === 'host' && !isConnected}
-            onClick={handleStartGame}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 font-black text-base sm:text-lg shadow-lg shadow-amber-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-          >
-            <span>{t.startGame}</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          <div className="w-full flex flex-col items-center gap-2">
+            <button
+              disabled={playMode === 'host' && !isConnected}
+              onClick={handleStartGame}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-black text-base sm:text-lg shadow-lg shadow-amber-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <span>{t.startGame}</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            {playMode === 'host' && !isConnected && (
+              <p className="text-[11px] text-amber-400/90 flex items-center gap-1.5 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>
+                  {!roomCode
+                    ? (locale === 'ko'
+                        ? '💡 상단의 [방 만들기]를 눌러 방을 생성하거나, 2번 싱글 플레이를 선택하세요.'
+                        : locale === 'es'
+                          ? '💡 Presiona [Crear Sala] arriba para crear una sala o selecciona Un Jugador.'
+                          : '💡 Tap [Host Room] above to create a room, or choose Option 2 for Solo Play.')
+                    : (locale === 'ko'
+                        ? '💡 상대방(플레이어 2)이 2자리 코드로 접속하면 게임을 시작할 수 있습니다.'
+                        : locale === 'es'
+                          ? '💡 Puedes comenzar cuando el Jugador 2 se una con el código de 2 dígitos.'
+                          : '💡 You can start once Player 2 joins with the 2-digit code.')}
+                </span>
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>
