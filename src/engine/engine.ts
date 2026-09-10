@@ -252,14 +252,17 @@ export function initGame(options?: InitGameOptions): GameState {
   };
 }
 
+/** 각 주사위의 최대 눈금 (1~3 눈금, 주사위 2개 합산 2~6으로 맨션 도달 거리 밸런스 최적화) */
+export const DIE_MAX_VALUE = 3;
+
 /**
- * 주사위 굴리기 (주사위 2개, 2~12 눈금 합산)
+ * 주사위 굴리기 (주사위 2개, 2~6 눈금 합산)
  * 13x13 복도 그리드 BFS 경로 탐색으로 도달 가능한 방 목록 및 비밀 통로 계산
  */
-export function rollDice(state: GameState): GameState {
+export function rollDice(state: GameState, maxVal: number = DIE_MAX_VALUE): GameState {
   const currentPlayer = state.players[state.currentPlayerIndex];
-  const d1 = Math.floor(Math.random() * 6) + 1;
-  const d2 = Math.floor(Math.random() * 6) + 1;
+  const d1 = Math.floor(Math.random() * maxVal) + 1;
+  const d2 = Math.floor(Math.random() * maxVal) + 1;
   const diceValue = d1 + d2;
 
   const { reachableRoomIds } = calculateReachablePaths(currentPlayer.currentRoomId, diceValue);

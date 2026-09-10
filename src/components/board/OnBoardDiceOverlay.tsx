@@ -85,8 +85,8 @@ export const OnBoardDiceOverlay: React.FC<OnBoardDiceOverlayProps> = ({
     if (isRolling) {
       const interval = setInterval(() => {
         setRollingValues([
-          Math.floor(Math.random() * 6) + 1,
-          Math.floor(Math.random() * 6) + 1,
+          Math.floor(Math.random() * 3) + 1,
+          Math.floor(Math.random() * 3) + 1,
         ]);
         setRollingRotation1({
           x: Math.floor(Math.random() * 360),
