@@ -3,6 +3,7 @@ import {
   Player, 
   Solution, 
   GameState, 
+  GamePhase,
   Suggestion, 
   LogEntry 
 } from './types';
@@ -83,6 +84,7 @@ export function shuffle<T>(array: T[]): T[] {
 }
 
 export interface InitGameOptions {
+  initialPhase?: GamePhase;
   isSinglePlayer?: boolean;
   player1CharacterId?: string;
   player2CharacterId?: string;
@@ -238,7 +240,7 @@ export function initGame(options?: InitGameOptions): GameState {
   };
 
   return {
-    phase: 'PLAYING_ROLL', // 주사위를 먼저 굴려야 함!
+    phase: options?.initialPhase || 'PLAYING_ROLL',
     turnCount: 1,
     maxTurns,
     currentPlayerIndex: 0,

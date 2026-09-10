@@ -58,6 +58,7 @@ export default function Home() {
     dismissSecretClue,
     activeDialogue,
     dismissDialogue,
+    exitToLobby,
     setLocale: setStoreLocale,
   } = useGameStore();
 
@@ -101,6 +102,8 @@ export default function Home() {
   
   // 최종 고발 모달 상태
   const [isAccuseModalOpen, setIsAccuseModalOpen] = useState(false);
+  // 메인 로비 나가기 확인 모달 상태
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
@@ -109,10 +112,11 @@ export default function Home() {
   const effectiveP1 = (playMode === 'guest' && hostSelectedCharacter) ? hostSelectedCharacter : p1Character;
   const effectiveP2 = (playMode === 'host' && guestSelectedCharacter) ? guestSelectedCharacter : p2Character;
 
-  // 게임 시작 여부 파생 (호스트/로컬은 hasStarted, 게스트 또는 세션 복원 시 카드가 분배되었을 때 시작으로 간주)
+  // 게임 시작 여부:
+  // 1. 호스트/1인 플레이어가 시작 버튼을 눌렀을 때 (hasStarted === true)
+  // 2. 게스트 모드에서 호스트가 게임을 시작하여 게임 상태가 LOBBY가 아니고 카드가 분배되었을 때
   const isGameStarted = hasStarted || 
-    (playMode === 'guest' && (gameState.players[0]?.hand?.length ?? 0) > 0) ||
-    (gameState.phase !== 'LOBBY' && (gameState.players[0]?.hand?.length ?? 0) > 0);
+    (playMode === 'guest' && gameState.phase !== 'LOBBY' && (gameState.players[1]?.hand?.length ?? 0) > 0);
 
   // 멀티플레이어 기기별 관점 (호스트=p1, 게스트=p2, 로컬=현재 차례)
   const myPlayer = playMode === 'guest'
@@ -145,13 +149,9 @@ export default function Home() {
   // 메인 설정 화면으로 나가기 핸들러
   const handleExitToLobby = () => {
     sounds.playCardSlide();
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('clueamos_session_v1');
-    }
-    if (isConnected) {
-      disconnectRoom();
-    }
     setHasStarted(false);
+    setIsExitModalOpen(false);
+    exitToLobby();
   };
 
   // 세션 복원 시도 (모바일 새로고침 또는 브라우저 복귀 시)
@@ -359,7 +359,7 @@ export default function Home() {
         onNewGame={() => {
           startNewGame(effectiveP1, effectiveP2, locale);
         }}
-        onExitToLobby={handleExitToLobby}
+        onExitToLobby={() => setIsExitModalOpen(true)}
       />
 
       {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
@@ -596,6 +596,39 @@ export default function Home() {
         }}
         onExitToLobby={handleExitToLobby}
       />
+
+      {/* 게임 나가기 확인 모달 창 */}
+      {isExitModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="max-w-sm w-full bg-slate-900 border border-amber-500/40 p-6 rounded-3xl text-center flex flex-col items-center gap-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center text-2xl shadow-inner">
+              🚪
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-100">
+                {t.exitToLobby}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                {t.confirmExitToLobby}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 w-full mt-2">
+              <button
+                onClick={() => setIsExitModalOpen(false)}
+                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 transition-colors cursor-pointer"
+              >
+                {locale === 'ko' ? '계속 플레이' : locale === 'es' ? 'Continuar' : 'Keep Playing'}
+              </button>
+              <button
+                onClick={handleExitToLobby}
+                className="py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-black text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                {locale === 'ko' ? '메인 화면으로' : locale === 'es' ? 'Salir al Menú' : 'Exit to Setup'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -180,13 +180,9 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
 
         {onExitToLobby && (
           <button
-            onClick={() => {
-              if (window.confirm(t.confirmExitToLobby)) {
-                onExitToLobby();
-              }
-            }}
+            onClick={onExitToLobby}
             title={t.exitToLobby}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/60 text-slate-400 hover:text-rose-300 transition-all flex items-center gap-1.5"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/60 text-slate-400 hover:text-rose-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <LogOut className="w-4 h-4 text-rose-400" />
             <span className="hidden sm:inline text-xs font-bold text-rose-300">

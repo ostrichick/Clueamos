@@ -121,6 +121,7 @@ interface GameStore {
   performAccusation: (accusation: Solution) => boolean;
   runAITurnIfNeeded: () => Promise<void>;
   dismissSecretClue: () => void;
+  exitToLobby: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
@@ -300,7 +301,7 @@ export const useGameStore = create<GameStore>((set, get) => {
   };
 
   return {
-    gameState: initGame(),
+    gameState: initGame({ initialPhase: 'LOBBY' }),
     aiMemories: {},
     selectedRoomId: null,
     isRollingDice: false,
@@ -581,6 +582,34 @@ export const useGameStore = create<GameStore>((set, get) => {
           payload: { gameState: newState, roomWeapons: INITIAL_ROOM_WEAPONS },
         });
       }
+    },
+
+    exitToLobby: () => {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(SESSION_KEY);
+      }
+      const { isConnected, currentLocale, playMode } = get();
+      if (isConnected) {
+        get().disconnectRoom();
+      }
+      set({
+        gameState: initGame({ initialPhase: 'LOBBY', locale: currentLocale, isSinglePlayer: playMode === 'solo' }),
+        aiMemories: {},
+        selectedRoomId: null,
+        isRollingDice: false,
+        roomWeapons: INITIAL_ROOM_WEAPONS,
+        activeEmote: null,
+        pendingDisprovePrompt: null,
+        lastSecretClue: null,
+        activeDialogue: null,
+        roomCode: null,
+        isConnected: false,
+        isConnecting: false,
+        connectionError: null,
+        peerOnline: false,
+        guestSelectedCharacter: null,
+        hostSelectedCharacter: null,
+      });
     },
 
     selectRoom: (roomId: string) => {
