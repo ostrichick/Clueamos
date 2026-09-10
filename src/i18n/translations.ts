@@ -140,6 +140,7 @@ export interface TranslationStrings {
   sortByCategory: string;
   quickNotes: string;
   secretPassagePrompt: string;
+  backToBoard: string;
 
   // Game Over
   investigationEnd: string;
@@ -311,6 +312,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     sortByCategory: 'Sort Hand',
     quickNotes: 'Notebook',
     secretPassagePrompt: 'Take Secret Passage to',
+    backToBoard: 'Back to Board',
 
     investigationEnd: 'Investigation Closed',
     truthRevealed: 'solved the mystery and brought justice!',
@@ -541,6 +543,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     sortByCategory: 'Ordenar Mano',
     quickNotes: 'Cuaderno',
     secretPassagePrompt: 'Usar Pasaje Secreto a',
+    backToBoard: 'Volver al Tablero',
 
     investigationEnd: 'Investigación Concluida',
     truthRevealed: '¡resolvió el misterio y triunfó!',
@@ -771,6 +774,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     sortByCategory: '손패 정렬',
     quickNotes: '수첩 보기',
     secretPassagePrompt: '비밀통로를 통해 이동:',
+    backToBoard: '보드판으로 돌아가기',
 
     investigationEnd: '수사 종료',
     truthRevealed: '님이 진실을 밝혀냈습니다!',

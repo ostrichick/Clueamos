@@ -457,6 +457,7 @@ export default function Home() {
                 setUserNotes({});
                 setMatrixNotes({});
               }}
+              onBackToBoard={() => setActiveTab('board')}
             />
           )}
 

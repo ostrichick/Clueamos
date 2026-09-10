@@ -17,7 +17,7 @@ import {
   decideBlakeAction, 
   recordShownCard 
 } from '@/engine/ai';
-import { SupportedLocale, translations, TranslationStrings } from '@/i18n/translations';
+import { SupportedLocale, translations } from '@/i18n/translations';
 import { peerManager, PeerMessage } from '@/network/peerManager';
 import { sounds } from '@/utils/sounds';
 
