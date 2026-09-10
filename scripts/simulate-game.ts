@@ -45,24 +45,23 @@ function initDetectiveBrain(playerId: string, hand: { id: string }[]): HumanDete
   return { playerId, notes };
 }
 
-function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCount: number = 2): { winner: string; turns: number; success: boolean } {
+function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCount: number = 2, isSolo: boolean = false): { winner: string; turns: number; success: boolean } {
+  const totalPlayers = (isSolo ? 1 : 2) + aiPlayerCount;
   if (verbose) {
     console.log(`\n======================================================`);
-    console.log(`  🕵️ GAME #${gameNumber} SIMULATION (AI Count: ${aiPlayerCount}, Total Players: ${2 + aiPlayerCount})`);
+    console.log(`  🕵️ GAME #${gameNumber} SIMULATION (${isSolo ? `Solo: 1 Human vs ${aiPlayerCount} AI(s)` : `Multiplayer: 2 Humans + ${aiPlayerCount} AI(s)`}, Total Players: ${totalPlayers})`);
     console.log(`======================================================\n`);
   }
 
-  // 1. Initialize Game: Player 1 as Scarlett, Player 2 as Mustard
+  // 1. Initialize Game
   let state: GameState = initGame({
+    isSinglePlayer: isSolo,
     player1CharacterId: 'suspect_scarlett',
     player2CharacterId: 'suspect_mustard',
     locale: 'ko',
     maxTurns: 25,
     aiPlayerCount,
   });
-
-  const p1 = state.players[0];
-  const p2 = state.players[1];
 
   if (verbose) {
     console.log(`[Roster Initialized: ${state.players.length} Players]`);
@@ -73,10 +72,12 @@ function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCou
   }
 
   // Brains / Memories
-  const brains: Record<string, HumanDetectiveBrain> = {
-    p1: initDetectiveBrain('p1', p1.hand),
-    p2: initDetectiveBrain('p2', p2.hand),
-  };
+  const brains: Record<string, HumanDetectiveBrain> = {};
+  state.players.forEach(p => {
+    if (p.type === 'human') {
+      brains[p.id] = initDetectiveBrain(p.id, p.hand);
+    }
+  });
 
   const aiMemories: Record<string, AIMemory> = {};
   state.players.forEach(p => {
@@ -313,25 +314,30 @@ function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCou
   };
 }
 
-// 1. Detailed verification for 0 AIs (1v1 Duel)
-console.log('>>> 1. RUNNING 1v1 DUEL SIMULATION (0 AIs, P1 vs P2)...');
-const duelRes = runSingleGame(1, true, 0);
+// 1. Detailed verification for Solo 1v1 (1 Human vs 1 AI - Default Solo Option)
+console.log('>>> 1. RUNNING SOLO 1v1 DUEL SIMULATION (1 Human vs 1 AI)...');
+const solo1v1Res = runSingleGame(1, true, 1, true);
+console.log(`Solo 1v1 Result: Winner = ${solo1v1Res.winner}, Turns = ${solo1v1Res.turns}`);
+
+// 2. Detailed verification for Solo 1v5 (1 Human vs 5 AIs - Full Party Solo)
+console.log('\n>>> 2. RUNNING SOLO 1v5 FULL PARTY SIMULATION (1 Human vs 5 AIs)...');
+const solo1v5Res = runSingleGame(2, true, 5, true);
+console.log(`Solo 1v5 Result: Winner = ${solo1v5Res.winner}, Turns = ${solo1v5Res.turns}`);
+
+// 3. Detailed verification for Multiplayer 1v1 (0 AIs, P1 vs P2)
+console.log('\n>>> 3. RUNNING MULTIPLAYER 1v1 DUEL SIMULATION (0 AIs, P1 vs P2)...');
+const duelRes = runSingleGame(3, true, 0, false);
 console.log(`Duel Result: Winner = ${duelRes.winner}, Turns = ${duelRes.turns}`);
 
-// 2. Detailed verification for 4 AIs (6-Player Full Party)
-console.log('\n>>> 2. RUNNING 6-PLAYER FULL PARTY SIMULATION (4 AIs)...');
-const partyRes = runSingleGame(2, true, 4);
-console.log(`Full Party Result: Winner = ${partyRes.winner}, Turns = ${partyRes.turns}`);
-
-// 3. Batch simulation across all AI counts (0, 1, 2, 3, 4 AIs)
-console.log('\n>>> 3. RUNNING 50 STRESS-TEST GAME SIMULATIONS ACROSS ALL AI COUNTS (0~4 AIs)...');
+// 4. Batch simulation across both Solo and Multiplayer with various AI counts
+console.log('\n>>> 4. RUNNING 50 STRESS-TEST GAME SIMULATIONS (Solo 1~5 AIs & Multiplayer 0~4 AIs)...');
 let successCount = 0;
 let solvedCount = 0;
-const aiCountsToTest = [0, 1, 2, 3, 4];
 
 for (let i = 1; i <= 50; i++) {
-  const aiCount = aiCountsToTest[i % aiCountsToTest.length];
-  const res = runSingleGame(i, false, aiCount);
+  const isSolo = i % 2 === 0;
+  const aiCount = isSolo ? ((i % 5) + 1) : (i % 5);
+  const res = runSingleGame(i, false, aiCount, isSolo);
   if (res.success) successCount++;
   if (res.winner !== 'None (Timeout/Culprit escaped)') solvedCount++;
 }

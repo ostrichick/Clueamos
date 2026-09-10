@@ -83,6 +83,45 @@ describe('Clueamos Core Game Engine', () => {
     expect(totalDistributed).toBe(15);
   });
 
+  it('싱글 플레이 기본 옵션은 1 Player vs 1 AI (총 2인, 8장/7장 분배)이어야 한다', () => {
+    const state = initGame({
+      isSinglePlayer: true,
+      player1CharacterId: 'suspect_scarlett',
+      locale: 'ko',
+    });
+
+    expect(state.players).toHaveLength(2);
+    expect(state.players[0].roleType).toBe('p1');
+    expect(state.players[0].type).toBe('human');
+    expect(state.players[1].roleType).toBe('ai1');
+    expect(state.players[1].type.startsWith('ai_')).toBe(true);
+
+    const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
+    expect(totalDistributed).toBe(15);
+    expect(state.players[0].hand.length).toBe(8);
+    expect(state.players[1].hand.length).toBe(7);
+  });
+
+  it('싱글 플레이에서 AI 5명 설정 시 1 Player vs 5 AIs (총 6인 풀파티)로 생성되어야 한다', () => {
+    const state = initGame({
+      isSinglePlayer: true,
+      player1CharacterId: 'suspect_scarlett',
+      aiPlayerCount: 5,
+      locale: 'ko',
+    });
+
+    expect(state.players).toHaveLength(6);
+    expect(state.players[0].roleType).toBe('p1');
+    expect(state.players[0].type).toBe('human');
+    for (let i = 1; i <= 5; i++) {
+      expect(state.players[i].roleType).toBe(`ai${i}`);
+      expect(state.players[i].type.startsWith('ai_')).toBe(true);
+    }
+
+    const totalDistributed = state.players.reduce((sum, p) => sum + p.hand.length, 0);
+    expect(totalDistributed).toBe(15);
+  });
+
   it('주사위를 굴리고 도달 가능한 방으로 이동할 수 있어야 한다', () => {
     const state = initGame();
     expect(state.phase).toBe('PLAYING_ROLL');

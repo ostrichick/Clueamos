@@ -500,9 +500,28 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     setPlayMode: (mode) => {
+      const currentAiCount = get().aiPlayerCount;
+      let newAiCount = currentAiCount;
+      if (mode === 'solo') {
+        // Solo mode: default to 1 AI (1 human vs 1 AI) if currently 0 or 2
+        if (currentAiCount === 0 || currentAiCount === 2) {
+          newAiCount = 1;
+        } else {
+          newAiCount = Math.max(1, Math.min(5, currentAiCount));
+        }
+      } else {
+        // Multiplayer (host/guest/local): default to 2 AIs if currently 1 or 5
+        if (currentAiCount === 1 || currentAiCount === 5) {
+          newAiCount = 2;
+        } else {
+          newAiCount = Math.max(0, Math.min(4, currentAiCount));
+        }
+      }
+
       set({ 
         playMode: mode, 
-        myPlayerRole: mode === 'guest' ? 'p2' : 'p1' 
+        myPlayerRole: mode === 'guest' ? 'p2' : 'p1',
+        aiPlayerCount: newAiCount,
       });
     },
 

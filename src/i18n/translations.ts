@@ -24,11 +24,13 @@ export interface TranslationStrings {
   aiDetectivesPreview: string;
   aiCountTitle: string;
   aiCountSubtitle: string;
+  aiCountSubtitleSolo: string;
   aiCount0: string;
   aiCount1: string;
   aiCount2: string;
   aiCount3: string;
   aiCount4: string;
+  aiCount5: string;
   aiCountGuestNote: string;
   characterAlreadyChosen: string;
   startGame: string;
@@ -262,18 +264,20 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     aiDetectivesPreview: 'AI Detectives (Randomly Assigned)',
     aiCountTitle: 'Additional AI Detectives',
     aiCountSubtitle: 'Choose how many AI detectives to include alongside the 2 human players (Total: 2 to 6 players)',
+    aiCountSubtitleSolo: 'Choose how many AI detectives to challenge in solo mode (Total: 2 to 6 players)',
     aiCount0: '0 AIs (1v1 Duel)',
     aiCount1: '1 AI (3 Players)',
     aiCount2: '2 AIs (4 Players - Default)',
     aiCount3: '3 AIs (5 Players)',
     aiCount4: '4 AIs (6 Players - Full Party)',
+    aiCount5: '5 AIs (6 Players - Full Party)',
     aiCountGuestNote: 'Set by Host',
     characterAlreadyChosen: 'Chosen by Player 1',
     startGame: 'Start Investigation',
     playModeLocal: 'Single Screen (Pass & Play)',
     playModeMulti: '1. Multiplayer (Host / Join)',
-    playModeSolo: '2. Solo Play (vs 3 AIs)',
-    playModeSoloDesc: 'Test your deductive wits against 3 intelligent AI detectives.',
+    playModeSolo: '2. Solo Play (vs AI)',
+    playModeSoloDesc: 'Test your deductive wits against intelligent AI detectives.',
     aiRolling: 'Rolling the dice...',
     aiMoving: 'Moving across the mansion...',
     aiSuggesting: 'Proposing a deduction hypothesis...',
@@ -549,18 +553,20 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     aiDetectivesPreview: 'Detectives de IA (Asignados al azar)',
     aiCountTitle: 'Detectives de IA Adicionales',
     aiCountSubtitle: 'Elige cuántos detectives de IA agregar junto a los 2 jugadores humanos (Total: 2 a 6 jugadores)',
+    aiCountSubtitleSolo: 'Elige cuántos detectives de IA desafiar en solitario (Total: 2 a 6 jugadores)',
     aiCount0: '0 IA (Duelo 1v1)',
     aiCount1: '1 IA (3 Jugadores)',
     aiCount2: '2 IA (4 Jugadores - Por defecto)',
     aiCount3: '3 IA (5 Jugadores)',
     aiCount4: '4 IA (6 Jugadores - Mansión Completa)',
+    aiCount5: '5 IA (6 Jugadores - Mansión Completa)',
     aiCountGuestNote: 'Configurado por el Anfitrión',
     characterAlreadyChosen: 'Elegido por Jugador 1',
     startGame: 'Iniciar Investigación',
     playModeLocal: 'Una Pantalla (Pass & Play)',
     playModeMulti: '1. Multijugador (Crear / Unirse)',
-    playModeSolo: '2. En Solitario (vs 3 IA)',
-    playModeSoloDesc: 'Pon a prueba tus habilidades de deducción contra 3 detectives de IA.',
+    playModeSolo: '2. En Solitario (vs IA)',
+    playModeSoloDesc: 'Pon a prueba tus habilidades de deducción contra detectives de IA.',
     aiRolling: 'Lanzando los dados...',
     aiMoving: 'Moviéndose por la mansión...',
     aiSuggesting: 'Proponiendo una hipótesis deductiva...',
@@ -836,18 +842,20 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     aiDetectivesPreview: 'AI 탐정 (남은 캐릭터 중 자동 배정)',
     aiCountTitle: 'AI 탐정 인원 설정',
     aiCountSubtitle: '두 명의 사람 플레이어 외에 참가할 AI 탐정 수를 설정하세요 (총 2~6인 플레이)',
+    aiCountSubtitleSolo: '혼자서 상대할 AI 탐정 수를 설정하세요 (총 2~6인 플레이)',
     aiCount0: '0명 (1:1 결투)',
     aiCount1: '1명 (총 3인)',
     aiCount2: '2명 (총 4인 - 기본)',
     aiCount3: '3명 (총 5인)',
     aiCount4: '4명 (총 6인 풀파티)',
+    aiCount5: '5명 (총 6인 풀파티)',
     aiCountGuestNote: '방장이 설정 중',
     characterAlreadyChosen: '플레이어 1 선택 완료',
     startGame: '사건 수사 시작',
     playModeLocal: '한 화면에서 플레이 (Pass & Play)',
     playModeMulti: '1. 멀티 플레이 (방 만들기 / 참여)',
     playModeSolo: '2. 싱글 플레이 (Solo vs AI)',
-    playModeSoloDesc: '3명의 지능형 AI 탐정을 상대로 혼자서 두뇌 대결을 펼칩니다.',
+    playModeSoloDesc: '지능형 AI 탐정들을 상대로 혼자서 두뇌 대결을 펼칩니다.',
     aiRolling: '주사위를 굴리는 중...',
     aiMoving: '호텔 방으로 이동 중...',
     aiSuggesting: '사건 현장 가설을 제시하는 중...',

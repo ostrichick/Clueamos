@@ -363,111 +363,100 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             })}
           </div>
 
-          {/* AI 탐정 추가 설정 (멀티플레이어 모드) */}
-          {playMode !== 'solo' ? (
-            <div className="bg-slate-800/50 border border-amber-500/20 rounded-2xl p-4 flex flex-col gap-3 text-left">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🤖</span>
-                    <h3 className="text-sm font-bold text-slate-200">{t.aiCountTitle}</h3>
-                    {playMode === 'guest' && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium">
-                        🔒 {t.aiCountGuestNote}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{t.aiCountSubtitle}</p>
+          {/* AI 탐정 인원 설정 (솔로 모드: 1~5명 / 멀티플레이어 모드: 0~4명) */}
+          <div className="bg-slate-800/50 border border-amber-500/20 rounded-2xl p-4 flex flex-col gap-3 text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🤖</span>
+                  <h3 className="text-sm font-bold text-slate-200">{t.aiCountTitle}</h3>
+                  {playMode === 'guest' && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium">
+                      🔒 {t.aiCountGuestNote}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg self-start sm:self-auto border border-amber-500/20">
-                  {locale === 'ko' 
-                    ? `총 ${2 + aiPlayerCount}인 게임 (${aiPlayerCount === 0 ? '1:1 진검승부' : `사람 2명 + AI ${aiPlayerCount}명`})`
-                    : `Total ${2 + aiPlayerCount} Players (${aiPlayerCount === 0 ? '1v1 Duel' : `2 Humans + ${aiPlayerCount} AIs`})`}
-                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {playMode === 'solo' ? t.aiCountSubtitleSolo : t.aiCountSubtitle}
+                </p>
               </div>
-
-              {/* AI 인원수 선택 버튼 (0, 1, 2, 3, 4명) */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-0.5">
-                {[0, 1, 2, 3, 4].map(count => {
-                  const isSelected = aiPlayerCount === count;
-                  const isGuest = playMode === 'guest';
-                  
-                  return (
-                    <button
-                      key={count}
-                      type="button"
-                      disabled={isGuest}
-                      onClick={() => {
-                        if (!isGuest) setAiPlayerCount(count);
-                      }}
-                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 border ${
-                        isSelected
-                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]'
-                          : isGuest
-                            ? 'bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed'
-                            : 'bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600 active:scale-95 cursor-pointer'
-                      }`}
-                    >
-                      <span className="text-xs font-black">{count === 0 ? '⚔️ 0명' : `🤖 ${count}명`}</span>
-                      <span className={`text-[10px] truncate max-w-full ${isSelected ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
-                        {count === 0 
-                          ? (locale === 'ko' ? '1:1 결투' : '1v1') 
-                          : count === 2 
-                            ? (locale === 'ko' ? '기본 (4인)' : 'Default') 
-                            : count === 4 
-                              ? (locale === 'ko' ? '풀파티' : 'Max 6') 
-                              : `${2 + count}인`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* AI 탐정 배정 미리보기 */}
-              <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-800/80 text-xs">
-                <span className="text-slate-400 font-medium text-[11px]">
-                  {aiPlayerCount === 0 
-                    ? (locale === 'ko' ? '⚔️ AI 탐정 없음: 사람 둘만의 두뇌 대결' : '⚔️ No AI: 1v1 pure human duel') 
-                    : `${t.aiDetectivesPreview}:`}
-                </span>
-                {aiPlayerCount > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {aiCandidates.slice(0, aiPlayerCount).map(c => (
-                      <span 
-                        key={c.id} 
-                        className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 font-mono flex items-center gap-1"
-                      >
-                        <span>{CHARACTER_PROFILES[c.id]?.avatar}</span>
-                        <span>{getCardName(c.id).replace(/^[^\s]+\s+/, '')}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg self-start sm:self-auto border border-amber-500/20">
+                {playMode === 'solo'
+                  ? (locale === 'ko'
+                      ? `총 ${1 + aiPlayerCount}인 게임 (${aiPlayerCount === 1 ? '1:1 진검승부' : `플레이어 1명 + AI ${aiPlayerCount}명`})`
+                      : `Total ${1 + aiPlayerCount} Players (${aiPlayerCount === 1 ? '1v1 Duel' : `1 Human + ${aiPlayerCount} AIs`})`)
+                  : (locale === 'ko'
+                      ? `총 ${2 + aiPlayerCount}인 게임 (${aiPlayerCount === 0 ? '1:1 진검승부' : `사람 2명 + AI ${aiPlayerCount}명`})`
+                      : `Total ${2 + aiPlayerCount} Players (${aiPlayerCount === 0 ? '1v1 Duel' : `2 Humans + ${aiPlayerCount} AIs`})`)}
               </div>
             </div>
-          ) : (
-            /* 솔로 플레이 모드일 때의 AI 미리보기 */
-            <div className="bg-slate-800/30 border border-slate-700/40 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 text-slate-400 font-medium">
-                <span>🤖</span>
-                <span>{t.aiDetectivesPreview}:</span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {aiCandidates.slice(0, 3).map(c => (
-                  <span 
-                    key={c.id} 
-                    className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 font-mono flex items-center gap-1"
+
+            {/* AI 인원수 선택 버튼 (솔로: 1~5명, 멀티: 0~4명) */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-0.5">
+              {(playMode === 'solo' ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map(count => {
+                const isSelected = aiPlayerCount === count;
+                const isGuest = playMode === 'guest';
+                const totalPlayers = (playMode === 'solo' ? 1 : 2) + count;
+                
+                let subLabel = '';
+                if (playMode === 'solo') {
+                  if (count === 1) subLabel = locale === 'ko' ? '1:1 결투 (기본)' : '1v1 (Default)';
+                  else if (count === 5) subLabel = locale === 'ko' ? '풀파티 (6인)' : 'Max 6';
+                  else subLabel = locale === 'ko' ? `총 ${totalPlayers}인` : `${totalPlayers} Players`;
+                } else {
+                  if (count === 0) subLabel = locale === 'ko' ? '1:1 결투' : '1v1';
+                  else if (count === 2) subLabel = locale === 'ko' ? '기본 (4인)' : 'Default';
+                  else if (count === 4) subLabel = locale === 'ko' ? '풀파티 (6인)' : 'Max 6';
+                  else subLabel = locale === 'ko' ? `총 ${totalPlayers}인` : `${totalPlayers} Players`;
+                }
+
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    disabled={isGuest}
+                    onClick={() => {
+                      if (!isGuest) setAiPlayerCount(count);
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 border ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]'
+                        : isGuest
+                          ? 'bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed'
+                          : 'bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600 active:scale-95 cursor-pointer'
+                    }`}
                   >
-                    <span>{CHARACTER_PROFILES[c.id]?.avatar}</span>
-                    <span>{getCardName(c.id).replace(/^[^\s]+\s+/, '')}</span>
-                  </span>
-                ))}
-                <span className="text-[10px] text-slate-500">
-                  (3 AIs)
-                </span>
-              </div>
+                    <span className="text-xs font-black">{count === 0 ? '⚔️ 0명' : `🤖 ${count}명`}</span>
+                    <span className={`text-[10px] truncate max-w-full ${isSelected ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
+                      {subLabel}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          )}
+
+            {/* AI 탐정 배정 미리보기 */}
+            <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-800/80 text-xs">
+              <span className="text-slate-400 font-medium text-[11px]">
+                {aiPlayerCount === 0 
+                  ? (locale === 'ko' ? '⚔️ AI 탐정 없음: 사람 둘만의 두뇌 대결' : '⚔️ No AI: 1v1 pure human duel') 
+                  : `${t.aiDetectivesPreview}:`}
+              </span>
+              {aiPlayerCount > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {aiCandidates.slice(0, aiPlayerCount).map(c => (
+                    <span 
+                      key={c.id} 
+                      className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 font-mono flex items-center gap-1"
+                    >
+                      <span>{CHARACTER_PROFILES[c.id]?.avatar}</span>
+                      <span>{getCardName(c.id).replace(/^[^\s]+\s+/, '')}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 시작 버튼: 호스트/로컬은 시작 버튼, 게스트는 대기 안내 */}

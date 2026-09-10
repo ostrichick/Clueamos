@@ -225,12 +225,12 @@ export function initGame(options?: InitGameOptions): GameState {
       });
     }
   } else {
-    // 1인 싱글 플레이: P1(사람), 그리고 1~5명의 AI 탐정 (기본 3명)
+    // 1인 싱글 플레이: P1(사람), 그리고 1~5명의 AI 탐정 (기본 1명: 1 player vs 1 AI)
     const remainingSuspects = shuffle(
       SUSPECTS.filter(s => s.id !== p1CharId)
     );
 
-    const defaultAiCount = 3;
+    const defaultAiCount = 1;
     const aiCount = typeof options?.aiPlayerCount === 'number'
       ? Math.max(1, Math.min(5, options.aiPlayerCount))
       : defaultAiCount;
