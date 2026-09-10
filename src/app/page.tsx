@@ -14,6 +14,8 @@ import { AccusationModal } from '@/components/modals/AccusationModal';
 import { GameOverModal } from '@/components/modals/GameOverModal';
 import { DisprovePromptModal } from '@/components/modals/DisprovePromptModal';
 import { SpeechBubble } from '@/components/board/SpeechBubble';
+import { TurnPhaseStepper } from '@/components/board/TurnPhaseStepper';
+import { TableEmotesBar } from '@/components/board/TableEmotesBar';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
@@ -30,6 +32,10 @@ export default function Home() {
     performDisprove,
     performAccusation,
     isRollingDice,
+    roomWeapons,
+    activeEmote,
+    triggerEmote,
+    dismissEmote,
     playMode,
     setPlayMode,
     createRoom,
@@ -347,9 +353,17 @@ export default function Home() {
         />
       )}
 
-      {/* AI 탐정 실시간 말풍선 배너 */}
-      <div className="px-4 pt-3 sm:px-6">
-        <SpeechBubble dialogue={activeDialogue} onDismiss={dismissDialogue} />
+      {/* AI 탐정 실시간 말풍선 배너 & 탐정 테이블 이모지 바 */}
+      <div className="px-4 pt-3 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex-1 w-full">
+          <SpeechBubble dialogue={activeDialogue} onDismiss={dismissDialogue} />
+        </div>
+        <TableEmotesBar
+          activeEmote={activeEmote}
+          onTriggerEmote={triggerEmote}
+          onDismissEmote={dismissEmote}
+          t={t}
+        />
       </div>
 
       {/* 메인 대시보드 */}
@@ -359,6 +373,13 @@ export default function Home() {
         <div className="lg:col-span-2 flex flex-col gap-4">
           {activeTab === 'board' ? (
             <div className="flex flex-col gap-4">
+              {/* 턴 진행 가이드 스텝 바 (Turn Phase Stepper) */}
+              <TurnPhaseStepper
+                phase={gameState.phase}
+                isMyTurn={isMyTurn}
+                t={t}
+              />
+
               <GameBoard
                 players={gameState.players}
                 currentPlayerIndex={gameState.currentPlayerIndex}
@@ -366,6 +387,7 @@ export default function Home() {
                 currentDiceRoll={gameState.currentDiceRoll}
                 accessibleRoomIds={gameState.accessibleRoomIds}
                 isRollingDice={isRollingDice}
+                roomWeapons={roomWeapons}
                 t={t}
                 locale={locale}
                 isMyTurn={isMyTurn}
@@ -418,7 +440,7 @@ export default function Home() {
               )}
             </div>
           ) : (
-            /* 사건 추리 수첩 */
+            /* 사건 추리 수첩 (스마트 어시스트 & 로그 연동) */
             <DeductionNotebook
               t={t}
               locale={locale}
@@ -430,6 +452,11 @@ export default function Home() {
               toggleMatrixCell={toggleMatrixCell}
               getCardName={getCardName}
               getRoomName={getRoomName}
+              logs={gameState.logs}
+              onResetNotes={() => {
+                setUserNotes({});
+                setMatrixNotes({});
+              }}
             />
           )}
 
@@ -439,6 +466,7 @@ export default function Home() {
               cards={myPlayer.hand}
               playerName={getPlayerDisplayName(myPlayer, locale)}
               getCardName={getCardName}
+              onOpenNotebook={() => setActiveTab('notes')}
               t={t}
             />
           )}

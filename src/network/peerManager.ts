@@ -15,6 +15,7 @@ export type PeerMessageType =
   | 'PRIVATE_CLUE_REVEALED'
   | 'ACTION_ACCUSE'
   | 'EVENT_DIALOGUE'
+  | 'EVENT_EMOTE'
   | 'HEARTBEAT'
   | 'PING'
   | 'PONG';

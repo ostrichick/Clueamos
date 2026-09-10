@@ -17,8 +17,9 @@ import {
   decideBlakeAction, 
   recordShownCard 
 } from '@/engine/ai';
-import { SupportedLocale, translations } from '@/i18n/translations';
+import { SupportedLocale, translations, TranslationStrings } from '@/i18n/translations';
 import { peerManager, PeerMessage } from '@/network/peerManager';
+import { sounds } from '@/utils/sounds';
 
 export type PlayMode = 'local' | 'host' | 'guest';
 export type PlayerRole = 'p1' | 'p2';
@@ -30,6 +31,25 @@ export interface ActiveDialogue {
   color: string;
   text: string;
 }
+
+export interface ActiveEmote {
+  playerId: string;
+  speakerName: string;
+  avatar: string;
+  color: string;
+  emote: string;
+  label: string;
+  timestamp: number;
+}
+
+export const INITIAL_ROOM_WEAPONS: Record<string, string[]> = {
+  room_ballroom: ['weapon_candlestick'],
+  room_kitchen: ['weapon_knife'],
+  room_library: ['weapon_revolver'],
+  room_wine_cellar: ['weapon_rope'],
+  room_room304: ['weapon_pipe'],
+  room_rooftop: ['weapon_wrench'],
+};
 
 const SESSION_KEY = 'clueamos_session_v1';
 
@@ -70,6 +90,10 @@ interface GameStore {
   // AI 대사 및 말풍선 인터랙션
   activeDialogue: ActiveDialogue | null;
 
+  // 피지컬 보드게임 토큰 및 리액션
+  roomWeapons: Record<string, string[]>;
+  activeEmote: ActiveEmote | null;
+
   // 비밀 반증 인터랙션 상태
   pendingDisprovePrompt: { availableCards: Card[]; askerId: string } | null;
   lastSecretClue: { card: Card; fromName: string } | null;
@@ -78,6 +102,8 @@ interface GameStore {
   setLocale: (locale: SupportedLocale) => void;
   showDialogue: (speaker: Player, text: string) => void;
   dismissDialogue: () => void;
+  triggerEmote: (emoteKey: string) => void;
+  dismissEmote: () => void;
   setPlayMode: (mode: PlayMode) => void;
   createRoom: (desiredCode?: string) => Promise<string>;
   joinRoom: (code: string) => Promise<void>;
@@ -132,6 +158,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (playMode === 'guest' && msg.payload?.gameState) {
           set({
             gameState: msg.payload.gameState as GameState,
+            roomWeapons: (msg.payload.roomWeapons as Record<string, string[]>) || INITIAL_ROOM_WEAPONS,
             selectedRoomId: null,
             isRollingDice: false,
           });
@@ -143,6 +170,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (playMode === 'guest' && msg.payload?.gameState) {
           set({
             gameState: msg.payload.gameState as GameState,
+            roomWeapons: (msg.payload.roomWeapons as Record<string, string[]>) || get().roomWeapons,
             isRollingDice: false,
           });
         }
@@ -237,6 +265,21 @@ export const useGameStore = create<GameStore>((set, get) => {
         break;
       }
 
+      case 'EVENT_EMOTE': {
+        if (msg.payload) {
+          const emoteData = msg.payload as unknown as ActiveEmote;
+          sounds.playEmote();
+          set({ activeEmote: emoteData });
+          setTimeout(() => {
+            const cur = get().activeEmote;
+            if (cur && cur.timestamp === emoteData.timestamp) {
+              set({ activeEmote: null });
+            }
+          }, 3200);
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -273,11 +316,67 @@ export const useGameStore = create<GameStore>((set, get) => {
     guestSelectedCharacter: null,
     hostSelectedCharacter: null,
     activeDialogue: null,
+    roomWeapons: INITIAL_ROOM_WEAPONS,
+    activeEmote: null,
     pendingDisprovePrompt: null,
     lastSecretClue: null,
 
     setLocale: (loc) => {
       set({ currentLocale: loc });
+    },
+
+    triggerEmote: (emoteKey: string) => {
+      const { gameState, playMode, currentLocale } = get();
+      const myPlayer = playMode === 'guest'
+        ? gameState.players[1]
+        : playMode === 'host'
+          ? gameState.players[0]
+          : gameState.players[gameState.currentPlayerIndex];
+
+      if (!myPlayer) return;
+
+      type EmoteKey = 'emoteObserve' | 'emotePonder' | 'emoteEureka' | 'emoteTea';
+      const emoteLabels: Record<string, { icon: string; key: EmoteKey }> = {
+        observe: { icon: '🧐', key: 'emoteObserve' },
+        ponder: { icon: '🤔', key: 'emotePonder' },
+        eureka: { icon: '💡', key: 'emoteEureka' },
+        tea: { icon: '☕', key: 'emoteTea' },
+      };
+
+      const meta = emoteLabels[emoteKey] || { icon: '🧐', key: 'emoteObserve' };
+      const currentDict = translations[currentLocale] || translations.en;
+      const label = currentDict[meta.key] || meta.icon;
+
+      const emoteData: ActiveEmote = {
+        playerId: myPlayer.id,
+        speakerName: myPlayer.name,
+        avatar: myPlayer.avatar,
+        color: myPlayer.color,
+        emote: meta.icon,
+        label,
+        timestamp: Date.now(),
+      };
+
+      sounds.playEmote();
+      set({ activeEmote: emoteData });
+
+      if (playMode !== 'local') {
+        peerManager.sendMessage({
+          type: 'EVENT_EMOTE',
+          payload: emoteData as unknown as Record<string, unknown>,
+        });
+      }
+
+      setTimeout(() => {
+        const cur = get().activeEmote;
+        if (cur && cur.timestamp === emoteData.timestamp) {
+          set({ activeEmote: null });
+        }
+      }, 3200);
+    },
+
+    dismissEmote: () => {
+      set({ activeEmote: null });
     },
 
     showDialogue: (speaker, text) => {
@@ -465,6 +564,8 @@ export const useGameStore = create<GameStore>((set, get) => {
           ai_1: ai1Mem,
           ai_2: ai2Mem,
         },
+        roomWeapons: INITIAL_ROOM_WEAPONS,
+        activeEmote: null,
         selectedRoomId: null,
         isRollingDice: false,
       });
@@ -472,7 +573,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (playMode === 'host') {
         peerManager.sendMessage({
           type: 'START_GAME',
-          payload: { gameState: newState },
+          payload: { gameState: newState, roomWeapons: INITIAL_ROOM_WEAPONS },
         });
       }
     },
@@ -524,7 +625,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (playMode === 'host') {
           peerManager.sendMessage({
             type: 'STATE_SYNC',
-            payload: { gameState: nextState },
+            payload: { gameState: nextState, roomWeapons: get().roomWeapons },
           });
         }
       } catch (e: unknown) {
@@ -548,7 +649,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (playMode === 'host') {
         peerManager.sendMessage({
           type: 'STATE_SYNC',
-          payload: { gameState: nextState },
+          payload: { gameState: nextState, roomWeapons: get().roomWeapons },
         });
       }
 
@@ -571,7 +672,17 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       const { gameState, aiMemories } = get();
       const nextState = makeSuggestion(gameState, suggestion);
-      set({ gameState: nextState });
+
+      // Move weapon miniature to suggested room
+      const curWeapons = { ...get().roomWeapons };
+      Object.keys(curWeapons).forEach(rId => {
+        curWeapons[rId] = curWeapons[rId].filter(wId => wId !== suggestion.weaponId);
+      });
+      if (!curWeapons[suggestion.locationId]) curWeapons[suggestion.locationId] = [];
+      curWeapons[suggestion.locationId].push(suggestion.weaponId);
+      sounds.playWeaponDrop();
+
+      set({ gameState: nextState, roomWeapons: curWeapons });
 
       // If an AI suspect was summoned to the room for questioning, trigger dialogue reaction
       const summonedP = nextState.players.find(p => p.characterId === suggestion.suspectId);
@@ -582,7 +693,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (playMode === 'host') {
         peerManager.sendMessage({
           type: 'STATE_SYNC',
-          payload: { gameState: nextState },
+          payload: { gameState: nextState, roomWeapons: curWeapons },
         });
       }
 
@@ -698,7 +809,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (playMode === 'host') {
         peerManager.sendMessage({
           type: 'STATE_SYNC',
-          payload: { gameState: nextState },
+          payload: { gameState: nextState, roomWeapons: get().roomWeapons },
         });
       }
 

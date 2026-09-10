@@ -118,6 +118,29 @@ export interface TranslationStrings {
   online: string;
   offline: string;
 
+  // Turn Stepper & Table Immersion
+  stepRollDice: string;
+  stepMoveRoom: string;
+  stepSuggest: string;
+  stepWaiting: string;
+  smartAssistTitle: string;
+  smartAssistDesc: string;
+  smartClueDisprovedTag: string;
+  handBadge: string;
+  resetNotes: string;
+  caseFileTitle: string;
+  caseFileDesc: string;
+  caseFileSealWarning: string;
+  close: string;
+  emoteObserve: string;
+  emotePonder: string;
+  emoteEureka: string;
+  emoteTea: string;
+  shakeToRoll: string;
+  sortByCategory: string;
+  quickNotes: string;
+  secretPassagePrompt: string;
+
   // Game Over
   investigationEnd: string;
   truthRevealed: string;
@@ -266,6 +289,28 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     investigationTimeline: 'Investigation Timeline & Debrief',
     online: 'Online',
     offline: 'Reconnecting...',
+
+    stepRollDice: 'Roll Die',
+    stepMoveRoom: 'Move to Room',
+    stepSuggest: 'Investigate',
+    stepWaiting: 'Waiting...',
+    smartAssistTitle: 'Smart Clue Assist',
+    smartAssistDesc: 'Auto-marks your hand and flags clues disproved by other detectives',
+    smartClueDisprovedTag: 'Disproved',
+    handBadge: 'HAND',
+    resetNotes: 'Clear Notes',
+    caseFileTitle: 'Confidential Murder Case File',
+    caseFileDesc: 'Sealed with red wax. Contains the true culprit, murder location, and murder weapon. Can only be opened during the Final Accusation.',
+    caseFileSealWarning: 'Wax seal unbroken. Final accusation required to unseal.',
+    close: 'Close',
+    emoteObserve: '🧐 Observe',
+    emotePonder: '🤔 Ponder',
+    emoteEureka: '💡 Eureka!',
+    emoteTea: '☕ Tea Break',
+    shakeToRoll: 'Shake phone or tap to roll!',
+    sortByCategory: 'Sort Hand',
+    quickNotes: 'Notebook',
+    secretPassagePrompt: 'Take Secret Passage to',
 
     investigationEnd: 'Investigation Closed',
     truthRevealed: 'solved the mystery and brought justice!',
@@ -475,6 +520,28 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     online: 'En línea',
     offline: 'Reconectando...',
 
+    stepRollDice: 'Lanzar Dado',
+    stepMoveRoom: 'Mover a Habitación',
+    stepSuggest: 'Investigar',
+    stepWaiting: 'Esperando...',
+    smartAssistTitle: 'Asistente de Pistas',
+    smartAssistDesc: 'Marca automáticamente tu mano y resalta pistas desmentidas por otros detectives',
+    smartClueDisprovedTag: 'Desmentido',
+    handBadge: 'MANO',
+    resetNotes: 'Borrar Notas',
+    caseFileTitle: 'Expediente Confidencial del Asesinato',
+    caseFileDesc: 'Sellado con cera roja. Contiene al verdadero culpable, lugar y arma homicida. Solo puede abrirse durante la Acusación Final.',
+    caseFileSealWarning: 'Sello de cera intacto. Se requiere acusación formal para desellar.',
+    close: 'Cerrar',
+    emoteObserve: '🧐 Observar',
+    emotePonder: '🤔 Pensar',
+    emoteEureka: '💡 ¡Eureka!',
+    emoteTea: '☕ Tomar Té',
+    shakeToRoll: '¡Agita el móvil o pulsa para lanzar!',
+    sortByCategory: 'Ordenar Mano',
+    quickNotes: 'Cuaderno',
+    secretPassagePrompt: 'Usar Pasaje Secreto a',
+
     investigationEnd: 'Investigación Concluida',
     truthRevealed: '¡resolvió el misterio y triunfó!',
     mysteryUnsolved: 'El culpable escapó y el caso quedó sin resolver.',
@@ -578,7 +645,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
   ko: {
     gameTitle: 'Clueamos',
     gameSubtitle: '폭풍우 치는 밤의 그랜드 벨벳 호텔 4인 미스터리 추리극',
-    ruleTitle: '부부 맞춤형 4인 플레이 룰',
+    ruleTitle: '2인 플레이어 맞춤 4인 추리 룰',
     rule1: '둘이서도 지루하지 않게 컴퓨터 탐정 2명(아서, 블레이크)이 함께 추리합니다.',
     rule2: 'AI는 정답을 훔쳐보지 않으며, 여러분과 똑같은 단서만을 바탕으로 공정하게 행동합니다.',
     rule3: '용의자 6명, 살인 장소 6곳, 범행 도구 6개의 조합을 먼저 밝혀내세요.',
@@ -682,6 +749,28 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     investigationTimeline: '사건 수사 타임라인 복기',
     online: '온라인',
     offline: '재연결 대기...',
+
+    stepRollDice: '주사위 굴리기',
+    stepMoveRoom: '방으로 이동',
+    stepSuggest: '가설 추리',
+    stepWaiting: '대기 중...',
+    smartAssistTitle: '스마트 단서 어시스트',
+    smartAssistDesc: '내 손패를 자동 표시하고 다른 탐정들의 반증 기록을 단서 태그로 각인합니다',
+    smartClueDisprovedTag: '반증됨',
+    handBadge: '내 손패',
+    resetNotes: '메모 초기화',
+    caseFileTitle: '극비 살인 사건 봉투 (CONFIDENTIAL)',
+    caseFileDesc: '붉은 밀랍 인장으로 봉인된 서류. 진범, 살인 장소, 흉기 카드가 들어있으며 최종 지목 시에만 개봉할 수 있습니다.',
+    caseFileSealWarning: '밀랍 인장이 봉인되어 있습니다. 최종 고발 시 개봉됩니다.',
+    close: '닫기',
+    emoteObserve: '🧐 관찰',
+    emotePonder: '🤔 고뇌',
+    emoteEureka: '💡 영감',
+    emoteTea: '☕ 티타임',
+    shakeToRoll: '폰을 가볍게 흔들거나 탭하여 주사위를 굴리세요!',
+    sortByCategory: '손패 정렬',
+    quickNotes: '수첩 보기',
+    secretPassagePrompt: '비밀통로를 통해 이동:',
 
     investigationEnd: '수사 종료',
     truthRevealed: '님이 진실을 밝혀냈습니다!',

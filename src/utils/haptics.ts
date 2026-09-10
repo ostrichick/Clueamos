@@ -61,6 +61,20 @@ class HapticsEngine {
   public warning(): void {
     this.vibrate([90, 50, 90]);
   }
+
+  /**
+   * Shake gesture recognized
+   */
+  public shakeTrigger(): void {
+    this.vibrate([25, 30, 45]);
+  }
+
+  /**
+   * Wax seal cracked / case envelope opened
+   */
+  public waxCrack(): void {
+    this.vibrate([15, 10, 30]);
+  }
 }
 
 export const haptics = new HapticsEngine();

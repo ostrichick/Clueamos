@@ -592,6 +592,127 @@ class SoundController {
     });
   }
 
+  // 12. 살인 도구 미니어처 토큰 착지 소리: 방 테이블 위에 묵직하게 놓이는 금속/목재 '탁!' 임팩트
+  playWeaponDrop() {
+    haptics.tick();
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // 1. 목재 테이블 착지 타격음
+    this.playNoiseTransient(now, 0.012, 2200, 3.0, 0.28);
+
+    // 2. 묵직한 중저음 우드 쿵
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.06);
+
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    osc.connect(gain);
+    gain.connect(this.getMasterOut());
+    osc.start(now);
+    osc.stop(now + 0.06);
+
+    // 3. 은은한 금속성 잔향 (피지컬 미니어처 느낌)
+    const metal = ctx.createOscillator();
+    const metalGain = ctx.createGain();
+    metal.type = 'sine';
+    metal.frequency.setValueAtTime(1850, now);
+    metalGain.gain.setValueAtTime(0.08, now);
+    metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    metal.connect(metalGain);
+    metalGain.connect(this.getMasterOut(true));
+    metal.start(now);
+    metal.stop(now + 0.12);
+  }
+
+  // 13. 추리 수첩 연필 마킹/도장 소리: 종이 위에 사각-하고 흑연이 그어지는 기분 좋은 필기감
+  playPencilMark() {
+    haptics.tick();
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // 흑연 마찰음 (사각)
+    this.playNoiseTransient(now, 0.022, 4200, 1.8, 0.22);
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(680, now);
+    osc.frequency.exponentialRampToValueAtTime(420, now + 0.03);
+
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+    osc.connect(gain);
+    gain.connect(this.getMasterOut());
+    osc.start(now);
+    osc.stop(now + 0.03);
+  }
+
+  // 14. 비밀 사건 봉투 밀랍 인장 부러지는 소리: 바삭하고 묵직한 크랙음
+  playWaxSealBreak() {
+    haptics.waxCrack();
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // 3연속 미세 밀랍 크랙
+    this.playNoiseTransient(now, 0.008, 5200, 4.0, 0.35);
+    this.playNoiseTransient(now + 0.015, 0.01, 3800, 3.0, 0.3);
+    this.playNoiseTransient(now + 0.035, 0.015, 2400, 2.5, 0.25);
+
+    // 종이 봉투 개봉 버석임
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.09);
+
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+    osc.connect(gain);
+    gain.connect(this.getMasterOut(true));
+    osc.start(now);
+    osc.stop(now + 0.09);
+  }
+
+  // 15. 탐정 테이블 이모지 퀵 리액션 사운드: 경쾌하고 따뜻한 버블 차임
+  playEmote() {
+    haptics.tick();
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // 상승 2화음 (Bb5 -> D6)
+    [932.33, 1174.66].forEach((freq, idx) => {
+      const t = now + idx * 0.06;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.14, t + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+
+      osc.connect(gain);
+      gain.connect(this.getMasterOut(true));
+      osc.start(t);
+      osc.stop(t + 0.28);
+    });
+  }
+
   // ==========================================
   // 12. 웹 오디오 프로시저럴 미스터리 누아르 BGM 엔진
   // ==========================================
