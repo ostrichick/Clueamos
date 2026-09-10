@@ -1109,17 +1109,52 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     performEndTurn: () => {
-      const { playMode } = get();
+      const { playMode, gameState } = get();
 
       if (playMode === 'guest') {
         peerManager.sendMessage({ type: 'ACTION_END_TURN' });
+        const lastLog = gameState.logs[gameState.logs.length - 1];
+        set({
+          turnReviewState: {
+            active: true,
+            turnNumber: gameState.turnCount,
+            lastPlayerName: gameState.players[gameState.currentPlayerIndex]?.name || 'Player',
+            summary: lastLog ? lastLog.message : '',
+            readyRoles: ['p2'],
+          },
+          selectedRoomId: null,
+        });
         return;
       }
 
-      const { gameState } = get();
       if (gameState.phase === 'GAME_OVER') return;
 
       const lastPlayer = gameState.players[gameState.currentPlayerIndex];
+      const isLastPlayerHuman = lastPlayer?.type === 'human';
+
+      // 1) Solo mode: if human just ended their turn, proceed immediately without asking to confirm
+      if (playMode === 'solo' && isLastPlayerHuman) {
+        get().proceedToNextTurn();
+        return;
+      }
+
+      // 2) Multiplayer: the player who just took their turn is already ready!
+      const initialReadyRoles: PlayerRole[] = [];
+      if (isLastPlayerHuman && lastPlayer?.roleType) {
+        if (lastPlayer.roleType === 'p1' || lastPlayer.roleType === 'p2') {
+          initialReadyRoles.push(lastPlayer.roleType as PlayerRole);
+        }
+      }
+
+      // If in Host mode and no guest exists, proceed immediately
+      if (playMode === 'host') {
+        const hasGuest = gameState.players.some(p => p.roleType === 'p2');
+        if (!hasGuest && initialReadyRoles.includes('p1')) {
+          get().proceedToNextTurn();
+          return;
+        }
+      }
+
       const lastLog = gameState.logs[gameState.logs.length - 1];
       const summary = lastLog ? lastLog.message : `${lastPlayer?.name || 'Player'} turn finished`;
 
@@ -1128,7 +1163,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         turnNumber: gameState.turnCount,
         lastPlayerName: lastPlayer?.name || '',
         summary,
-        readyRoles: [],
+        readyRoles: initialReadyRoles,
       };
 
       set({ turnReviewState: reviewState, selectedRoomId: null });

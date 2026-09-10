@@ -28,7 +28,7 @@ export const TurnReviewBanner: React.FC<TurnReviewBannerProps> = ({
   const isMyRoleReady = review.readyRoles.includes(myPlayerRole);
 
   return (
-    <div className="sticky top-2 z-40 px-3 sm:px-6 w-full max-w-5xl mx-auto animate-in fade-in slide-in-from-top-3 duration-300">
+    <div className="w-full z-20 animate-in fade-in slide-in-from-top-2 duration-300">
       <div className="bg-gradient-to-r from-blue-950/95 via-slate-900/95 to-amber-950/95 border-2 border-amber-400/80 rounded-2xl sm:rounded-3xl p-4 sm:px-6 sm:py-3.5 shadow-2xl shadow-amber-500/25 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         {/* 요약 안내 */}
         <div className="flex items-start gap-3 w-full md:w-auto text-left min-w-0">

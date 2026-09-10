@@ -540,16 +540,6 @@ export default function Home() {
         t={t}
       />
 
-      {/* 턴 종료 후 수첩 정리 및 플레이어 확인 배너 */}
-      <TurnReviewBanner
-        review={turnReviewState}
-        playMode={playMode}
-        myPlayerRole={myPlayerRole}
-        isAutoPlaying={isAutoPlaying}
-        onConfirm={confirmTurnReview}
-        t={t}
-      />
-
       {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
       {(lastSecretClue || isPassingCard) && (
         <CardPassModal
@@ -592,6 +582,16 @@ export default function Home() {
             t={t}
             activePlayerName={currentPlayer ? getPlayerDisplayName(currentPlayer, locale) : undefined}
             isAITurn={!isHumanTurn}
+          />
+
+          {/* 턴 종료 후 수첩 정리 및 플레이어 확인 배너 (보드판 위 배치) */}
+          <TurnReviewBanner
+            review={turnReviewState}
+            playMode={playMode}
+            myPlayerRole={myPlayerRole}
+            isAutoPlaying={isAutoPlaying}
+            onConfirm={confirmTurnReview}
+            t={t}
           />
 
           {/* 보드판 (Mansion Game Board) */}
@@ -886,6 +886,7 @@ export default function Home() {
         t={t}
         getCardName={getCardName}
         getRoomName={getRoomName}
+        getEffectiveCardStatus={getEffectiveCardStatus}
       />
 
       {/* 게임 오버 모달 창 */}
