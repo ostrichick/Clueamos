@@ -19,7 +19,12 @@ import {
   Smartphone,
   Laptop,
   Copy,
-  Radio
+  Radio,
+  Music,
+  LayoutGrid,
+  ListChecks,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { SUSPECTS, LOCATIONS, WEAPONS, CHARACTER_PROFILES } from '@/engine/data';
 import { GameBoard } from '@/components/board/GameBoard';
@@ -37,6 +42,7 @@ export default function Home() {
     startNewGame,
     performRollDice,
     performMove,
+    performWaitInHallway,
     performSuggestion,
     performDisprove,
     performAccusation,
@@ -46,10 +52,12 @@ export default function Home() {
     createRoom,
     joinRoom,
     disconnectRoom,
+    restoreSessionIfNeeded,
     roomCode,
     isConnected,
     isConnecting,
     connectionError,
+    peerOnline,
     myPlayerRole,
     syncGuestCharacterChoice,
     syncHostCharacterChoice,
@@ -88,6 +96,12 @@ export default function Home() {
   const [selectedWeapon, setSelectedWeapon] = useState(WEAPONS[0].id);
   const [activeTab, setActiveTab] = useState<'board' | 'notes'>('board');
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [bgmActive, setBgmActive] = useState(false);
+
+  // 탐정 수첩 보기 모드 (단순 체크리스트 vs 매트릭스 그리드)
+  const [notebookViewMode, setNotebookViewMode] = useState<'simple' | 'matrix'>('simple');
+  const [matrixNotes, setMatrixNotes] = useState<Record<string, Record<string, '?' | 'X' | 'O'>>>({});
+  const [timelineExpanded, setTimelineExpanded] = useState(false);
   
   // 최종 고발 모달 상태 (용의자, 살인 장소, 흉기 도구)
   const [isAccuseModalOpen, setIsAccuseModalOpen] = useState(false);
@@ -105,8 +119,10 @@ export default function Home() {
   const effectiveP1 = (playMode === 'guest' && hostSelectedCharacter) ? hostSelectedCharacter : p1Character;
   const effectiveP2 = (playMode === 'host' && guestSelectedCharacter) ? guestSelectedCharacter : p2Character;
 
-  // 게임 시작 여부 파생 (호스트/로컬은 hasStarted, 게스트는 카드가 분배되었을 때 시작으로 간주)
-  const isGameStarted = hasStarted || (playMode === 'guest' && (gameState.players[0]?.hand?.length ?? 0) > 0);
+  // 게임 시작 여부 파생 (호스트/로컬은 hasStarted, 게스트 또는 세션 복원 시 카드가 분배되었을 때 시작으로 간주)
+  const isGameStarted = hasStarted || 
+    (playMode === 'guest' && (gameState.players[0]?.hand?.length ?? 0) > 0) ||
+    (gameState.phase !== 'LOBBY' && (gameState.players[0]?.hand?.length ?? 0) > 0);
 
   // 멀티플레이어 기기별 관점 (호스트=p1, 게스트=p2, 로컬=현재 차례)
   const myPlayer = playMode === 'guest'
@@ -119,6 +135,11 @@ export default function Home() {
     ? isHumanTurn
     : (myPlayerRole === 'p1' && currentPlayer?.roleType === 'p1') ||
       (myPlayerRole === 'p2' && currentPlayer?.roleType === 'p2');
+
+  // 세션 복원 시도 (모바일 새로고침 또는 브라우저 복귀 시)
+  useEffect(() => {
+    restoreSessionIfNeeded().catch(() => {});
+  }, [restoreSessionIfNeeded]);
 
   // URL 쿼리스트링 `?room=XXXX` 자동 감지 및 자동 접속
   useEffect(() => {
@@ -228,6 +249,22 @@ export default function Home() {
       const current = prev[cardId] || 'UNKNOWN';
       const next = current === 'UNKNOWN' ? 'NO' : current === 'NO' ? 'YES' : 'UNKNOWN';
       return { ...prev, [cardId]: next };
+    });
+  };
+
+  const toggleMatrixCell = (cardId: string, playerId: string) => {
+    sounds.playDisprove();
+    setMatrixNotes(prev => {
+      const cardMap = prev[cardId] || {};
+      const current = cardMap[playerId] || '?';
+      const next = current === '?' ? 'X' : current === 'X' ? 'O' : '?';
+      return {
+        ...prev,
+        [cardId]: {
+          ...cardMap,
+          [playerId]: next,
+        },
+      };
     });
   };
 
@@ -626,12 +663,22 @@ export default function Home() {
             {t.round} {gameState.turnCount} / {gameState.maxTurns}
           </div>
 
-          {/* 멀티플레이 룸 뱃지 */}
-          {playMode !== 'local' && roomCode && (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-slate-300">{roomCode}</span>
-              <span className="text-[10px] text-amber-400 font-bold">({playMode.toUpperCase()})</span>
+          {/* 멀티플레이 룸 뱃지 및 온라인 상태 */}
+          {playMode !== 'local' && (
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-mono">
+              {roomCode && <span className="text-slate-200 font-bold">{roomCode}</span>}
+              {peerOnline ? (
+                <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold font-sans">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="hidden sm:inline">{t.online}</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold font-sans">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                  <span className="hidden sm:inline">{t.offline}</span>
+                </span>
+              )}
+              <span className="text-[10px] text-amber-400 font-bold hidden sm:inline font-sans">({playMode.toUpperCase()})</span>
             </div>
           )}
         </div>
@@ -680,6 +727,22 @@ export default function Home() {
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+          </button>
+
+          {/* 절차적 필름 느와르 재즈 BGM 토글 */}
+          <button
+            onClick={() => {
+              const next = sounds.toggleBgm();
+              setBgmActive(next);
+            }}
+            title={t.bgmMusic}
+            className={`p-2 rounded-lg border transition-all ${
+              bgmActive
+                ? 'bg-amber-500/20 border-amber-500 text-amber-400 shadow-sm shadow-amber-500/30 ring-1 ring-amber-500/40'
+                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
+            }`}
+          >
+            <Music className={`w-4 h-4 ${bgmActive ? 'animate-pulse text-amber-400' : ''}`} />
           </button>
 
           <button 
@@ -749,6 +812,7 @@ export default function Home() {
                 isMyTurn={isMyTurn}
                 onRollDice={handleRollDice}
                 onMoveToRoom={handleMove}
+                onWaitInHallway={performWaitInHallway}
               />
 
               {/* 플레이어 질문 작성 패널 (내 차례일 때만 활성화) */}
@@ -800,94 +864,353 @@ export default function Home() {
               )}
             </div>
           ) : (
-            /* 사건 추리 수첩 (체크리스트 - 내 기기 소지 카드는 자동 NO) */
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-300 flex items-center gap-1.5">
+            /* 사건 추리 수첩 (간편 체크리스트 vs 실전 탐정 매트릭스 그리드) */
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2">
                   <ScrollText className="w-4 h-4 text-amber-400" />
-                  {t.notebookTitle}
-                </h2>
-                <span className="text-xs text-slate-500">
-                  {t.notebookDesc}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                {/* 용의자 */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="font-bold text-rose-400 border-b border-slate-800 pb-1">{t.suspectsHeader}</div>
-                  {SUSPECTS.map(s => {
-                    const isMyCard = myPlayer?.hand?.some(c => c.id === s.id);
-                    const mark = isMyCard ? 'NO' : (userNotes[s.id] || 'UNKNOWN');
-                    return (
-                      <div 
-                        key={s.id} 
-                        onClick={() => !isMyCard && toggleNote(s.id)}
-                        className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                          !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
-                        } border-slate-800 bg-slate-900/40`}
-                      >
-                        <span className="text-slate-300">{getCardName(s.id)}</span>
-                        <span>
-                          {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
-                          {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
-                          {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  <h2 className="text-sm font-bold text-slate-200">
+                    {t.notebookTitle}
+                  </h2>
                 </div>
 
-                {/* 살인이 일어난 장소 */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="font-bold text-blue-400 border-b border-slate-800 pb-1">{t.locationsHeader}</div>
-                  {LOCATIONS.map(r => {
-                    const isMyCard = myPlayer?.hand?.some(c => c.id === r.id);
-                    const mark = isMyCard ? 'NO' : (userNotes[r.id] || 'UNKNOWN');
-                    return (
-                      <div 
-                        key={r.id} 
-                        onClick={() => !isMyCard && toggleNote(r.id)}
-                        className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                          !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
-                        } border-slate-800 bg-slate-900/40`}
-                      >
-                        <span className="text-slate-300">{getRoomName(r.id)}</span>
-                        <span>
-                          {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
-                          {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
-                          {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 범행 도구 */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="font-bold text-amber-400 border-b border-slate-800 pb-1">{t.weaponsHeader}</div>
-                  {WEAPONS.map(w => {
-                    const isMyCard = myPlayer?.hand?.some(c => c.id === w.id);
-                    const mark = isMyCard ? 'NO' : (userNotes[w.id] || 'UNKNOWN');
-                    return (
-                      <div 
-                        key={w.id} 
-                        onClick={() => !isMyCard && toggleNote(w.id)}
-                        className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                          !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
-                        } border-slate-800 bg-slate-900/40`}
-                      >
-                        <span className="text-slate-300">{getCardName(w.id)}</span>
-                        <span>
-                          {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
-                          {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
-                          {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
-                        </span>
-                      </div>
-                    );
-                  })}
+                {/* 보기 모드 전환 (체크리스트 vs 실전 매트릭스) */}
+                <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700 self-start sm:self-auto">
+                  <button
+                    onClick={() => setNotebookViewMode('simple')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      notebookViewMode === 'simple'
+                        ? 'bg-amber-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <ListChecks className="w-3.5 h-3.5" />
+                    <span>{t.notebookSimpleMode}</span>
+                  </button>
+                  <button
+                    onClick={() => setNotebookViewMode('matrix')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      notebookViewMode === 'matrix'
+                        ? 'bg-amber-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>{t.notebookMatrixMode}</span>
+                  </button>
                 </div>
               </div>
+
+              {notebookViewMode === 'simple' ? (
+                /* 1. 간편 체크리스트 뷰 */
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* 용의자 */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="font-bold text-rose-400 border-b border-slate-800 pb-1">{t.suspectsHeader}</div>
+                    {SUSPECTS.map(s => {
+                      const isMyCard = myPlayer?.hand?.some(c => c.id === s.id);
+                      const mark = isMyCard ? 'NO' : (userNotes[s.id] || 'UNKNOWN');
+                      return (
+                        <div 
+                          key={s.id} 
+                          onClick={() => !isMyCard && toggleNote(s.id)}
+                          className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                            !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
+                          } border-slate-800 bg-slate-900/40`}
+                        >
+                          <span className="text-slate-300">{getCardName(s.id)}</span>
+                          <span>
+                            {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
+                            {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
+                            {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 살인이 일어난 장소 */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="font-bold text-blue-400 border-b border-slate-800 pb-1">{t.locationsHeader}</div>
+                    {LOCATIONS.map(r => {
+                      const isMyCard = myPlayer?.hand?.some(c => c.id === r.id);
+                      const mark = isMyCard ? 'NO' : (userNotes[r.id] || 'UNKNOWN');
+                      return (
+                        <div 
+                          key={r.id} 
+                          onClick={() => !isMyCard && toggleNote(r.id)}
+                          className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                            !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
+                          } border-slate-800 bg-slate-900/40`}
+                        >
+                          <span className="text-slate-300">{getRoomName(r.id)}</span>
+                          <span>
+                            {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
+                            {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
+                            {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 범행 도구 */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="font-bold text-amber-400 border-b border-slate-800 pb-1">{t.weaponsHeader}</div>
+                    {WEAPONS.map(w => {
+                      const isMyCard = myPlayer?.hand?.some(c => c.id === w.id);
+                      const mark = isMyCard ? 'NO' : (userNotes[w.id] || 'UNKNOWN');
+                      return (
+                        <div 
+                          key={w.id} 
+                          onClick={() => !isMyCard && toggleNote(w.id)}
+                          className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                            !isMyCard ? 'cursor-pointer hover:bg-slate-800/50' : 'opacity-70'
+                          } border-slate-800 bg-slate-900/40`}
+                        >
+                          <span className="text-slate-300">{getCardName(w.id)}</span>
+                          <span>
+                            {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500" />}
+                            {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />}
+                            {mark === 'UNKNOWN' && <span className="text-slate-600">?</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* 2. 전 탐정 매트릭스 그리드 뷰 (보드게임 정석 추리표) */
+                <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800/80 text-slate-300 border-b border-slate-700 font-semibold">
+                        <th className="p-2.5 min-w-[130px] text-slate-300">
+                          {locale === 'ko' ? '단서 카드' : 'Clue Card'}
+                        </th>
+                        {gameState.players.map(p => {
+                          const isMyDetective = p.id === myPlayer?.id;
+                          return (
+                            <th key={p.id} className="p-2 text-center min-w-[70px] border-l border-slate-800/80">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-base leading-none">{p.avatar}</span>
+                                <span className={`text-[10px] font-bold truncate max-w-[65px] ${isMyDetective ? 'text-amber-400' : 'text-slate-300'}`}>
+                                  {isMyDetective ? (locale === 'ko' ? '나 (Me)' : 'You') : getPlayerDisplayName(p, locale).split(' ')[0]}
+                                </span>
+                              </div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {/* 용의자 섹션 */}
+                      <tr className="bg-rose-950/40 text-rose-300 font-black text-[10px]">
+                        <td colSpan={1 + gameState.players.length} className="px-3 py-1 uppercase tracking-wider">
+                          {t.suspectsHeader}
+                        </td>
+                      </tr>
+                      {SUSPECTS.map(s => {
+                        const cardName = getCardName(s.id);
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="p-2 font-medium text-slate-200 border-r border-slate-800/50">
+                              {cardName}
+                            </td>
+                            {gameState.players.map(p => {
+                              const isMyDetective = p.id === myPlayer?.id;
+                              const isMyCard = myPlayer?.hand?.some(c => c.id === s.id);
+
+                              if (isMyDetective) {
+                                if (isMyCard) {
+                                  return (
+                                    <td key={p.id} className="p-1.5 text-center border-l border-slate-800/50 bg-amber-500/10">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-slate-950">
+                                        HAND
+                                      </span>
+                                    </td>
+                                  );
+                                }
+                                const mark = userNotes[s.id] || 'UNKNOWN';
+                                return (
+                                  <td
+                                    key={p.id}
+                                    onClick={() => toggleNote(s.id)}
+                                    className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors"
+                                  >
+                                    {mark === 'NO' && <span className="text-rose-400 font-black text-sm">✕</span>}
+                                    {mark === 'YES' && <span className="text-emerald-400 font-black text-sm">✓</span>}
+                                    {mark === 'UNKNOWN' && <span className="text-slate-600 font-mono">?</span>}
+                                  </td>
+                                );
+                              }
+
+                              const cellVal = matrixNotes[s.id]?.[p.id] || '?';
+                              return (
+                                <td
+                                  key={p.id}
+                                  onClick={() => toggleMatrixCell(s.id, p.id)}
+                                  className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors select-none"
+                                >
+                                  {cellVal === 'O' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300">
+                                      O
+                                    </span>
+                                  )}
+                                  {cellVal === 'X' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 border border-rose-500/60 text-rose-300">
+                                      X
+                                    </span>
+                                  )}
+                                  {cellVal === '?' && (
+                                    <span className="text-slate-600 font-mono text-xs">·</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+
+                      {/* 장소 섹션 */}
+                      <tr className="bg-blue-950/40 text-blue-300 font-black text-[10px]">
+                        <td colSpan={1 + gameState.players.length} className="px-3 py-1 uppercase tracking-wider">
+                          {t.locationsHeader}
+                        </td>
+                      </tr>
+                      {LOCATIONS.map(r => {
+                        const roomName = getRoomName(r.id);
+                        return (
+                          <tr key={r.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="p-2 font-medium text-slate-200 border-r border-slate-800/50">
+                              {roomName}
+                            </td>
+                            {gameState.players.map(p => {
+                              const isMyDetective = p.id === myPlayer?.id;
+                              const isMyCard = myPlayer?.hand?.some(c => c.id === r.id);
+
+                              if (isMyDetective) {
+                                if (isMyCard) {
+                                  return (
+                                    <td key={p.id} className="p-1.5 text-center border-l border-slate-800/50 bg-amber-500/10">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-slate-950">
+                                        HAND
+                                      </span>
+                                    </td>
+                                  );
+                                }
+                                const mark = userNotes[r.id] || 'UNKNOWN';
+                                return (
+                                  <td
+                                    key={p.id}
+                                    onClick={() => toggleNote(r.id)}
+                                    className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors"
+                                  >
+                                    {mark === 'NO' && <span className="text-rose-400 font-black text-sm">✕</span>}
+                                    {mark === 'YES' && <span className="text-emerald-400 font-black text-sm">✓</span>}
+                                    {mark === 'UNKNOWN' && <span className="text-slate-600 font-mono">?</span>}
+                                  </td>
+                                );
+                              }
+
+                              const cellVal = matrixNotes[r.id]?.[p.id] || '?';
+                              return (
+                                <td
+                                  key={p.id}
+                                  onClick={() => toggleMatrixCell(r.id, p.id)}
+                                  className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors select-none"
+                                >
+                                  {cellVal === 'O' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300">
+                                      O
+                                    </span>
+                                  )}
+                                  {cellVal === 'X' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 border border-rose-500/60 text-rose-300">
+                                      X
+                                    </span>
+                                  )}
+                                  {cellVal === '?' && (
+                                    <span className="text-slate-600 font-mono text-xs">·</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+
+                      {/* 범행 도구 섹션 */}
+                      <tr className="bg-amber-950/40 text-amber-300 font-black text-[10px]">
+                        <td colSpan={1 + gameState.players.length} className="px-3 py-1 uppercase tracking-wider">
+                          {t.weaponsHeader}
+                        </td>
+                      </tr>
+                      {WEAPONS.map(w => {
+                        const weaponName = getCardName(w.id);
+                        return (
+                          <tr key={w.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="p-2 font-medium text-slate-200 border-r border-slate-800/50">
+                              {weaponName}
+                            </td>
+                            {gameState.players.map(p => {
+                              const isMyDetective = p.id === myPlayer?.id;
+                              const isMyCard = myPlayer?.hand?.some(c => c.id === w.id);
+
+                              if (isMyDetective) {
+                                if (isMyCard) {
+                                  return (
+                                    <td key={p.id} className="p-1.5 text-center border-l border-slate-800/50 bg-amber-500/10">
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-slate-950">
+                                        HAND
+                                      </span>
+                                    </td>
+                                  );
+                                }
+                                const mark = userNotes[w.id] || 'UNKNOWN';
+                                return (
+                                  <td
+                                    key={p.id}
+                                    onClick={() => toggleNote(w.id)}
+                                    className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors"
+                                  >
+                                    {mark === 'NO' && <span className="text-rose-400 font-black text-sm">✕</span>}
+                                    {mark === 'YES' && <span className="text-emerald-400 font-black text-sm">✓</span>}
+                                    {mark === 'UNKNOWN' && <span className="text-slate-600 font-mono">?</span>}
+                                  </td>
+                                );
+                              }
+
+                              const cellVal = matrixNotes[w.id]?.[p.id] || '?';
+                              return (
+                                <td
+                                  key={p.id}
+                                  onClick={() => toggleMatrixCell(w.id, p.id)}
+                                  className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors select-none"
+                                >
+                                  {cellVal === 'O' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300">
+                                      O
+                                    </span>
+                                  )}
+                                  {cellVal === 'X' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 border border-rose-500/60 text-rose-300">
+                                      X
+                                    </span>
+                                  )}
+                                  {cellVal === '?' && (
+                                    <span className="text-slate-600 font-mono text-xs">·</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -1071,31 +1394,85 @@ export default function Home() {
         </div>
       )}
 
-      {/* 게임 오버 모달 창 */}
+      {/* 게임 오버 모달 창 (정답 공개 및 사건 수사 타임라인 복기) */}
       {gameState.phase === 'GAME_OVER' && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="max-w-md w-full bg-slate-900 border border-amber-500/40 p-6 rounded-3xl text-center flex flex-col items-center gap-4 shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="max-w-lg w-full bg-slate-900 border border-amber-500/50 p-6 rounded-3xl text-center flex flex-col items-center gap-4 shadow-2xl my-auto">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/10">
               🏆
             </div>
             <h2 className="text-2xl font-black text-slate-100">{t.investigationEnd}</h2>
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-slate-300 font-medium">
               {gameState.winnerId 
                 ? `${getPlayerDisplayName(gameState.players.find(p => p.id === gameState.winnerId)!, locale)} ${t.truthRevealed}`
                 : t.mysteryUnsolved}
             </p>
-            <div className="bg-slate-800/60 p-4 rounded-xl text-xs text-left w-full flex flex-col gap-1 text-slate-300">
-              <div className="font-bold text-amber-400 mb-1">{t.secretSolutionTitle}</div>
-              <div>• {t.solutionCulprit}: {getCardName(gameState.solution.suspectId)}</div>
-              <div>• {t.solutionLocation}: {getRoomName(gameState.solution.locationId)}</div>
-              <div>• {t.solutionWeapon}: {getCardName(gameState.solution.weaponId)}</div>
+
+            {/* 사건의 진상 (정답 카드 3장) */}
+            <div className="bg-slate-800/70 border border-amber-500/30 p-4 rounded-2xl text-xs text-left w-full flex flex-col gap-1.5 text-slate-200 shadow-inner">
+              <div className="font-bold text-amber-400 mb-1 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>{t.secretSolutionTitle}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                <div className="bg-slate-900/60 p-2 rounded-xl border border-slate-700/80">
+                  <span className="text-[10px] text-rose-400 block font-bold">{t.solutionCulprit}</span>
+                  <span className="font-semibold text-slate-100">{getCardName(gameState.solution.suspectId)}</span>
+                </div>
+                <div className="bg-slate-900/60 p-2 rounded-xl border border-slate-700/80">
+                  <span className="text-[10px] text-blue-400 block font-bold">{t.solutionLocation}</span>
+                  <span className="font-semibold text-slate-100">{getRoomName(gameState.solution.locationId)}</span>
+                </div>
+                <div className="bg-slate-900/60 p-2 rounded-xl border border-slate-700/80">
+                  <span className="text-[10px] text-amber-400 block font-bold">{t.solutionWeapon}</span>
+                  <span className="font-semibold text-slate-100">{getCardName(gameState.solution.weaponId)}</span>
+                </div>
+              </div>
             </div>
+
+            {/* 사건 수사 타임라인 복기 (Collapsible Timeline Debrief) */}
+            <div className="w-full bg-slate-800/40 border border-slate-700/60 rounded-2xl overflow-hidden text-left shadow-inner">
+              <button
+                onClick={() => setTimelineExpanded(!timelineExpanded)}
+                className="w-full p-3.5 flex items-center justify-between text-xs font-bold text-amber-400 hover:bg-slate-800/60 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <ScrollText className="w-4 h-4 text-amber-400" />
+                  <span>{t.investigationTimeline}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300">
+                    {gameState.logs.length}
+                  </span>
+                </span>
+                {timelineExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {timelineExpanded && (
+                <div className="p-3 border-t border-slate-700/60 max-h-56 overflow-y-auto flex flex-col gap-2 text-xs text-slate-300">
+                  {gameState.logs.map((log) => (
+                    <div 
+                      key={log.id} 
+                      className={`p-2.5 rounded-xl border text-[11px] leading-relaxed ${
+                        log.type === 'accusation'
+                          ? 'border-rose-500/40 bg-rose-950/20 text-rose-200'
+                          : log.type === 'disprove'
+                            ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
+                            : 'border-slate-800 bg-slate-900/60 text-slate-300'
+                      }`}
+                    >
+                      <span className="text-[10px] text-slate-500 mr-1.5 font-mono">[{t.round} {log.turn}]</span>
+                      {log.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => {
                 setHasStarted(false);
                 disconnectRoom();
               }}
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm transition-colors"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
             >
               {t.playAgain}
             </button>

@@ -499,6 +499,212 @@ class SoundController {
       overtone.stop(now + duration);
     });
   }
+
+  // 10. 말(Pawn) 복도 타일 보행 스텝 소리: 타일을 하나씩 통-통 딛는 경쾌한 목재 폰 걸음마 소리
+  playPawnStep() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // 부드러운 완충 탭
+    this.playNoiseTransient(now, 0.008, 1600, 2.0, 0.12);
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    const pitch = 260 + (Math.random() - 0.5) * 30;
+    osc.frequency.setValueAtTime(pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(pitch * 0.7, now + 0.04);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    osc.connect(gain);
+    gain.connect(this.getMasterOut());
+
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  // 11. 비밀 통로 이동 소리: 은밀한 회전 벽장을 통과하는 신비로운 스위시 사운드
+  playSecretPassage() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    try {
+      const duration = 0.45;
+      const bufferSize = Math.floor(ctx.sampleRate * duration);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400, now);
+      filter.frequency.exponentialRampToValueAtTime(320, now + duration);
+      filter.Q.setValueAtTime(2.5, now);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.2, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.getMasterOut(true));
+
+      noise.start(now);
+    } catch {}
+
+    // 신비로운 하강 차임 (659Hz -> 392Hz)
+    [659.25, 493.88, 392.0].forEach((f, i) => {
+      const t = now + 0.08 + i * 0.09;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.1, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.connect(g);
+      g.connect(this.getMasterOut(true));
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+  }
+
+  // ==========================================
+  // 12. 웹 오디오 프로시저럴 미스터리 누아르 BGM 엔진
+  // ==========================================
+  public isBgmPlaying: boolean = false;
+  private bgmGainNode: GainNode | null = null;
+  private bgmIntervalId: ReturnType<typeof setInterval> | null = null;
+  private bgmBarIndex: number = 0;
+  public bgmVolume: number = 0.25;
+
+  public toggleBgm() {
+    if (this.isBgmPlaying) {
+      this.stopBgm();
+    } else {
+      this.startBgm();
+    }
+    return this.isBgmPlaying;
+  }
+
+  public setBgmVolume(val: number) {
+    this.bgmVolume = Math.max(0, Math.min(1, val));
+    if (this.bgmGainNode && this.ctx) {
+      this.bgmGainNode.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
+    }
+  }
+
+  public startBgm() {
+    if (this.isBgmPlaying) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    this.isBgmPlaying = true;
+
+    if (!this.bgmGainNode) {
+      this.bgmGainNode = ctx.createGain();
+      this.bgmGainNode.gain.setValueAtTime(this.bgmVolume, ctx.currentTime);
+      this.bgmGainNode.connect(this.getMasterOut(true));
+    }
+
+    this.bgmBarIndex = 0;
+    this.scheduleBgmBar();
+
+    // 65 BPM 기준으로 1마디 = 약 3.69초마다 다음 마디 예약
+    this.bgmIntervalId = setInterval(() => {
+      if (this.isBgmPlaying) {
+        this.scheduleBgmBar();
+      }
+    }, 3650);
+  }
+
+  public stopBgm() {
+    this.isBgmPlaying = false;
+    if (this.bgmIntervalId) {
+      clearInterval(this.bgmIntervalId);
+      this.bgmIntervalId = null;
+    }
+    if (this.bgmGainNode && this.ctx) {
+      this.bgmGainNode.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+      setTimeout(() => {
+        if (this.bgmGainNode && this.ctx) {
+          this.bgmGainNode.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
+        }
+      }, 300);
+    }
+  }
+
+  private scheduleBgmBar() {
+    const ctx = this.getContext();
+    if (!ctx || !this.bgmGainNode) return;
+
+    const now = ctx.currentTime;
+    const bar = this.bgmBarIndex % 4;
+    this.bgmBarIndex++;
+
+    // 4마디 재즈 하모니: Cm9 -> Fm9 -> G7(b9) -> Cm11
+    const jazzChords = [
+      { bass: 65.41, keys: [155.56, 196.0, 233.08, 293.66] }, // Cm9
+      { bass: 87.31, keys: [207.65, 261.63, 311.13, 392.0] }, // Fm9
+      { bass: 97.99, keys: [246.94, 293.66, 349.23, 415.3] }, // G7b9
+      { bass: 65.41, keys: [174.61, 233.08, 293.66, 349.23] }, // Cm11
+    ];
+
+    const currentChord = jazzChords[bar];
+
+    // 콘트라베이스 워킹 피치카토 (1박, 3박)
+    [0, 1.84].forEach((offset, i) => {
+      const t = now + offset;
+      const bassOsc = ctx.createOscillator();
+      const bassGain = ctx.createGain();
+      bassOsc.type = 'sine';
+      // 3박에는 부드러운 5도 또는 경과음
+      const freq = i === 0 ? currentChord.bass : currentChord.bass * 1.498;
+      bassOsc.frequency.setValueAtTime(freq, t);
+
+      bassGain.gain.setValueAtTime(0.001, t);
+      bassGain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+      bassGain.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+
+      bassOsc.connect(bassGain);
+      bassGain.connect(this.bgmGainNode!);
+      bassOsc.start(t);
+      bassOsc.stop(t + 1.4);
+    });
+
+    // 로즈 일렉트릭 피아노 코드 컴핑 (따뜻한 벨 하모닉스, 0.4초 및 2.2초에 리듬 연주)
+    [0.35, 2.15].forEach((offset, beatIdx) => {
+      const t = now + offset;
+      const vel = beatIdx === 0 ? 0.06 : 0.045;
+
+      currentChord.keys.forEach((f, kIdx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(vel, t + 0.03 + kIdx * 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+
+        osc.connect(gain);
+        gain.connect(this.bgmGainNode!);
+        osc.start(t);
+        osc.stop(t + 1.3);
+      });
+    });
+  }
 }
 
 export const sounds = new SoundController();

@@ -344,3 +344,128 @@ export function calculateReachablePaths(
 
   return { reachableRoomIds, roomDistances, reachableTileSteps };
 }
+
+/**
+ * BFS to find the exact corridor tile path from startRoom to targetRoom
+ * Used for step-by-step pawn walking animation
+ */
+export function findShortestCorridorPath(
+  startRoomId: string,
+  targetRoomId: string
+): Array<{ r: number; c: number }> {
+  if (startRoomId === targetRoomId) return [];
+
+  const startRoom = BOARD_ROOMS[startRoomId];
+  const targetRoom = BOARD_ROOMS[targetRoomId];
+  if (!startRoom || !targetRoom) return [];
+
+  // If secret passage between rooms, return the portal endpoints
+  if (startRoom.secretPassage?.targetRoomId === targetRoomId) {
+    const spStart = startRoom.secretPassage;
+    const spEnd = targetRoom.secretPassage || { r: targetRoom.doors[0].r, c: targetRoom.doors[0].c };
+    return [{ r: spStart.r, c: spStart.c }, { r: spEnd.r, c: spEnd.c }];
+  }
+
+  const queue: Array<{ r: number; c: number }> = [];
+  const parentMap = new Map<string, { r: number; c: number } | null>();
+
+  // Doorway steps of start room
+  for (const door of startRoom.doors) {
+    const dr = door.facing === 'south' ? 1 : door.facing === 'north' ? -1 : 0;
+    const dc = door.facing === 'east' ? 1 : door.facing === 'west' ? -1 : 0;
+    const outR = door.r + dr;
+    const outC = door.c + dc;
+    if (outR >= 0 && outR < GRID_ROWS && outC >= 0 && outC < GRID_COLS) {
+      const key = `${outR},${outC}`;
+      parentMap.set(key, { r: door.r, c: door.c });
+      queue.push({ r: outR, c: outC });
+    }
+  }
+
+  // Target room doors set
+  const targetDoors = new Set<string>();
+  for (const d of targetRoom.doors) {
+    targetDoors.add(`${d.r},${d.c}`);
+  }
+
+  const directions = [
+    [0, 1],
+    [0, -1],
+    [1, 0],
+    [-1, 0],
+  ];
+
+  let endTile: { r: number; c: number } | null = null;
+  let targetDoorCell: { r: number; c: number } | null = null;
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    // Check if current is adjacent to any door of targetRoom
+    for (const [dr, dc] of directions) {
+      const nr = current.r + dr;
+      const nc = current.c + dc;
+      if (targetDoors.has(`${nr},${nc}`)) {
+        endTile = current;
+        targetDoorCell = { r: nr, c: nc };
+        break;
+      }
+    }
+    if (endTile) break;
+
+    // Expand
+    for (const [dr, dc] of directions) {
+      const nr = current.r + dr;
+      const nc = current.c + dc;
+      const key = `${nr},${nc}`;
+
+      if (
+        nr >= 0 &&
+        nr < GRID_ROWS &&
+        nc >= 0 &&
+        nc < GRID_COLS &&
+        !parentMap.has(key)
+      ) {
+        // Validate corridor
+        let inAnyRoom = false;
+        for (const room of Object.values(BOARD_ROOMS)) {
+          if (
+            nr >= room.rowRange[0] &&
+            nr <= room.rowRange[1] &&
+            nc >= room.colRange[0] &&
+            nc <= room.colRange[1]
+          ) {
+            inAnyRoom = true;
+            break;
+          }
+        }
+        const inCenter =
+          nr >= CENTER_ZONE.rowRange[0] &&
+          nr <= CENTER_ZONE.rowRange[1] &&
+          nc >= CENTER_ZONE.colRange[0] &&
+          nc <= CENTER_ZONE.colRange[1];
+
+        if (!inAnyRoom && !inCenter) {
+          parentMap.set(key, current);
+          queue.push({ r: nr, c: nc });
+        }
+      }
+    }
+  }
+
+  if (!endTile) return [];
+
+  // Reconstruct path
+  const path: Array<{ r: number; c: number }> = [];
+  if (targetDoorCell) {
+    path.push(targetDoorCell);
+  }
+
+  let curr: { r: number; c: number } | null = endTile;
+  while (curr) {
+    path.unshift(curr);
+    curr = parentMap.get(`${curr.r},${curr.c}`) || null;
+  }
+
+  return path;
+}

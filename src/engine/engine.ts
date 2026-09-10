@@ -331,11 +331,29 @@ export function makeSuggestion(
     timestamp: Date.now(),
   };
 
+  const logs = [...state.logs, newLog];
+
+  // Classic Clue Rule: If a player is playing the suggested suspect, summon them to this room!
+  const updatedPlayers = state.players.map(p => {
+    if (p.characterId === suggestion.suspectId && p.currentRoomId !== suggestion.locationId) {
+      logs.push({
+        id: `log_${Date.now()}_summon_${p.id}`,
+        turn: state.turnCount,
+        message: `🚨 [Summoned] ${p.name} was summoned to the ${location} for questioning!`,
+        type: 'event',
+        timestamp: Date.now() + 1,
+      });
+      return { ...p, currentRoomId: suggestion.locationId };
+    }
+    return p;
+  });
+
   return {
     ...state,
+    players: updatedPlayers,
     currentSuggestion: fullSuggestion,
     phase: 'WAITING_DISPROVE',
-    logs: [...state.logs, newLog],
+    logs,
   };
 }
 
@@ -354,6 +372,7 @@ export function getDisprovableCards(player: Player, suggestion: Suggestion): Car
 
 /**
  * 시계방향으로 다음 반증 가능한 플레이어 찾기
+ * 정통 클루 룰: 오답으로 탈락한 플레이어라도 손패의 카드는 여전히 유효하므로 반증 의무를 수행함!
  */
 export function findNextDisprovingPlayer(
   players: Player[], 
@@ -365,7 +384,6 @@ export function findNextDisprovingPlayer(
   for (let i = 1; i < total; i++) {
     const targetIdx = (askerIndex + i) % total;
     const targetPlayer = players[targetIdx];
-    if (targetPlayer.isEliminated) continue;
 
     const disprovable = getDisprovableCards(targetPlayer, suggestion);
     if (disprovable.length > 0) {
@@ -374,6 +392,27 @@ export function findNextDisprovingPlayer(
   }
 
   return null;
+}
+
+/**
+ * 주사위 굴림 후 방에 진입하지 않고 복도에서 대기(턴 넘기기)
+ */
+export function waitInHallway(state: GameState): GameState {
+  const player = state.players[state.currentPlayerIndex];
+  const waitLog: LogEntry = {
+    id: `log_${Date.now()}_wait`,
+    turn: state.turnCount,
+    message: `🚶 ${player.name} waited in the hallway and ended their turn.`,
+    type: 'event',
+    timestamp: Date.now(),
+  };
+
+  return nextTurn({
+    ...state,
+    currentDiceRoll: undefined,
+    accessibleRoomIds: undefined,
+    logs: [...state.logs, waitLog],
+  });
 }
 
 /**

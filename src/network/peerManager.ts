@@ -8,11 +8,13 @@ export type PeerMessageType =
   | 'STATE_SYNC'
   | 'ACTION_ROLL'
   | 'ACTION_MOVE'
+  | 'ACTION_WAIT_HALLWAY'
   | 'ACTION_SUGGEST'
   | 'ACTION_DISPROVE'
   | 'DISPROVE_REQUEST'
   | 'PRIVATE_CLUE_REVEALED'
   | 'ACTION_ACCUSE'
+  | 'HEARTBEAT'
   | 'PING'
   | 'PONG';
 

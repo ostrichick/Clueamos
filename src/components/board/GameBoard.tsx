@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   BOARD_ROOMS, 
   CENTER_ZONE, 
   generateBoardGrid, 
   calculateReachablePaths, 
+  findShortestCorridorPath,
   BoardCell 
 } from '@/engine/boardGrid';
 import { SECRET_PASSAGES, getPlayerDisplayName } from '@/engine/engine';
 import { Player } from '@/engine/types';
 import { TranslationStrings, SupportedLocale } from '@/i18n/translations';
 import { Sparkles, Dices, ArrowRight } from 'lucide-react';
+import { sounds } from '@/utils/sounds';
 
 interface GameBoardProps {
   players: Player[];
@@ -25,6 +27,7 @@ interface GameBoardProps {
   isMyTurn?: boolean;
   onRollDice: () => void;
   onMoveToRoom: (roomId: string) => void;
+  onWaitInHallway?: () => void;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -39,10 +42,58 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   isMyTurn = true,
   onRollDice,
   onMoveToRoom,
+  onWaitInHallway,
 }) => {
   const currentPlayer = players[currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
   const isMovePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_MOVE';
+  const [walkingState, setWalkingState] = useState<{
+    playerId: string;
+    path: Array<{ r: number; c: number }>;
+    stepIndex: number;
+  } | null>(null);
+
+  const handleRoomClick = (targetRoomId: string) => {
+    if (!currentPlayer || walkingState) return;
+
+    // Check if secret passage
+    if (SECRET_PASSAGES[currentPlayer.currentRoomId] === targetRoomId) {
+      sounds.playSecretPassage();
+      onMoveToRoom(targetRoomId);
+      return;
+    }
+
+    // Corridor path walk
+    const path = findShortestCorridorPath(currentPlayer.currentRoomId, targetRoomId);
+    if (path.length > 0) {
+      setWalkingState({
+        playerId: currentPlayer.id,
+        path,
+        stepIndex: 0,
+      });
+
+      let currentStep = 0;
+      sounds.playPawnStep();
+
+      const stepInterval = setInterval(() => {
+        currentStep++;
+        if (currentStep < path.length) {
+          sounds.playPawnStep();
+          setWalkingState({
+            playerId: currentPlayer.id,
+            path,
+            stepIndex: currentStep,
+          });
+        } else {
+          clearInterval(stepInterval);
+          setWalkingState(null);
+          onMoveToRoom(targetRoomId);
+        }
+      }, 70);
+    } else {
+      onMoveToRoom(targetRoomId);
+    }
+  };
   const isRollPhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ROLL';
 
   // Generate grid cells once
@@ -120,17 +171,29 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           </div>
         </div>
 
-        {/* 주사위 굴리기 버튼 */}
-        {isRollPhase && (
-          <button
-            disabled={isRollingDice}
-            onClick={onRollDice}
-            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <Dices className="w-4 h-4" />
-            <span>{isRollingDice ? t.rollingDice : t.rollDiceBtn}</span>
-          </button>
-        )}
+        {/* 주사위 굴리기 및 이동 단계 액션 버튼들 */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {isRollPhase && (
+            <button
+              disabled={isRollingDice}
+              onClick={onRollDice}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <Dices className="w-4 h-4" />
+              <span>{isRollingDice ? t.rollingDice : t.rollDiceBtn}</span>
+            </button>
+          )}
+
+          {isMovePhase && onWaitInHallway && (
+            <button
+              onClick={onWaitInHallway}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs shadow transition-all active:scale-95 flex items-center justify-center gap-1.5"
+            >
+              <span>🚶</span>
+              <span>{t.waitInHallway}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 2. 클래식 Clue 13x13 맨션 보드판 메인 영역 */}
@@ -173,6 +236,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             // 체크무늬 색상 교차
             const isAlt = (cell.r + cell.c) % 2 === 0;
 
+            // 현재 보행 중인 말이 이 칸 위에 있는지 체크
+            const isWalkingHere = walkingState && walkingState.path[walkingState.stepIndex]?.r === cell.r && walkingState.path[walkingState.stepIndex]?.c === cell.c;
+            const walkingPlayer = isWalkingHere ? players.find(p => p.id === walkingState.playerId) : null;
+
             return (
               <div
                 key={key}
@@ -181,15 +248,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   gridColumnStart: cell.c + 1,
                 }}
                 className={`w-full h-full rounded-[3px] flex items-center justify-center text-[10px] font-bold transition-all relative ${
-                  isReachableTile
-                    ? 'bg-emerald-500/35 border border-emerald-400/80 shadow-[0_0_8px_rgba(52,211,153,0.4)] text-emerald-200 z-10'
-                    : isAlt
-                      ? 'bg-[#cba86e] border border-[#a2824b] text-[#523d1d]'
-                      : 'bg-[#bc9961] border border-[#8e6e37] text-[#423117]'
+                  isWalkingHere
+                    ? 'bg-amber-400/40 border-2 border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.6)] z-30'
+                    : isReachableTile
+                      ? 'bg-emerald-500/35 border border-emerald-400/80 shadow-[0_0_8px_rgba(52,211,153,0.4)] text-emerald-200 z-10'
+                      : isAlt
+                        ? 'bg-[#cba86e] border border-[#a2824b] text-[#523d1d]'
+                        : 'bg-[#bc9961] border border-[#8e6e37] text-[#423117]'
                 }`}
               >
-                {/* 돋보이는 걸음 수 및 발자국 */}
-                {isReachableTile ? (
+                {walkingPlayer ? (
+                  <div className="z-30 transform animate-bounce filter drop-shadow scale-125">
+                    <span className="text-sm">{walkingPlayer.avatar}</span>
+                  </div>
+                ) : isReachableTile ? (
                   <span className="font-mono text-[11px] font-black drop-shadow animate-pulse">
                     {stepNumber}
                   </span>
@@ -218,25 +290,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               CLUEAMOS
             </div>
             <div className="text-[8px] sm:text-[9px] text-amber-200/70 font-mono tracking-tighter">
-              {t.confidentialCaseFile}
+              CASE FILE
             </div>
           </div>
 
           {/* C. 6개 방 구역들 (Continuous Illustrated Rooms with Walls & Doors) */}
-          {Object.values(BOARD_ROOMS).map(roomConfig => {
-            const roomId = roomConfig.id;
+          {Object.entries(BOARD_ROOMS).map(([roomId, roomConfig]) => {
+            const isAccessible = isMovePhase && (pathResult.reachableRoomIds.includes(roomId) || accessibleRoomIds.includes(roomId));
             const isCurrent = currentPlayer?.currentRoomId === roomId;
-            const isAccessible = isMovePhase && (accessibleRoomIds.includes(roomId) || pathResult.reachableRoomIds.includes(roomId));
             const distance = pathResult.roomDistances[roomId];
             const isSecret = currentSecretTarget === roomId;
-            const roomPlayers = playersByRoom[roomId] || [];
+            const roomPlayers = (playersByRoom[roomId] || []).filter(p => p.id !== walkingState?.playerId);
 
             return (
               <div
                 key={roomId}
                 onClick={() => {
-                  if (isAccessible) {
-                    onMoveToRoom(roomId);
+                  if (isAccessible && !isCurrent) {
+                    handleRoomClick(roomId);
                   }
                 }}
                 style={{

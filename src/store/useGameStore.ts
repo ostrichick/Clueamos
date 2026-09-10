@@ -4,6 +4,7 @@ import {
   initGame, 
   rollDice, 
   movePlayer, 
+  waitInHallway,
   makeSuggestion, 
   findNextDisprovingPlayer, 
   resolveDisprove, 
@@ -22,6 +23,24 @@ import { peerManager, PeerMessage } from '@/network/peerManager';
 export type PlayMode = 'local' | 'host' | 'guest';
 export type PlayerRole = 'p1' | 'p2';
 
+const SESSION_KEY = 'clueamos_session_v1';
+
+function saveSession(data: { roomCode: string; playMode: PlayMode; role: PlayerRole }) {
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+    } catch {}
+  }
+}
+
+function clearSession() {
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {}
+  }
+}
+
 interface GameStore {
   gameState: GameState;
   aiMemories: Record<string, AIMemory>;
@@ -35,6 +54,7 @@ interface GameStore {
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
+  peerOnline: boolean;
   guestSelectedCharacter: string | null;
   hostSelectedCharacter: string | null;
 
@@ -44,15 +64,17 @@ interface GameStore {
 
   // 액션
   setPlayMode: (mode: PlayMode) => void;
-  createRoom: () => Promise<string>;
+  createRoom: (desiredCode?: string) => Promise<string>;
   joinRoom: (code: string) => Promise<void>;
   disconnectRoom: () => void;
+  restoreSessionIfNeeded: () => Promise<boolean>;
   startNewGame: (p1CharacterId?: string, p2CharacterId?: string, locale?: SupportedLocale) => void;
   syncGuestCharacterChoice: (charId: string) => void;
   syncHostCharacterChoice: (charId: string) => void;
   selectRoom: (roomId: string) => void;
   performRollDice: () => void;
   performMove: (roomId: string) => void;
+  performWaitInHallway: () => void;
   performSuggestion: (suggestion: Omit<Suggestion, 'askerId'>) => void;
   performDisprove: (cardId?: string) => void;
   performAccusation: (accusation: Solution) => boolean;
@@ -148,6 +170,18 @@ export const useGameStore = create<GameStore>((set, get) => {
         break;
       }
 
+      case 'ACTION_WAIT_HALLWAY': {
+        if (playMode === 'host') {
+          get().performWaitInHallway();
+        }
+        break;
+      }
+
+      case 'HEARTBEAT': {
+        set({ peerOnline: true });
+        break;
+      }
+
       // Disprove prompt sent from Host to Guest
       case 'DISPROVE_REQUEST': {
         if (playMode === 'guest' && msg.payload?.availableCards) {
@@ -193,6 +227,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     isConnected: false,
     isConnecting: false,
     connectionError: null,
+    peerOnline: false,
     guestSelectedCharacter: null,
     hostSelectedCharacter: null,
     pendingDisprovePrompt: null,
@@ -205,7 +240,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       });
     },
 
-    createRoom: async () => {
+    createRoom: async (desiredCode?: string) => {
       set({ isConnecting: true, connectionError: null });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
@@ -227,7 +262,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       };
 
       try {
-        const code = await peerManager.createRoom();
+        const code = await peerManager.createRoom(desiredCode);
+        saveSession({ roomCode: code, playMode: 'host', role: 'p1' });
         set({
           roomCode: code,
           playMode: 'host',
@@ -254,6 +290,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       try {
         await peerManager.joinRoom(code);
+        saveSession({ roomCode: code, playMode: 'guest', role: 'p2' });
         set({
           roomCode: code,
           playMode: 'guest',
@@ -277,15 +314,36 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     disconnectRoom: () => {
+      clearSession();
       peerManager.cleanup();
       set({
         roomCode: null,
         isConnected: false,
         isConnecting: false,
         connectionError: null,
+        peerOnline: false,
         playMode: 'local',
         myPlayerRole: 'p1',
       });
+    },
+
+    restoreSessionIfNeeded: async () => {
+      if (typeof window === 'undefined') return false;
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return false;
+      try {
+        const session = JSON.parse(raw);
+        if (session.roomCode && session.playMode) {
+          if (session.playMode === 'guest') {
+            await get().joinRoom(session.roomCode);
+            return true;
+          } else if (session.playMode === 'host') {
+            await get().createRoom(session.roomCode);
+            return true;
+          }
+        }
+      } catch {}
+      return false;
     },
 
     syncGuestCharacterChoice: (charId: string) => {
@@ -397,6 +455,31 @@ export const useGameStore = create<GameStore>((set, get) => {
         const msg = e instanceof Error ? e.message : 'Cannot move to this room.';
         alert(msg);
       }
+    },
+
+    performWaitInHallway: () => {
+      const { playMode } = get();
+
+      if (playMode === 'guest') {
+        peerManager.sendMessage({ type: 'ACTION_WAIT_HALLWAY' });
+        return;
+      }
+
+      const { gameState } = get();
+      const nextState = waitInHallway(gameState);
+      set({ gameState: nextState, selectedRoomId: null });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'STATE_SYNC',
+          payload: { gameState: nextState },
+        });
+      }
+
+      // Trigger AI turn if next
+      setTimeout(() => {
+        get().runAITurnIfNeeded();
+      }, 1000);
     },
 
     performSuggestion: (suggestion) => {

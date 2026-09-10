@@ -107,6 +107,17 @@ export interface TranslationStrings {
   liveLogTitle: string;
   detectivesListTitle: string;
 
+  // New Features
+  waitInHallway: string;
+  waitInHallwayDesc: string;
+  summonedForQuestioning: string;
+  bgmMusic: string;
+  notebookSimpleMode: string;
+  notebookMatrixMode: string;
+  investigationTimeline: string;
+  online: string;
+  offline: string;
+
   // Game Over
   investigationEnd: string;
   truthRevealed: string;
@@ -229,6 +240,16 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
     liveLogTitle: 'Case Activity Log',
     detectivesListTitle: 'Detectives Roster',
+
+    waitInHallway: 'Wait in Hallway',
+    waitInHallwayDesc: 'Cannot reach any room with this roll. Wait in the corridor and pass turn.',
+    summonedForQuestioning: 'was summoned for questioning!',
+    bgmMusic: 'Noir BGM',
+    notebookSimpleMode: 'Quick Checklist',
+    notebookMatrixMode: 'Detective Matrix',
+    investigationTimeline: 'Investigation Timeline & Debrief',
+    online: 'Online',
+    offline: 'Reconnecting...',
 
     investigationEnd: 'Investigation Closed',
     truthRevealed: 'solved the mystery and brought justice!',
@@ -378,6 +399,16 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     liveLogTitle: 'Registro de Actividad',
     detectivesListTitle: 'Detectives del Caso',
 
+    waitInHallway: 'Esperar en el Pasillo',
+    waitInHallwayDesc: 'No alcanzas ninguna habitación con esta tirada. Espera en el pasillo.',
+    summonedForQuestioning: '¡fue convocado para interrogatorio!',
+    bgmMusic: 'Música Noir',
+    notebookSimpleMode: 'Lista Rápida',
+    notebookMatrixMode: 'Matriz Detective',
+    investigationTimeline: 'Línea de Tiempo del Caso',
+    online: 'En línea',
+    offline: 'Reconectando...',
+
     investigationEnd: 'Investigación Concluida',
     truthRevealed: '¡resolvió el misterio y triunfó!',
     mysteryUnsolved: 'El culpable escapó y el caso quedó sin resolver.',
@@ -525,6 +556,16 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
 
     liveLogTitle: '실시간 사건 수사 일지',
     detectivesListTitle: '탐정 수사관 현황',
+
+    waitInHallway: '복도에서 대기 (턴 넘기기)',
+    waitInHallwayDesc: '주사위 눈금이 부족하여 들어갈 수 있는 방이 없습니다. 복도에서 대기하고 턴을 넘기세요.',
+    summonedForQuestioning: '님이 알리바이 심문을 위해 해당 방으로 소환되었습니다!',
+    bgmMusic: '미스터리 BGM',
+    notebookSimpleMode: '간편 체크리스트',
+    notebookMatrixMode: '정통 탐정 시트',
+    investigationTimeline: '사건 수사 타임라인 복기',
+    online: '온라인',
+    offline: '재연결 대기...',
 
     investigationEnd: '수사 종료',
     truthRevealed: '님이 진실을 밝혀냈습니다!',
