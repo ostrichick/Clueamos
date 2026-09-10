@@ -492,13 +492,14 @@ export const useGameStore = create<GameStore>((set, get) => {
     disconnectRoom: () => {
       clearSession();
       peerManager.cleanup();
+      const curMode = get().playMode;
       set({
         roomCode: null,
         isConnected: false,
         isConnecting: false,
         connectionError: null,
         peerOnline: false,
-        playMode: 'local',
+        playMode: curMode === 'guest' ? 'host' : curMode,
         myPlayerRole: 'p1',
       });
     },

@@ -115,7 +115,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 setPlayMode('host');
               }
             }}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
               playMode !== 'solo'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200'
@@ -126,10 +126,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </button>
           <button
             onClick={() => {
-              setPlayMode('solo');
               disconnectRoom();
+              setPlayMode('solo');
             }}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
               playMode === 'solo'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200'
