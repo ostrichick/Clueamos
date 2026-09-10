@@ -140,6 +140,22 @@ export interface TranslationStrings {
     win: string;
     fail: string;
   };
+  aiDialogue: {
+    arthur: {
+      move: string[];
+      suggest: string[];
+      disprove: string[];
+      cannotDisprove: string[];
+      summoned: string[];
+    };
+    blake: {
+      move: string[];
+      suggest: string[];
+      disprove: string[];
+      cannotDisprove: string[];
+      summoned: string[];
+    };
+  };
 }
 
 export const translations: Record<SupportedLocale, TranslationStrings> = {
@@ -298,6 +314,56 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
       noDisprove: 'Nobody could disprove this hypothesis! (Very close to truth)',
       win: '🎉 [Case Solved!] discovered the truth and won!',
       fail: '❌ accusation was wrong! Eliminated from investigation.',
+    },
+    aiDialogue: {
+      arthur: {
+        move: [
+          'Deductive probability indicates the crime originated here.',
+          'Systematically eliminating variables in this room.',
+          'A meticulous mind overlooks no detail in this location.'
+        ],
+        suggest: [
+          'Logically, this scenario presents the fewest contradictions. Can anyone refute it?',
+          'My working hypothesis is formulated. What say the evidence?',
+          'Testing the hypothesis: suspect, location, and weapon.'
+        ],
+        disprove: [
+          'I hold documentary evidence contrary to your supposition.',
+          'Logic dictates this card disproves your scenario.'
+        ],
+        cannotDisprove: [
+          'I possess no records to contradict that claim.',
+          'Fascinating... that scenario remains plausible.'
+        ],
+        summoned: [
+          'Pardon me, summoned for questioning. What is your hypothesis?',
+          'Called to the crime scene! Let us cross-examine the facts.'
+        ]
+      },
+      blake: {
+        move: [
+          'My gut never lies. The truth is hiding in this room!',
+          'Following the scent of a criminal... I sense foul play here!',
+          'Let’s kick down this door and see what rattles loose!'
+        ],
+        suggest: [
+          'Don’t try to play poker with me—here’s what really went down!',
+          'I can smell the deceit in this room! Refute this if you can!',
+          'Who has the guts to challenge my detective instincts?'
+        ],
+        disprove: [
+          'Hold your horses! I’ve got the card right here!',
+          'Not on my watch! This card proves you got it wrong!'
+        ],
+        cannotDisprove: [
+          'Tch... got nothing in my hand to call your bluff.',
+          'Can’t help you there, partner. My hands are clean.'
+        ],
+        summoned: [
+          'Who dragged me into this room?! What’s the accusation?',
+          'Questioning me? Ha! You better have solid proof!'
+        ]
+      }
     }
   },
 
@@ -456,6 +522,56 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
       noDisprove: '¡Nadie pudo refutar esta hipótesis! (Muy cerca de la verdad)',
       win: '🎉 [¡Caso Resuelto!] descubrió la verdad y ganó.',
       fail: '❌ falló en su acusación. ¡Queda fuera del caso!',
+    },
+    aiDialogue: {
+      arthur: {
+        move: [
+          'La probabilidad deductiva indica que el crimen se originó aquí.',
+          'Eliminando variables sistemáticamente en esta habitación.',
+          'Una mente meticulosa no pasa por alto ningún detalle aquí.'
+        ],
+        suggest: [
+          'Lógicamente, este escenario presenta menos contradicciones. ¿Alguien puede refutarlo?',
+          'Mi hipótesis de trabajo está lista. ¿Qué dicen las pruebas?',
+          'Poniendo a prueba la hipótesis: sospechoso, lugar y arma.'
+        ],
+        disprove: [
+          'Tengo pruebas documentales que contradicen tu suposición.',
+          'La lógica dicta que esta carta refuta tu teoría.'
+        ],
+        cannotDisprove: [
+          'No poseo registros para contradecir esa afirmación.',
+          'Fascinante... ese escenario sigue siendo plausible.'
+        ],
+        summoned: [
+          'Disculpen, ¡he sido llamado a declarar! ¿Cuál es su sospecha?',
+          '¡Llamado a la escena del crimen! Aclaremos los hechos.'
+        ]
+      },
+      blake: {
+        move: [
+          'Mi instinto nunca falla. ¡La verdad se oculta en esta habitación!',
+          'Siguiendo el rastro del criminal... ¡aquí huele a juego sucio!',
+          '¡Derribemos esta puerta y veamos qué encontramos!'
+        ],
+        suggest: [
+          '¡No intenten engañarme, esto es exactamente lo que ocurrió!',
+          '¡Puedo oler el engaño en este cuarto! ¡A ver quién lo refuta!',
+          '¿Quién se atreve a desafiar mi instinto de detective?'
+        ],
+        disprove: [
+          '¡Alto ahí! ¡Tengo la carta justo aquí!',
+          '¡Ni lo sueñes! ¡Esta carta demuestra que te equivocas!'
+        ],
+        cannotDisprove: [
+          'Tch... no tengo nada en mi mano para desmentirte.',
+          'No puedo ayudarte, colega. Mis manos están limpias.'
+        ],
+        summoned: [
+          '¿Quién me arrastró a esta habitación? ¿De qué se me acusa?',
+          '¿Sospechan de mí? ¡Más vale que tengan pruebas sólidas!'
+        ]
+      }
     }
   },
 
@@ -614,6 +730,56 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
       noDisprove: '아무도 이 가설을 반증하지 못했습니다! (정답에 매우 근접)',
       win: '🎉 [사건 해결!] 진실을 밝혀내어 승리했습니다!',
       fail: '❌ 최종 고발이 빗나갔습니다! 현장에서 배제됩니다.',
+    },
+    aiDialogue: {
+      arthur: {
+        move: [
+          '논리적 확률에 따르면 범행의 핵심 단서는 이 방에 있습니다.',
+          '이 방의 모든 변수를 체계적으로 검증하겠습니다.',
+          '치밀한 탐정은 그 어떤 사소한 흔적도 놓치지 않는 법이죠.'
+        ],
+        suggest: [
+          '논리적으로 모순이 가장 적은 가설입니다. 반증할 수 있습니까?',
+          '수집된 정황을 조합한 결과입니다. 증거를 제시해 보시죠.',
+          '용의자, 범행 장소, 흉기의 가설을 엄밀히 검증합니다.'
+        ],
+        disprove: [
+          '귀하의 가설과 상충되는 결정적 단서를 제가 소지하고 있습니다.',
+          '논리적 귀결에 따라, 이 카드로 당신의 가설을 반증합니다.'
+        ],
+        cannotDisprove: [
+          '제 기록에는 해당 가설을 반증할 증거가 없군요.',
+          '흥미롭습니다... 이 가설은 여전히 유효합니다.'
+        ],
+        summoned: [
+          '심문을 위해 소환되었군요. 어떤 가설을 묻고자 하십니까?',
+          '사건 현장으로 불려왔습니다. 진실을 명백히 밝혀보죠.'
+        ]
+      },
+      blake: {
+        move: [
+          '내 동물적 직감은 틀린 적이 없지. 진실은 바로 이 방에 있어!',
+          '범인의 냄새가 진동하는군... 여기 뭔가 숨겨져 있어!',
+          '문을 박차고 들어가서 샅샅이 뒤져보자고!'
+        ],
+        suggest: [
+          '포커페이스는 그쯤 해두지! 내 감이 말해주는 사건의 진상이야!',
+          '여기서 냄새나는 짓을 벌인 자가 누구인지 가려내주마!',
+          '내 날카로운 직감에 반박할 수 있는 사람 나와봐!'
+        ],
+        disprove: [
+          '어림없는 소리! 그 단서는 내가 쥐고 있거든!',
+          '잠깐, 그 추리는 완전히 빗나갔어! 이 카드를 봐라!'
+        ],
+        cannotDisprove: [
+          '칫... 내 손엔 네 블러핑을 깰 카드가 없군.',
+          '난 도와줄 수 없겠는데? 이번엔 네 말이 맞을지도 모르지.'
+        ],
+        summoned: [
+          '날 이 방으로 끌고 온 게 누구야?! 무슨 혐의지?',
+          '나를 의심하는 건가? 증거도 없이 덤볐다간 큰코다칠걸!'
+        ]
+      }
     }
   }
 };

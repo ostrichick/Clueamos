@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { GameState, Solution, Suggestion, Card } from '@/engine/types';
+import { GameState, Solution, Suggestion, Card, Player } from '@/engine/types';
 import { 
   initGame, 
   rollDice, 
   movePlayer, 
-  waitInHallway,
+  waitInHallway, 
   makeSuggestion, 
   findNextDisprovingPlayer, 
   resolveDisprove, 
@@ -17,11 +17,19 @@ import {
   decideBlakeAction, 
   recordShownCard 
 } from '@/engine/ai';
-import { SupportedLocale } from '@/i18n/translations';
+import { SupportedLocale, translations } from '@/i18n/translations';
 import { peerManager, PeerMessage } from '@/network/peerManager';
 
 export type PlayMode = 'local' | 'host' | 'guest';
 export type PlayerRole = 'p1' | 'p2';
+
+export interface ActiveDialogue {
+  speakerId: string;
+  speakerName: string;
+  avatar: string;
+  color: string;
+  text: string;
+}
 
 const SESSION_KEY = 'clueamos_session_v1';
 
@@ -46,6 +54,7 @@ interface GameStore {
   aiMemories: Record<string, AIMemory>;
   selectedRoomId: string | null;
   isRollingDice: boolean;
+  currentLocale: SupportedLocale;
 
   // 멀티플레이어 상태
   playMode: PlayMode;
@@ -58,11 +67,17 @@ interface GameStore {
   guestSelectedCharacter: string | null;
   hostSelectedCharacter: string | null;
 
+  // AI 대사 및 말풍선 인터랙션
+  activeDialogue: ActiveDialogue | null;
+
   // 비밀 반증 인터랙션 상태
   pendingDisprovePrompt: { availableCards: Card[]; askerId: string } | null;
   lastSecretClue: { card: Card; fromName: string } | null;
 
   // 액션
+  setLocale: (locale: SupportedLocale) => void;
+  showDialogue: (speaker: Player, text: string) => void;
+  dismissDialogue: () => void;
   setPlayMode: (mode: PlayMode) => void;
   createRoom: (desiredCode?: string) => Promise<string>;
   joinRoom: (code: string) => Promise<void>;
@@ -208,6 +223,20 @@ export const useGameStore = create<GameStore>((set, get) => {
         break;
       }
 
+      case 'EVENT_DIALOGUE': {
+        if (msg.payload) {
+          const dialogue = msg.payload as unknown as ActiveDialogue;
+          set({ activeDialogue: dialogue });
+          setTimeout(() => {
+            const cur = get().activeDialogue;
+            if (cur && cur.text === dialogue.text) {
+              set({ activeDialogue: null });
+            }
+          }, 4000);
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -215,11 +244,24 @@ export const useGameStore = create<GameStore>((set, get) => {
 
   peerManager.onMessageReceived = handleIncomingPeerMessage;
 
+  const triggerAIDialogue = (player: Player, type: 'move' | 'suggest' | 'disprove' | 'cannotDisprove' | 'summoned') => {
+    if (!player.type.startsWith('ai_')) return;
+    const { currentLocale } = get();
+    const dict = translations[currentLocale]?.aiDialogue || translations.en.aiDialogue;
+    const characterKey = player.type === 'ai_logic' ? 'arthur' : 'blake';
+    const lines = dict[characterKey]?.[type] || [];
+    if (lines.length > 0) {
+      const text = lines[Math.floor(Math.random() * lines.length)];
+      get().showDialogue(player, text);
+    }
+  };
+
   return {
     gameState: initGame(),
     aiMemories: {},
     selectedRoomId: null,
     isRollingDice: false,
+    currentLocale: 'en',
 
     playMode: 'local',
     myPlayerRole: 'p1',
@@ -230,8 +272,42 @@ export const useGameStore = create<GameStore>((set, get) => {
     peerOnline: false,
     guestSelectedCharacter: null,
     hostSelectedCharacter: null,
+    activeDialogue: null,
     pendingDisprovePrompt: null,
     lastSecretClue: null,
+
+    setLocale: (loc) => {
+      set({ currentLocale: loc });
+    },
+
+    showDialogue: (speaker, text) => {
+      const dialogue = {
+        speakerId: speaker.id,
+        speakerName: speaker.name,
+        avatar: speaker.avatar,
+        color: speaker.color,
+        text,
+      };
+      set({ activeDialogue: dialogue });
+
+      if (get().playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'EVENT_DIALOGUE',
+          payload: dialogue,
+        });
+      }
+
+      setTimeout(() => {
+        const cur = get().activeDialogue;
+        if (cur && cur.text === text) {
+          set({ activeDialogue: null });
+        }
+      }, 4000);
+    },
+
+    dismissDialogue: () => {
+      set({ activeDialogue: null });
+    },
 
     setPlayMode: (mode) => {
       set({ 
@@ -497,6 +573,12 @@ export const useGameStore = create<GameStore>((set, get) => {
       const nextState = makeSuggestion(gameState, suggestion);
       set({ gameState: nextState });
 
+      // If an AI suspect was summoned to the room for questioning, trigger dialogue reaction
+      const summonedP = nextState.players.find(p => p.characterId === suggestion.suspectId);
+      if (summonedP && summonedP.type.startsWith('ai_') && summonedP.currentRoomId === suggestion.locationId) {
+        setTimeout(() => triggerAIDialogue(summonedP, 'summoned'), 500);
+      }
+
       if (playMode === 'host') {
         peerManager.sendMessage({
           type: 'STATE_SYNC',
@@ -590,6 +672,10 @@ export const useGameStore = create<GameStore>((set, get) => {
       const responder = disprover ? gameState.players[disprover.playerIndex] : undefined;
       const asker = gameState.players[gameState.currentPlayerIndex];
 
+      if (responder && responder.type.startsWith('ai_')) {
+        triggerAIDialogue(responder, cardId ? 'disprove' : 'cannotDisprove');
+      }
+
       if (cardId && responder) {
         const shownCard = responder.hand.find(c => c.id === cardId);
         if (shownCard) {
@@ -676,8 +762,10 @@ export const useGameStore = create<GameStore>((set, get) => {
           get().performAccusation(action.accusation);
         } else {
           get().performMove(action.targetRoomId);
+          triggerAIDialogue(currentP, 'move');
           setTimeout(() => {
             get().performSuggestion(action.suggestion);
+            triggerAIDialogue(currentP, 'suggest');
           }, 800);
         }
       }, 800);

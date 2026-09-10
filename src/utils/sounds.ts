@@ -3,6 +3,8 @@
 // 실물 목재, 펠트, 종이, 크리스털 차임 및 룸 리버브(Acoustic Room Impulse)를 모델링하여
 // 실제 고급 보드게임을 플레이하는 듯한 자연스럽고 따뜻한 사운드를 제공합니다.
 
+import { haptics } from './haptics';
+
 class SoundController {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
@@ -174,6 +176,7 @@ class SoundController {
 
   // 1. 주사위 굴리는 소리: 나무/아크릴 주사위가 펠트 매트 위에서 딸그락거리며 구르는 물리적 충격 시퀀스
   playDice() {
+    haptics.diceRoll();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -215,6 +218,7 @@ class SoundController {
 
   // 2. 발자국 / 방 이동 소리: 묵직하고 고급스러운 목재 보드게임 말(말/폰)을 '탁' 내려놓는 타격감
   playMove() {
+    haptics.tick();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -243,6 +247,7 @@ class SoundController {
 
   // 3. 질문 제시 / 가설 소리: 고풍스러운 서재의 신비로운 비브라폰/오르골 아쿠스틱 아르페지오
   playQuestion() {
+    haptics.tick();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -296,6 +301,7 @@ class SoundController {
 
   // 4. 수첩 체크 / 반증 선택 소리: 탐정이 수첩에 사각사각 연필로 체크하는 자연스러운 아날로그 필기음
   playDisprove() {
+    haptics.tick();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -308,6 +314,7 @@ class SoundController {
 
   // 5. 카드 슬라이딩 소리: 고급 린넨 플레잉 카드가 펠트 매트 위를 부드럽게 스쳐 지나가는 마찰음
   playCardSlide() {
+    haptics.cardFlip();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -346,6 +353,7 @@ class SoundController {
 
   // 6. 카드 3D 뒤집기 스냅 소리: 손가락으로 카드를 착 뒤집어 테이블에 내려놓는 경쾌한 탭 사운드
   playCardFlip() {
+    haptics.cardFlip();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -374,6 +382,7 @@ class SoundController {
 
   // 7. 단서 획득 성공 차임벨 소리: 크리스털 글록켄슈필/오르골의 맑고 우아한 상승 4음
   playClue() {
+    haptics.secretClue();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -418,6 +427,7 @@ class SoundController {
 
   // 8. 사건 해결 승리 팡파레: 웅장하고 따뜻한 실내악 브라스 & 대성당 벨 승리 화음
   playWin() {
+    haptics.victory();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -448,6 +458,7 @@ class SoundController {
 
   // 9. 추리 실패 / 탈락 소리: 8비트 버저가 아닌 깊고 묵직한 오케스트라 베이스 드럼 & 고풍스러운 괘종시계 타종
   playFail() {
+    haptics.warning();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -502,6 +513,7 @@ class SoundController {
 
   // 10. 말(Pawn) 복도 타일 보행 스텝 소리: 타일을 하나씩 통-통 딛는 경쾌한 목재 폰 걸음마 소리
   playPawnStep() {
+    haptics.tick();
     if (!this.enabled) return;
     const ctx = this.getContext();
     if (!ctx) return;

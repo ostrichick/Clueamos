@@ -14,6 +14,7 @@ export type PeerMessageType =
   | 'DISPROVE_REQUEST'
   | 'PRIVATE_CLUE_REVEALED'
   | 'ACTION_ACCUSE'
+  | 'EVENT_DIALOGUE'
   | 'HEARTBEAT'
   | 'PING'
   | 'PONG';

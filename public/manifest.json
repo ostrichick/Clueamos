@@ -1,0 +1,18 @@
+{
+  "name": "Clueamos - Mystery Board Game",
+  "short_name": "Clueamos",
+  "description": "Authentic 4-player murder mystery deduction board game with tactile cards, multiplayer, and AI detectives.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
