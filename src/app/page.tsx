@@ -399,10 +399,10 @@ export default function Home() {
         />
       </div>
 
-      {/* 메인 대시보드 (보드판과 추리 수첩을 한 화면에 동시 배치) */}
+      {/* 메인 대시보드: 좌측(보드 & 탐정명단/로그) | 우측(추측/액션패널, 추리수첩, 내 손패) */}
       <div className="flex-1 max-w-[1700px] w-full mx-auto p-3 sm:p-5 grid grid-cols-1 xl:grid-cols-12 gap-6">
         
-        {/* 좌측 영역 (7열): 스텝퍼, 보드판, 행동 결정 패널, 가설 추리 패널, 내 손패 */}
+        {/* 좌측 영역 (7열): 스텝퍼, 보드판, 탐정 현황 & 실시간 사건 일지 */}
         <div className="xl:col-span-7 flex flex-col gap-4">
           {/* 턴 진행 가이드 스텝 바 (Turn Phase Stepper) */}
           <TurnPhaseStepper
@@ -413,6 +413,7 @@ export default function Home() {
             isAITurn={!isHumanTurn}
           />
 
+          {/* 보드판 (Mansion Game Board) */}
           <GameBoard
             players={gameState.players}
             currentPlayerIndex={gameState.currentPlayerIndex}
@@ -430,41 +431,167 @@ export default function Home() {
             onWaitInHallway={performWaitInHallway}
           />
 
-          {/* 플레이어 질문 작성 패널 (내 차례일 때만 활성화) */}
+          {/* 하단 2열 서브 그리드: 탐정 명단 & 실시간 사건 일지 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 탐정 현황 (Detectives Roster) */}
+            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-md">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.detectivesListTitle}</h3>
+              <div className="flex flex-col gap-2">
+                {gameState.players.map((p, idx) => (
+                  <div 
+                    key={p.id}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
+                      idx === gameState.currentPlayerIndex
+                        ? 'border-amber-500/60 bg-amber-500/10'
+                        : 'border-slate-800 bg-slate-900/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{p.avatar}</span>
+                      <span className="font-semibold text-slate-200">{getPlayerDisplayName(p, locale)}</span>
+                    </div>
+                    {p.isEliminated ? (
+                      <span className="text-[10px] text-rose-400 font-bold">{t.eliminated}</span>
+                    ) : (
+                      <span className="text-[11px] text-slate-500">
+                        {p.hand.length} {t.cardsCount}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 사건 수사 일지 (Live Activity Log) */}
+            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px] shadow-md">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+                {t.liveLogTitle}
+              </h3>
+              <div className="flex-1 overflow-y-auto max-h-[300px] flex flex-col gap-2 pr-1 text-xs">
+                {gameState.logs.slice().reverse().map(log => (
+                  <div 
+                    key={log.id} 
+                    className={`p-2.5 rounded-lg border leading-relaxed ${
+                      log.type === 'accusation'
+                        ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
+                        : log.type === 'disprove'
+                          ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
+                          : 'border-slate-800 bg-slate-900/50 text-slate-300'
+                    }`}
+                  >
+                    <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
+                    {log.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 우측 영역 (5열): 추리 스테이션 (추측 패널 / 행동 결정 패널 + 탐정 수첩 + 내 손패) */}
+        <div className="xl:col-span-5 flex flex-col gap-4">
+          {/* 1. 플레이어 질문 작성 패널 (내 차례일 때 수첩 바로 위에 노출) */}
           {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_SUGGEST' && (
-            <div className="bg-slate-800/60 border border-amber-500/40 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
-              <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4" /> {t.askHypothesis} ({t.currentRoom}: {getRoomName(currentPlayer.currentRoomId)})
+            <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/95 to-amber-950/40 border-2 border-amber-500/60 rounded-2xl p-4 sm:p-5 flex flex-col gap-3.5 shadow-xl shadow-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between border-b border-amber-500/20 pb-2.5">
+                <div className="text-xs font-bold text-amber-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <HelpCircle className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm font-extrabold text-amber-300">{t.askHypothesis}</span>
+                </div>
+                <div className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold font-mono">
+                  📍 {t.currentRoom}: {getRoomName(currentPlayer.currentRoomId)}
+                </div>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="text-slate-400 block mb-1">{t.selectSuspect}</label>
+                  <label className="text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
+                    <span>{t.selectSuspect}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {userNotes[selectedSuspect] === 'NO' ? '✕ 제외됨' : userNotes[selectedSuspect] === 'YES' ? '◯ 확정' : '❓ 미확인'}
+                    </span>
+                  </label>
                   <select 
                     value={selectedSuspect} 
                     onChange={e => setSelectedSuspect(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
+                    className="w-full bg-slate-900 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl p-2.5 text-slate-100 font-medium transition-colors cursor-pointer"
                   >
-                    {SUSPECTS.map(s => <option key={s.id} value={s.id}>{getCardName(s.id)}</option>)}
+                    {SUSPECTS.map(s => {
+                      const note = userNotes[s.id];
+                      const tag = note === 'NO' ? ' [✕ 제외]' : note === 'YES' ? ' [◯ 확정]' : ' [❓ 미확인]';
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {getCardName(s.id)}{tag}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-slate-400 block mb-1">{t.selectWeapon}</label>
+                  <label className="text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
+                    <span>{t.selectWeapon}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {userNotes[selectedWeapon] === 'NO' ? '✕ 제외됨' : userNotes[selectedWeapon] === 'YES' ? '◯ 확정' : '❓ 미확인'}
+                    </span>
+                  </label>
                   <select 
                     value={selectedWeapon} 
                     onChange={e => setSelectedWeapon(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200"
+                    className="w-full bg-slate-900 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl p-2.5 text-slate-100 font-medium transition-colors cursor-pointer"
                   >
-                    {WEAPONS.map(w => <option key={w.id} value={w.id}>{getCardName(w.id)}</option>)}
+                    {WEAPONS.map(w => {
+                      const note = userNotes[w.id];
+                      const tag = note === 'NO' ? ' [✕ 제외]' : note === 'YES' ? ' [◯ 확정]' : ' [❓ 미확인]';
+                      return (
+                        <option key={w.id} value={w.id}>
+                          {getCardName(w.id)}{tag}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end mt-2">
+              {/* 빠른 후보 칩 (아직 배제되지 않은 미확인 ? 후보들 원터치 선택) */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider mr-1">미확인 후보:</span>
+                {SUSPECTS.filter(s => userNotes[s.id] === 'UNKNOWN').slice(0, 3).map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSuspect(s.id)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedSuspect === s.id 
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
+                        : 'bg-slate-800/80 text-amber-200/90 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    {getCardName(s.id)}
+                  </button>
+                ))}
+                {WEAPONS.filter(w => userNotes[w.id] === 'UNKNOWN').slice(0, 3).map(w => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setSelectedWeapon(w.id)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedWeapon === w.id 
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
+                        : 'bg-slate-800/80 text-amber-200/90 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    {getCardName(w.id)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2 justify-end mt-1 pt-2 border-t border-slate-800/80">
                 <button
                   onClick={handleSuggestion}
-                  className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-colors flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95"
                 >
                   <span>{t.askQuestionBtn}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -473,20 +600,20 @@ export default function Home() {
             </div>
           )}
 
-          {/* 플레이어 행동 완료 후 턴 넘기기 vs 최종 고발 결정 패널 */}
+          {/* 2. 플레이어 행동 완료 후 턴 넘기기 vs 최종 고발 결정 패널 (내 차례일 때 수첩 바로 위에 노출) */}
           {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_ACTION_DONE' && (
-            <div className="bg-gradient-to-r from-slate-900/95 via-slate-850 to-slate-900/95 border-2 border-amber-500/60 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="bg-gradient-to-r from-slate-900/95 via-slate-850 to-slate-900/95 border-2 border-amber-500/60 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-extrabold text-amber-300 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                   {t.actionDoneTitle}
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed max-w-xl">
+                <p className="text-xs text-slate-300 leading-relaxed max-w-md">
                   {t.actionDoneDesc}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button
                   onClick={performEndTurn}
                   className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95"
@@ -507,23 +634,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* 내 비공개 손패 영역 (실물 카드 보관함 랙) */}
-          {myPlayer && (
-            <CardHandTray
-              cards={myPlayer.hand}
-              playerName={getPlayerDisplayName(myPlayer, locale)}
-              getCardName={getCardName}
-              onOpenNotebook={() => {
-                document.getElementById('deduction-notebook')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              t={t}
-            />
-          )}
-        </div>
-
-        {/* 우측 영역 (5열): 사건 추리 수첩 (항상 표시), 탐정 현황 & 실시간 사건 일지 */}
-        <div className="xl:col-span-5 flex flex-col gap-4">
-          {/* 사건 추리 수첩 (스마트 어시스트 & 로그 연동) */}
+          {/* 3. 사건 추리 수첩 (항상 상시 노출) */}
           <DeductionNotebook
             t={t}
             locale={locale}
@@ -545,59 +656,18 @@ export default function Home() {
             }}
           />
 
-          {/* 탐정 현황 */}
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.detectivesListTitle}</h3>
-            <div className="flex flex-col gap-2">
-              {gameState.players.map((p, idx) => (
-                <div 
-                  key={p.id}
-                  className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                    idx === gameState.currentPlayerIndex
-                      ? 'border-amber-500/60 bg-amber-500/10'
-                      : 'border-slate-800 bg-slate-900/20'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{p.avatar}</span>
-                    <span className="font-semibold text-slate-200">{getPlayerDisplayName(p, locale)}</span>
-                  </div>
-                  {p.isEliminated ? (
-                    <span className="text-[10px] text-rose-400 font-bold">{t.eliminated}</span>
-                  ) : (
-                    <span className="text-[11px] text-slate-500">
-                      {p.hand.length} {t.cardsCount}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 사건 수사 일지 */}
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px]">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-              {t.liveLogTitle}
-            </h3>
-            <div className="flex-1 overflow-y-auto max-h-[320px] flex flex-col gap-2 pr-1 text-xs">
-              {gameState.logs.slice().reverse().map(log => (
-                <div 
-                  key={log.id} 
-                  className={`p-2.5 rounded-lg border leading-relaxed ${
-                    log.type === 'accusation'
-                      ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
-                      : log.type === 'disprove'
-                        ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
-                        : 'border-slate-800 bg-slate-900/50 text-slate-300'
-                  }`}
-                >
-                  <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
-                  {log.message}
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* 4. 내 비공개 손패 영역 (실물 카드 보관함 랙) */}
+          {myPlayer && (
+            <CardHandTray
+              cards={myPlayer.hand}
+              playerName={getPlayerDisplayName(myPlayer, locale)}
+              getCardName={getCardName}
+              onOpenNotebook={() => {
+                document.getElementById('deduction-notebook')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              t={t}
+            />
+          )}
         </div>
 
       </div>
