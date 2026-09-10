@@ -4,7 +4,7 @@ import React from 'react';
 import { 
   Languages, 
   Smartphone, 
-  Laptop, 
+  User, 
   Radio, 
   Copy, 
   Check, 
@@ -24,8 +24,6 @@ interface LobbyScreenProps {
   effectiveP2: string;
   handleSelectP1: (charId: string) => void;
   handleSelectP2: (charId: string) => void;
-  activePickerTab: 'p1' | 'p2';
-  setActivePickerTab: (tab: 'p1' | 'p2') => void;
   roomCode: string | null;
   inputRoomCode: string;
   setInputRoomCode: (code: string) => void;
@@ -51,8 +49,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   effectiveP2,
   handleSelectP1,
   handleSelectP2,
-  activePickerTab,
-  setActivePickerTab,
   roomCode,
   inputRoomCode,
   setInputRoomCode,
@@ -67,7 +63,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   handleStartGame,
   getCardName,
 }) => {
-  const aiCandidates = SUSPECTS.filter(s => s.id !== effectiveP1 && s.id !== effectiveP2);
+  const aiCandidates = playMode === 'solo'
+    ? SUSPECTS.filter(s => s.id !== effectiveP1)
+    : SUSPECTS.filter(s => s.id !== effectiveP1 && s.id !== effectiveP2);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-amber-500 relative">
@@ -109,16 +107,30 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </p>
         </div>
 
-        {/* 1. 플레이 모드 선택 (각자 폰으로 플레이 vs 한 화면에서 플레이) */}
+        {/* 1. 플레이 모드 선택 (1인 플레이 vs 각자 폰으로 플레이) */}
         <div className="flex items-center justify-center p-1 bg-slate-800/90 rounded-2xl border border-slate-700 w-full max-w-md shadow-inner">
           <button
             onClick={() => {
-              if (playMode === 'local') {
+              setPlayMode('solo');
+              disconnectRoom();
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              playMode === 'solo'
+                ? 'bg-amber-500 text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>{t.playModeSolo}</span>
+          </button>
+          <button
+            onClick={() => {
+              if (playMode === 'solo') {
                 setPlayMode('host');
               }
             }}
             className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              playMode !== 'local'
+              playMode !== 'solo'
                 ? 'bg-amber-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -126,24 +138,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <Smartphone className="w-4 h-4" />
             <span>{t.playModeMulti}</span>
           </button>
-          <button
-            onClick={() => {
-              setPlayMode('local');
-              disconnectRoom();
-            }}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              playMode === 'local'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Laptop className="w-4 h-4" />
-            <span>{t.playModeLocal}</span>
-          </button>
         </div>
 
         {/* 2. 멀티 디바이스 연동 패널 */}
-        {playMode !== 'local' && (
+        {playMode !== 'solo' && (
           <div className="w-full bg-slate-800/60 p-4 sm:p-5 rounded-2xl border border-amber-500/30 flex flex-col gap-4 text-left">
             {!roomCode ? (
               /* 방 만들기 / 참여하기 버튼 */
@@ -261,52 +259,24 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 {t.selectCharacterTitle}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {t.selectCharacterSubtitle}
+                {playMode === 'solo' ? t.playModeSoloDesc : t.selectCharacterSubtitle}
               </p>
             </div>
-
-            {/* 로컬 모드일 때만 플레이어 1/2 선택 탭 노출 */}
-            {playMode === 'local' && (
-              <div className="flex items-center gap-1 p-1 bg-slate-800 rounded-xl border border-slate-700 self-start sm:self-auto">
-                <button
-                  onClick={() => setActivePickerTab('p1')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    activePickerTab === 'p1' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {t.player} 1
-                </button>
-                <button
-                  onClick={() => setActivePickerTab('p2')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    activePickerTab === 'p2' ? 'bg-pink-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {t.player} 2
-                </button>
-              </div>
-            )}
           </div>
 
           {/* 현재 누구의 캐릭터를 고르고 있는지 안내 배너 */}
           <div className="px-3 py-2 rounded-xl bg-slate-800/40 border border-slate-700/60 flex items-center justify-between text-xs">
             <span className="text-slate-400">
-              {playMode === 'guest'
-                ? (locale === 'ko' ? '👉 당신(플레이어 2)의 탐정 캐릭터를 선택하세요:' : '👉 Choose your Detective character:')
-                : playMode === 'host'
-                  ? (locale === 'ko' ? '👉 당신(방장, 플레이어 1)의 탐정 캐릭터를 선택하세요:' : '👉 Choose your Detective character:')
-                  : activePickerTab === 'p1' 
-                    ? `👉 ${t.player1Choice}:` 
-                    : `👉 ${t.player2Choice}:`}
+              {playMode === 'solo'
+                ? (locale === 'ko' ? '👉 당신의 탐정 캐릭터:' : '👉 Your Detective Character:')
+                : playMode === 'guest'
+                  ? (locale === 'ko' ? '👉 당신(플레이어 2)의 탐정 캐릭터를 선택하세요:' : '👉 Choose your Detective character:')
+                  : (locale === 'ko' ? '👉 당신(방장, 플레이어 1)의 탐정 캐릭터를 선택하세요:' : '👉 Choose your Detective character:')}
             </span>
             <span className="font-bold text-amber-400">
               {playMode === 'guest'
                 ? `${t.player} 2: ${getCardName(effectiveP2)}`
-                : playMode === 'host'
-                  ? `${t.player} 1: ${getCardName(effectiveP1)}`
-                  : activePickerTab === 'p1' 
-                    ? `${t.player} 1: ${getCardName(effectiveP1)}` 
-                    : `${t.player} 2: ${getCardName(effectiveP2)}`}
+                : `${playMode === 'solo' ? (locale === 'ko' ? '탐정' : 'Detective') : `${t.player} 1`}: ${getCardName(effectiveP1)}`}
             </span>
           </div>
 
@@ -317,19 +287,18 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               const isP1 = effectiveP1 === s.id;
               const isP2 = effectiveP2 === s.id;
               
-              const isTargetRoleP1 = playMode === 'host' || (playMode === 'local' && activePickerTab === 'p1');
-              const isSelected = isTargetRoleP1 ? isP1 : isP2;
-              const isDisabledForP2 = !isTargetRoleP1 && isP1;
-              const isDisabledForP1 = isTargetRoleP1 && isP2;
+              const isSelected = playMode === 'guest' ? isP2 : isP1;
+              const isDisabled = playMode === 'guest' ? isP1 : (playMode === 'host' && isP2);
 
               return (
                 <div
                   key={s.id}
                   onClick={() => {
-                    if (isTargetRoleP1) {
-                      if (!isDisabledForP1) handleSelectP1(s.id);
+                    if (isDisabled) return;
+                    if (playMode === 'guest') {
+                      handleSelectP2(s.id);
                     } else {
-                      if (!isDisabledForP2) handleSelectP2(s.id);
+                      handleSelectP1(s.id);
                     }
                   }}
                   style={{
@@ -338,7 +307,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
                     isSelected
                       ? 'ring-2 bg-slate-800/90 shadow-lg'
-                      : isDisabledForP2 || isDisabledForP1
+                      : isDisabled
                         ? 'opacity-40 cursor-not-allowed bg-slate-900/30 border-slate-800'
                         : 'cursor-pointer hover:bg-slate-800/50 bg-slate-900/40 border-slate-800 hover:border-slate-700'
                   }`}
@@ -353,10 +322,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       </div>
                       {isP1 && (
                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500 text-slate-950">
-                          {t.player} 1
+                          {playMode === 'solo' ? (locale === 'ko' ? '내 캐릭터' : 'Your Detective') : `${t.player} 1`}
                         </span>
                       )}
-                      {isP2 && (
+                      {playMode !== 'solo' && isP2 && (
                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-pink-500 text-slate-950">
                           {t.player} 2
                         </span>
@@ -367,7 +336,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     </p>
                   </div>
 
-                  {isDisabledForP2 && (
+                  {isDisabled && (
                     <div className="text-[10px] text-amber-400/80 font-semibold mt-1">
                       🔒 {t.characterAlreadyChosen}
                     </div>
@@ -393,7 +362,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   <span>{getCardName(c.id).replace(/^[^\s]+\s+/, '')}</span>
                 </span>
               ))}
-              <span className="text-[10px] text-slate-500">(2 randomly assigned)</span>
+              <span className="text-[10px] text-slate-500">
+                ({playMode === 'solo' ? '3' : '2'} randomly assigned)
+              </span>
             </div>
           </div>
         </div>

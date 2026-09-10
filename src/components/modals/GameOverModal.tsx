@@ -17,6 +17,7 @@ interface GameOverModalProps {
   getCardName: (id: string) => string;
   getRoomName: (id: string) => string;
   onPlayAgain: () => void;
+  onExitToLobby?: () => void;
 }
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
@@ -30,6 +31,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   getCardName,
   getRoomName,
   onPlayAgain,
+  onExitToLobby,
 }) => {
   const [timelineExpanded, setTimelineExpanded] = useState(false);
 
@@ -109,12 +111,22 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           )}
         </div>
 
-        <button
-          onClick={onPlayAgain}
-          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
-        >
-          {t.playAgain}
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
+          <button
+            onClick={onPlayAgain}
+            className="flex-1 w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
+          >
+            {t.playAgain}
+          </button>
+          {onExitToLobby && (
+            <button
+              onClick={onExitToLobby}
+              className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-sm border border-slate-700 transition-all active:scale-[0.98]"
+            >
+              {t.exitToLobby}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

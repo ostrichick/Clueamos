@@ -8,7 +8,8 @@ import {
   ScrollText, 
   Flame, 
   RotateCcw,
-  MapPin 
+  MapPin,
+  LogOut 
 } from 'lucide-react';
 import { Player } from '@/engine/types';
 import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
@@ -35,6 +36,7 @@ interface GameHeaderProps {
   isMyTurn: boolean;
   onOpenAccuse: () => void;
   onNewGame: () => void;
+  onExitToLobby?: () => void;
 }
 
 export const GameHeader: React.FC<GameHeaderProps> = ({
@@ -57,6 +59,7 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   isMyTurn,
   onOpenAccuse,
   onNewGame,
+  onExitToLobby,
 }) => {
   return (
     <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-40">
@@ -170,10 +173,27 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
         <button 
           onClick={onNewGame}
           title={t.newGame}
-          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400"
+          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
         >
           <RotateCcw className="w-4 h-4" />
         </button>
+
+        {onExitToLobby && (
+          <button
+            onClick={() => {
+              if (window.confirm(t.confirmExitToLobby)) {
+                onExitToLobby();
+              }
+            }}
+            title={t.exitToLobby}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/60 text-slate-400 hover:text-rose-300 transition-all flex items-center gap-1.5"
+          >
+            <LogOut className="w-4 h-4 text-rose-400" />
+            <span className="hidden sm:inline text-xs font-bold text-rose-300">
+              {t.exitToLobby}
+            </span>
+          </button>
+        )}
       </div>
     </header>
   );

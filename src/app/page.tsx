@@ -31,6 +31,7 @@ export default function Home() {
     performSuggestion,
     performDisprove,
     performAccusation,
+    runAITurnIfNeeded,
     isRollingDice,
     roomWeapons,
     activeEmote,
@@ -74,7 +75,6 @@ export default function Home() {
   // 1 & 2 플레이어 캐릭터 선택 상태
   const [p1Character, setP1Character] = useState<string>('suspect_scarlett');
   const [p2Character, setP2Character] = useState<string>('suspect_mustard');
-  const [activePickerTab, setActivePickerTab] = useState<'p1' | 'p2'>('p1');
 
   // 멀티플레이어 로컬 입력 상태 (URL 쿼리스트링 파라미터가 있으면 초기값으로 사용)
   const [inputRoomCode, setInputRoomCode] = useState<string>(() => {
@@ -121,10 +121,38 @@ export default function Home() {
       ? gameState.players[0]
       : currentPlayer;
 
-  const isMyTurn = playMode === 'local'
+  const isMyTurn = (playMode === 'solo' || playMode === 'local')
     ? isHumanTurn
     : (myPlayerRole === 'p1' && currentPlayer?.roleType === 'p1') ||
       (myPlayerRole === 'p2' && currentPlayer?.roleType === 'p2');
+
+  // AI 턴 자동 실행 감지 (상태 변경 및 턴 전환 시 안전하게 AI 실행 보장)
+  useEffect(() => {
+    if (!isGameStarted) return;
+    if (gameState.phase === 'GAME_OVER') return;
+
+    if (gameState.phase === 'PLAYING_ROLL' && !isRollingDice) {
+      const currentP = gameState.players[gameState.currentPlayerIndex];
+      if (currentP && currentP.type.startsWith('ai_')) {
+        const timer = setTimeout(() => {
+          runAITurnIfNeeded();
+        }, 600);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isGameStarted, gameState.phase, gameState.currentPlayerIndex, gameState.players, isRollingDice, runAITurnIfNeeded]);
+
+  // 메인 설정 화면으로 나가기 핸들러
+  const handleExitToLobby = () => {
+    sounds.playCardSlide();
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('clueamos_session_v1');
+    }
+    if (isConnected) {
+      disconnectRoom();
+    }
+    setHasStarted(false);
+  };
 
   // 세션 복원 시도 (모바일 새로고침 또는 브라우저 복귀 시)
   useEffect(() => {
@@ -285,8 +313,6 @@ export default function Home() {
         effectiveP2={effectiveP2}
         handleSelectP1={handleSelectP1}
         handleSelectP2={handleSelectP2}
-        activePickerTab={activePickerTab}
-        setActivePickerTab={setActivePickerTab}
         roomCode={roomCode}
         inputRoomCode={inputRoomCode}
         setInputRoomCode={setInputRoomCode}
@@ -331,9 +357,9 @@ export default function Home() {
         isMyTurn={isMyTurn}
         onOpenAccuse={() => setIsAccuseModalOpen(true)}
         onNewGame={() => {
-          setHasStarted(false);
-          disconnectRoom();
+          startNewGame(effectiveP1, effectiveP2, locale);
         }}
+        onExitToLobby={handleExitToLobby}
       />
 
       {/* 실시간 은밀한 단서 3D 뒤집기 카드 모달 및 전달 애니메이션 */}
@@ -378,6 +404,8 @@ export default function Home() {
                 phase={gameState.phase}
                 isMyTurn={isMyTurn}
                 t={t}
+                activePlayerName={currentPlayer ? getPlayerDisplayName(currentPlayer, locale) : undefined}
+                isAITurn={!isHumanTurn}
               />
 
               <GameBoard
@@ -564,9 +592,9 @@ export default function Home() {
         getCardName={getCardName}
         getRoomName={getRoomName}
         onPlayAgain={() => {
-          setHasStarted(false);
-          disconnectRoom();
+          startNewGame(effectiveP1, effectiveP2, locale);
         }}
+        onExitToLobby={handleExitToLobby}
       />
     </div>
   );

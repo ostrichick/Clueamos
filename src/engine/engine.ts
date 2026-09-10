@@ -83,6 +83,7 @@ export function shuffle<T>(array: T[]): T[] {
 }
 
 export interface InitGameOptions {
+  isSinglePlayer?: boolean;
   player1CharacterId?: string;
   player2CharacterId?: string;
   player1Name?: string;
@@ -112,6 +113,9 @@ export function getPlayerDisplayName(player: Player, locale: SupportedLocale = '
   if (player.roleType === 'ai2') {
     return `${charName} (${t.aiLabel} 2)`;
   }
+  if (player.roleType === 'ai3') {
+    return `${charName} (${t.aiLabel} 3)`;
+  }
   return player.name;
 }
 
@@ -119,6 +123,7 @@ export function getPlayerDisplayName(player: Player, locale: SupportedLocale = '
  * 게임 초기화 함수
  */
 export function initGame(options?: InitGameOptions): GameState {
+  const isSingle = Boolean(options?.isSinglePlayer);
   const locale = options?.locale || 'en';
   const t = translations[locale] || translations.en;
   const p1CharId = options?.player1CharacterId || 'suspect_scarlett';
@@ -178,8 +183,8 @@ export function initGame(options?: InitGameOptions): GameState {
     {
       id: 'p2',
       characterId: p2CharId,
-      roleType: 'p2',
-      type: 'human',
+      roleType: isSingle ? 'ai1' : 'p2',
+      type: isSingle ? 'ai_logic' : 'human',
       avatar: p2Profile.avatar,
       color: p2Profile.color,
       currentRoomId: p2Profile.defaultRoomId,
@@ -190,7 +195,7 @@ export function initGame(options?: InitGameOptions): GameState {
     {
       id: 'ai_1',
       characterId: ai1CharId,
-      roleType: 'ai1',
+      roleType: isSingle ? 'ai2' : 'ai1',
       type: 'ai_logic',
       avatar: ai1Profile.avatar,
       color: ai1Profile.color,
@@ -202,7 +207,7 @@ export function initGame(options?: InitGameOptions): GameState {
     {
       id: 'ai_2',
       characterId: ai2CharId,
-      roleType: 'ai2',
+      roleType: isSingle ? 'ai3' : 'ai2',
       type: 'ai_instinct',
       avatar: ai2Profile.avatar,
       color: ai2Profile.color,

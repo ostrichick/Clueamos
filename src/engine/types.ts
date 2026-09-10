@@ -12,7 +12,7 @@ export interface Card {
 }
 
 export type PlayerType = 'human' | 'ai_logic' | 'ai_instinct';
-export type PlayerRoleType = 'p1' | 'p2' | 'ai1' | 'ai2';
+export type PlayerRoleType = 'p1' | 'p2' | 'ai1' | 'ai2' | 'ai3';
 
 export interface Player {
   id: string;

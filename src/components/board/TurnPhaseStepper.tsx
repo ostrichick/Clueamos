@@ -8,6 +8,8 @@ interface TurnPhaseStepperProps {
   phase: string;
   isMyTurn: boolean;
   t: TranslationStrings;
+  activePlayerName?: string;
+  isAITurn?: boolean;
   className?: string;
 }
 
@@ -15,6 +17,8 @@ export const TurnPhaseStepper: React.FC<TurnPhaseStepperProps> = ({
   phase,
   isMyTurn,
   t,
+  activePlayerName,
+  isAITurn = false,
   className = '',
 }) => {
   // Determine current active step index (1, 2, or 3)
@@ -34,7 +38,14 @@ export const TurnPhaseStepper: React.FC<TurnPhaseStepperProps> = ({
       className={`bg-slate-900/80 border border-amber-500/20 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-md shadow-lg flex items-center justify-between gap-2 select-none ${className}`}
     >
       <div className="flex items-center gap-1.5 sm:gap-2">
-        {!isMyTurn ? (
+        {isAITurn ? (
+          <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <span className="text-[11px] sm:text-xs text-cyan-200 truncate max-w-[200px] sm:max-w-none">
+              🤖 {activePlayerName}: {phase === 'PLAYING_ROLL' ? t.aiRolling : phase === 'PLAYING_MOVE' ? t.aiMoving : t.aiSuggesting}
+            </span>
+          </div>
+        ) : !isMyTurn ? (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
             <Hourglass className="w-3.5 h-3.5 text-amber-400 animate-spin" />
             <span className="text-[11px] sm:text-xs text-amber-200/90">{t.stepWaiting}</span>
@@ -49,8 +60,10 @@ export const TurnPhaseStepper: React.FC<TurnPhaseStepperProps> = ({
       <div className="flex items-center gap-1 sm:gap-2">
         {steps.map((s, idx) => {
           const Icon = s.icon;
-          const isActive = isMyTurn && currentStep === s.num;
-          const isDone = isMyTurn && currentStep > s.num;
+          const isCurrentActive = currentStep === s.num;
+          const isPassed = currentStep > s.num;
+          const isActive = (isMyTurn || isAITurn) && isCurrentActive;
+          const isDone = (isMyTurn || isAITurn) && isPassed;
 
           return (
             <React.Fragment key={s.num}>

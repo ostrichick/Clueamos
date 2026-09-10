@@ -15,6 +15,7 @@ import { TranslationStrings, SupportedLocale } from '@/i18n/translations';
 import { Sparkles, Dices, ArrowRight, X, ShieldAlert } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
 import { haptics } from '@/utils/haptics';
+import { OnBoardDiceOverlay } from './OnBoardDiceOverlay';
 
 const WEAPON_ICONS: Record<string, string> = {
   weapon_candlestick: '🕯️',
@@ -266,13 +267,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              {!isMyTurn && isHumanTurn
-                ? `${getPlayerDisplayName(currentPlayer, locale)} ${t.waitingForOtherPlayer}`
-                : isRollPhase
-                  ? t.shakeToRoll
-                  : isMovePhase
-                    ? (locale === 'ko' ? '도달 가능한 방이나 비밀 통로를 클릭하여 입장하세요. (마우스/터치 시 발자국 경로 미리보기)' : locale === 'es' ? 'Haz clic en una habitación alcanzable o pasaje secreto. (Pasa el cursor para ver las huellas)' : 'Click an accessible room or secret passage. Hover to preview footsteps route.')
-                    : t.notebookDesc}
+              {!isHumanTurn
+                ? (phase === 'PLAYING_ROLL' 
+                    ? `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiRolling}` 
+                    : phase === 'PLAYING_MOVE' 
+                      ? `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiMoving}` 
+                      : `🤖 ${getPlayerDisplayName(currentPlayer, locale)}: ${t.aiSuggesting}`)
+                : !isMyTurn && isHumanTurn
+                  ? `${getPlayerDisplayName(currentPlayer, locale)} ${t.waitingForOtherPlayer}`
+                  : isRollPhase
+                    ? t.shakeToRoll
+                    : isMovePhase
+                      ? (locale === 'ko' ? '도달 가능한 방이나 비밀 통로를 클릭하여 입장하세요. (마우스/터치 시 발자국 경로 미리보기)' : locale === 'es' ? 'Haz clic en una habitación alcanzable o pasaje secreto. (Pasa el cursor para ver las huellas)' : 'Click an accessible room or secret passage. Hover to preview footsteps route.')
+                      : t.notebookDesc}
             </p>
           </div>
         </div>
@@ -552,6 +559,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               </div>
             );
           })}
+
+          {/* D. 보드판 중앙 3D 입체 주사위 시각화 오버레이 */}
+          <OnBoardDiceOverlay
+            isRolling={isRollingDice}
+            rolledValue={currentDiceRoll}
+            currentRollerName={currentPlayer ? getPlayerDisplayName(currentPlayer, locale) : 'Detective'}
+            isAITurn={!isHumanTurn}
+            t={t}
+            canRollManually={isRollPhase && !isRollingDice}
+            onManualRoll={onRollDice}
+          />
         </div>
 
         {/* 하단 안내 캡션 */}

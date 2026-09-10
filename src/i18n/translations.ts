@@ -26,6 +26,15 @@ export interface TranslationStrings {
   startGame: string;
   playModeLocal: string;
   playModeMulti: string;
+  playModeSolo: string;
+  playModeSoloDesc: string;
+  aiRolling: string;
+  aiMoving: string;
+  aiSuggesting: string;
+  rolledResultOnBoard: string;
+  passDeviceToPlayer2: string;
+  exitToLobby: string;
+  confirmExitToLobby: string;
   hostRoomTitle: string;
   joinRoomTitle: string;
   hostRoomBtn: string;
@@ -205,6 +214,15 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     startGame: 'Start Investigation',
     playModeLocal: 'Single Screen (Pass & Play)',
     playModeMulti: 'Separate Phones (Online Sync)',
+    playModeSolo: 'Solo Play (vs 3 AIs)',
+    playModeSoloDesc: 'Test your deductive wits against 3 intelligent AI detectives.',
+    aiRolling: 'Rolling the dice...',
+    aiMoving: 'Moving across the mansion...',
+    aiSuggesting: 'Proposing a deduction hypothesis...',
+    rolledResultOnBoard: 'Rolled',
+    passDeviceToPlayer2: "Player 2's turn! Please pass the device.",
+    exitToLobby: 'Exit to Setup',
+    confirmExitToLobby: 'Are you sure you want to exit the current investigation and return to the main setup screen?',
     hostRoomTitle: 'Create Room (Player 1)',
     joinRoomTitle: 'Join Room (Player 2)',
     hostRoomBtn: 'Create Room',
@@ -436,6 +454,15 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     startGame: 'Iniciar Investigación',
     playModeLocal: 'Una Pantalla (Pass & Play)',
     playModeMulti: 'Teléfonos Separados (En línea)',
+    playModeSolo: 'Juego en Solitario (vs 3 IA)',
+    playModeSoloDesc: 'Pon a prueba tus habilidades de deducción contra 3 detectives de IA.',
+    aiRolling: 'Lanzando los dados...',
+    aiMoving: 'Moviéndose por la mansión...',
+    aiSuggesting: 'Proponiendo una hipótesis deductiva...',
+    rolledResultOnBoard: 'Resultado',
+    passDeviceToPlayer2: '¡Turno del Jugador 2! Por favor, pasa el dispositivo.',
+    exitToLobby: 'Menú Principal',
+    confirmExitToLobby: '¿Estás seguro de que deseas salir de la investigación actual y volver a la configuración principal?',
     hostRoomTitle: 'Crear Sala (Jugador 1)',
     joinRoomTitle: 'Unirse a Sala (Jugador 2)',
     hostRoomBtn: 'Crear Sala',
@@ -667,6 +694,15 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     startGame: '사건 수사 시작',
     playModeLocal: '한 화면에서 플레이 (Pass & Play)',
     playModeMulti: '각자 폰으로 플레이 (멀티 디바이스)',
+    playModeSolo: '1인 플레이 (Solo vs 3 AI)',
+    playModeSoloDesc: '3명의 지능형 AI 탐정을 상대로 혼자서 두뇌 대결을 펼칩니다.',
+    aiRolling: '주사위를 굴리는 중...',
+    aiMoving: '호텔 방으로 이동 중...',
+    aiSuggesting: '사건 현장 가설을 제시하는 중...',
+    rolledResultOnBoard: '나온 눈금',
+    passDeviceToPlayer2: '플레이어 2의 차례입니다! 기기를 건네주세요.',
+    exitToLobby: '메인 화면으로',
+    confirmExitToLobby: '현재 진행 중인 수사를 중단하고 메인 설정 화면으로 돌아가시겠습니까?',
     hostRoomTitle: '방 만들기 (플레이어 1)',
     joinRoomTitle: '방 참여하기 (플레이어 2)',
     hostRoomBtn: '방 만들기',

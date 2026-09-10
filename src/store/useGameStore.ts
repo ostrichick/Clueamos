@@ -21,7 +21,7 @@ import { SupportedLocale, translations } from '@/i18n/translations';
 import { peerManager, PeerMessage } from '@/network/peerManager';
 import { sounds } from '@/utils/sounds';
 
-export type PlayMode = 'local' | 'host' | 'guest';
+export type PlayMode = 'solo' | 'local' | 'host' | 'guest';
 export type PlayerRole = 'p1' | 'p2';
 
 export interface ActiveDialogue {
@@ -306,7 +306,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     isRollingDice: false,
     currentLocale: 'en',
 
-    playMode: 'local',
+    playMode: 'solo',
     myPlayerRole: 'p1',
     roomCode: null,
     isConnected: false,
@@ -548,22 +548,27 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     startNewGame: (p1CharacterId, p2CharacterId, locale) => {
       const { playMode } = get();
+      const isSinglePlayer = playMode === 'solo';
       const newState = initGame({ 
+        isSinglePlayer,
         player1CharacterId: p1CharacterId, 
         player2CharacterId: p2CharacterId, 
         locale 
       });
+      const p2Player = newState.players.find(p => p.id === 'p2');
       const ai1Player = newState.players.find(p => p.id === 'ai_1');
       const ai2Player = newState.players.find(p => p.id === 'ai_2');
-      const ai1Mem = ai1Player ? initAIMemory(ai1Player) : ({} as AIMemory);
-      const ai2Mem = ai2Player ? initAIMemory(ai2Player) : ({} as AIMemory);
+      
+      const memories: Record<string, AIMemory> = {};
+      if (p2Player && p2Player.type.startsWith('ai_')) {
+        memories.p2 = initAIMemory(p2Player);
+      }
+      if (ai1Player) memories.ai_1 = initAIMemory(ai1Player);
+      if (ai2Player) memories.ai_2 = initAIMemory(ai2Player);
 
       set({
         gameState: newState,
-        aiMemories: {
-          ai_1: ai1Mem,
-          ai_2: ai2Mem,
-        },
+        aiMemories: memories,
         roomWeapons: INITIAL_ROOM_WEAPONS,
         activeEmote: null,
         selectedRoomId: null,
@@ -850,36 +855,81 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     runAITurnIfNeeded: async () => {
-      const { playMode, gameState, aiMemories } = get();
-      if (playMode === 'guest') return; // Host handles AI execution
+      const { playMode, gameState } = get();
+      if (playMode === 'guest') return; // Host/Local/Solo handles AI execution
       if (gameState.phase === 'GAME_OVER') return;
 
       const currentP = gameState.players[gameState.currentPlayerIndex];
-      if (!currentP.type.startsWith('ai_')) return;
+      if (!currentP || !currentP.type.startsWith('ai_')) return;
 
-      const memory = aiMemories[currentP.id];
-      if (!memory) return;
+      // Ensure AI memory is initialized
+      let memory = get().aiMemories[currentP.id];
+      if (!memory) {
+        memory = initAIMemory(currentP);
+        set({ aiMemories: { ...get().aiMemories, [currentP.id]: memory } });
+      }
 
-      // AI roll
-      get().performRollDice();
-
-      setTimeout(() => {
-        const stateAfterRoll = get().gameState;
-        const action = currentP.type === 'ai_logic' 
-          ? decideArthurAction(stateAfterRoll, memory)
-          : decideBlakeAction(stateAfterRoll, memory);
-
-        if (action.type === 'ACCUSE') {
-          get().performAccusation(action.accusation);
-        } else {
-          get().performMove(action.targetRoomId);
-          triggerAIDialogue(currentP, 'move');
-          setTimeout(() => {
+      // If already in PLAYING_SUGGEST phase:
+      if (gameState.phase === 'PLAYING_SUGGEST') {
+        try {
+          const action = currentP.type === 'ai_logic'
+            ? decideArthurAction(gameState, memory)
+            : decideBlakeAction(gameState, memory);
+          if (action.type === 'MOVE_AND_SUGGEST') {
             get().performSuggestion(action.suggestion);
             triggerAIDialogue(currentP, 'suggest');
-          }, 800);
+          }
+        } catch (err) {
+          console.error('AI suggest error:', err);
         }
-      }, 800);
+        return;
+      }
+
+      if (gameState.phase !== 'PLAYING_ROLL') return;
+
+      // 1. AI rolls dice
+      sounds.playDice();
+      get().performRollDice();
+
+      // Wait for dice roll animation (600ms roll + 500ms result impact = 1100ms)
+      setTimeout(() => {
+        try {
+          const stateAfterRoll = get().gameState;
+          if (stateAfterRoll.phase !== 'PLAYING_MOVE') return;
+
+          const action = currentP.type === 'ai_logic' 
+            ? decideArthurAction(stateAfterRoll, memory)
+            : decideBlakeAction(stateAfterRoll, memory);
+
+          if (action.type === 'ACCUSE') {
+            get().performAccusation(action.accusation);
+          } else {
+            const accessible = stateAfterRoll.accessibleRoomIds || [currentP.currentRoomId];
+            if (accessible.length === 0 || !action.targetRoomId) {
+              get().performWaitInHallway();
+              return;
+            }
+
+            get().performMove(action.targetRoomId);
+            triggerAIDialogue(currentP, 'move');
+
+            setTimeout(() => {
+              try {
+                const stateAfterMove = get().gameState;
+                if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
+                  get().performSuggestion(action.suggestion);
+                  triggerAIDialogue(currentP, 'suggest');
+                }
+              } catch (err) {
+                console.error('AI suggestion error:', err);
+              }
+            }, 900);
+          }
+        } catch (err) {
+          console.error('AI turn decision error:', err);
+          get().performWaitInHallway();
+        }
+      }, 1100);
     },
 
     dismissSecretClue: () => {
