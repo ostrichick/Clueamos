@@ -9,7 +9,7 @@ import { CardHandTray } from '@/components/cards/CardHandTray';
 import { CardPassModal } from '@/components/cards/CardPassModal';
 import { LobbyScreen } from '@/components/lobby/LobbyScreen';
 import { GameHeader } from '@/components/layout/GameHeader';
-import { DeductionNotebook } from '@/components/notebook/DeductionNotebook';
+import { DeductionNotebook, NoteMark, MatrixMark } from '@/components/notebook/DeductionNotebook';
 import { AccusationModal } from '@/components/modals/AccusationModal';
 import { GameOverModal } from '@/components/modals/GameOverModal';
 import { DisprovePromptModal } from '@/components/modals/DisprovePromptModal';
@@ -111,8 +111,21 @@ export default function Home() {
   const [bgmActive, setBgmActive] = useState(false);
 
   // 개인 추리 수첩 (체크리스트 & 매트릭스 상태)
-  const [userNotes, setUserNotes] = useState<Record<string, 'UNKNOWN' | 'YES' | 'NO'>>({});
-  const [matrixNotes, setMatrixNotes] = useState<Record<string, Record<string, '?' | 'X' | 'O'>>>({});
+  const [userNotes, setUserNotes] = useState<Record<string, NoteMark>>({});
+  const [matrixNotes, setMatrixNotes] = useState<Record<string, Record<string, MatrixMark>>>({});
+  
+  // 게임이 새로 시작되었을 때 (새 라운드/새 게임) 이전 게임의 추리 수첩 메모를 깨끗하게 자동 초기화
+  const lastGameTimestampRef = useRef<number | null>(null);
+  useEffect(() => {
+    const initialLog = gameState.logs[0];
+    if (initialLog && initialLog.id === 'log_0') {
+      if (lastGameTimestampRef.current !== initialLog.timestamp) {
+        lastGameTimestampRef.current = initialLog.timestamp;
+        setUserNotes({});
+        setMatrixNotes({});
+      }
+    }
+  }, [gameState.logs]);
   
   // 최종 고발 모달 상태
   const [isAccuseModalOpen, setIsAccuseModalOpen] = useState(false);
@@ -145,28 +158,31 @@ export default function Home() {
       (myPlayerRole === 'p2' && currentPlayer?.roleType === 'p2');
 
   // 카드 추리 상태 판별 헬퍼 (스마트 수첩 및 내 손패와 드롭다운 완벽 일치 동기화)
-  const getEffectiveCardStatus = (cardId: string): { mark: 'YES' | 'NO' | 'UNKNOWN'; tag: string; label: string } => {
+  const getEffectiveCardStatus = (cardId: string): { mark: NoteMark; tag: string; label: string } => {
     const isMyCard = myPlayer?.hand?.some(c => c.id === cardId);
-    if (isMyCard) {
-      return { mark: 'NO', tag: ` [${t.handBadge} ✕]`, label: `✕ (${t.handBadge})` };
-    }
-    const note = userNotes[cardId] || 'UNKNOWN';
+    const note = userNotes[cardId] || 'EMPTY';
     if (note === 'NO') {
-      return { mark: 'NO', tag: ' [✕ 제외]', label: '✕ 제외됨' };
+      return { mark: 'NO', tag: isMyCard ? ` [${t.handBadge} ✕]` : ' [✕ 제외]', label: isMyCard ? `✕ (${t.handBadge})` : '✕ 제외됨' };
     }
     if (note === 'YES') {
-      return { mark: 'YES', tag: ' [◯ 확정]', label: '◯ 확정' };
+      return { mark: 'YES', tag: ' [✓ 확정]', label: '✓ 확정' };
     }
-    return { mark: 'UNKNOWN', tag: ' [❓ 미확인]', label: '❓ 미확인' };
+    if (note === 'UNKNOWN') {
+      return { mark: 'UNKNOWN', tag: ' [? 미확인]', label: '? 미확인' };
+    }
+    if (isMyCard) {
+      return { mark: 'EMPTY', tag: ` [${t.handBadge}]`, label: `- (${t.handBadge})` };
+    }
+    return { mark: 'EMPTY', tag: '', label: '- 미작성' };
   };
 
-  // 이미 배제된(내 손패/X 표시) 카드가 기본 선택되어 있을 경우 미확인 후보로 스마트 자동 전환
+  // 이미 배제된(X 표시) 카드가 기본 선택되어 있을 경우 미제외 후보로 스마트 자동 전환
   const activeSuspect = (getEffectiveCardStatus(selectedSuspect).mark === 'NO')
-    ? (SUSPECTS.find(s => getEffectiveCardStatus(s.id).mark === 'UNKNOWN')?.id || selectedSuspect)
+    ? (SUSPECTS.find(s => getEffectiveCardStatus(s.id).mark !== 'NO')?.id || selectedSuspect)
     : selectedSuspect;
 
   const activeWeapon = (getEffectiveCardStatus(selectedWeapon).mark === 'NO')
-    ? (WEAPONS.find(w => getEffectiveCardStatus(w.id).mark === 'UNKNOWN')?.id || selectedWeapon)
+    ? (WEAPONS.find(w => getEffectiveCardStatus(w.id).mark !== 'NO')?.id || selectedWeapon)
     : selectedWeapon;
 
   // AI 턴 자동 실행 감지 (상태 변경 및 턴 전환 시 안전하게 AI 실행 보장)
@@ -307,6 +323,8 @@ export default function Home() {
   // 메인 설정 화면으로 나가기 핸들러
   const handleExitToLobby = () => {
     sounds.playCardSlide();
+    setUserNotes({});
+    setMatrixNotes({});
     setHasStarted(false);
     setIsExitModalOpen(false);
     exitToLobby();
@@ -389,6 +407,8 @@ export default function Home() {
 
   const handleStartGame = () => {
     sounds.playMove();
+    setUserNotes({});
+    setMatrixNotes({});
     startNewGame(effectiveP1, effectiveP2, locale);
     setHasStarted(true);
   };
@@ -426,8 +446,18 @@ export default function Home() {
   const toggleNote = (cardId: string) => {
     sounds.playDisprove();
     setUserNotes(prev => {
-      const current = prev[cardId] || 'UNKNOWN';
-      const next = current === 'UNKNOWN' ? 'NO' : current === 'NO' ? 'YES' : 'UNKNOWN';
+      const current = prev[cardId] || 'EMPTY';
+      // Cycle: EMPTY (-) -> NO (x) -> UNKNOWN (?) -> YES (v) -> EMPTY (-)
+      let next: NoteMark;
+      if (current === 'EMPTY') {
+        next = 'NO';
+      } else if (current === 'NO') {
+        next = 'UNKNOWN';
+      } else if (current === 'UNKNOWN') {
+        next = 'YES';
+      } else {
+        next = 'EMPTY';
+      }
       return { ...prev, [cardId]: next };
     });
   };
@@ -436,8 +466,18 @@ export default function Home() {
     sounds.playDisprove();
     setMatrixNotes(prev => {
       const cardMap = prev[cardId] || {};
-      const current = cardMap[playerId] || '?';
-      const next = current === '?' ? 'X' : current === 'X' ? 'O' : '?';
+      const current = cardMap[playerId] || '-';
+      // Cycle: - -> X -> ? -> O -> -
+      let next: MatrixMark;
+      if (current === '-') {
+        next = 'X';
+      } else if (current === 'X') {
+        next = '?';
+      } else if (current === '?') {
+        next = 'O';
+      } else {
+        next = '-';
+      }
       return {
         ...prev,
         [cardId]: {
@@ -677,10 +717,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 빠른 후보 칩 (아직 배제되지 않은 미확인 ? 후보들 원터치 선택) */}
+              {/* 빠른 후보 칩 (아직 배제되지 않은 미확인/미작성 후보들 원터치 선택) */}
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                 <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider mr-1">미확인 후보:</span>
-                {SUSPECTS.filter(s => getEffectiveCardStatus(s.id).mark === 'UNKNOWN').slice(0, 3).map(s => (
+                {SUSPECTS.filter(s => getEffectiveCardStatus(s.id).mark !== 'NO').slice(0, 3).map(s => (
                   <button
                     key={s.id}
                     type="button"
@@ -694,7 +734,7 @@ export default function Home() {
                     {getCardName(s.id)}
                   </button>
                 ))}
-                {WEAPONS.filter(w => getEffectiveCardStatus(w.id).mark === 'UNKNOWN').slice(0, 3).map(w => (
+                {WEAPONS.filter(w => getEffectiveCardStatus(w.id).mark !== 'NO').slice(0, 3).map(w => (
                   <button
                     key={w.id}
                     type="button"
@@ -901,6 +941,8 @@ export default function Home() {
         getCardName={getCardName}
         getRoomName={getRoomName}
         onPlayAgain={() => {
+          setUserNotes({});
+          setMatrixNotes({});
           startNewGame(effectiveP1, effectiveP2, locale);
         }}
         onExitToLobby={handleExitToLobby}

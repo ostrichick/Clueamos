@@ -8,14 +8,17 @@ import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
 import { sounds } from '@/utils/sounds';
 
+export type NoteMark = 'EMPTY' | 'NO' | 'UNKNOWN' | 'YES';
+export type MatrixMark = '-' | 'X' | '?' | 'O';
+
 interface DeductionNotebookProps {
   t: TranslationStrings;
   locale: SupportedLocale;
   myPlayer?: Player;
   players: Player[];
-  userNotes: Record<string, 'UNKNOWN' | 'YES' | 'NO'>;
+  userNotes: Record<string, NoteMark>;
   toggleNote: (cardId: string) => void;
-  matrixNotes: Record<string, Record<string, '?' | 'X' | 'O'>>;
+  matrixNotes: Record<string, Record<string, MatrixMark>>;
   toggleMatrixCell: (cardId: string, playerId: string) => void;
   getCardName: (id: string) => string;
   getRoomName: (id: string) => string;
@@ -81,30 +84,31 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
 
   const renderSimpleRow = (id: string, name: string) => {
     const isMyCard = myPlayer?.hand?.some(c => c.id === id);
-    const mark = isMyCard ? 'NO' : (userNotes[id] || 'UNKNOWN');
+    const mark: NoteMark = userNotes[id] || 'EMPTY';
 
     return (
       <div 
         key={id} 
-        onClick={() => !isMyCard && handleNoteClick(id)}
-        className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
+        onClick={() => handleNoteClick(id)}
+        className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer hover:bg-slate-800/60 select-none ${
           isMyCard
-            ? 'border-amber-500/40 bg-amber-950/20 shadow-sm opacity-90'
-            : 'cursor-pointer hover:bg-slate-800/60 border-slate-800 bg-slate-900/40'
+            ? 'border-amber-500/40 bg-amber-950/20 shadow-sm'
+            : 'border-slate-800 bg-slate-900/40'
         }`}
       >
-        <div className="flex items-center gap-1.5">
-          <span className={isMyCard ? 'text-amber-200 font-bold' : 'text-slate-300'}>{name}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`truncate ${isMyCard ? 'text-amber-200 font-bold' : 'text-slate-300'}`}>{name}</span>
           {isMyCard && smartAssist && (
-            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
+            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono shrink-0">
               {t.handBadge}
             </span>
           )}
         </div>
-        <span>
+        <span className="w-5 h-5 flex items-center justify-center shrink-0">
           {mark === 'NO' && <X className="w-3.5 h-3.5 text-rose-500 font-black" />}
+          {mark === 'UNKNOWN' && <span className="text-amber-400 font-bold font-mono text-sm">?</span>}
           {mark === 'YES' && <Check className="w-3.5 h-3.5 text-emerald-400 font-black" />}
-          {mark === 'UNKNOWN' && <span className="text-slate-600 font-mono">?</span>}
+          {mark === 'EMPTY' && <span className="text-slate-500 font-mono font-bold text-sm">-</span>}
         </span>
       </div>
     );
@@ -128,30 +132,26 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
           const isMyCard = myPlayer?.hand?.some(c => c.id === id);
 
           if (isMyDetective) {
-            if (isMyCard) {
-              return (
-                <td key={p.id} className="p-1.5 text-center border-l border-slate-800/50 bg-amber-500/10">
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-slate-950 shadow">
-                    {t.handBadge}
-                  </span>
-                </td>
-              );
-            }
-            const mark = userNotes[id] || 'UNKNOWN';
+            const mark: NoteMark = userNotes[id] || 'EMPTY';
             return (
               <td
                 key={p.id}
                 onClick={() => handleNoteClick(id)}
-                className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors"
+                className={`p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors select-none ${
+                  isMyCard ? 'bg-amber-500/10' : ''
+                }`}
               >
-                {mark === 'NO' && <span className="text-rose-400 font-black text-sm">✕</span>}
-                {mark === 'YES' && <span className="text-emerald-400 font-black text-sm">✓</span>}
-                {mark === 'UNKNOWN' && <span className="text-slate-600 font-mono">?</span>}
+                <div className="flex items-center justify-center gap-1">
+                  {mark === 'NO' && <span className="text-rose-400 font-black text-sm">✕</span>}
+                  {mark === 'UNKNOWN' && <span className="text-amber-400 font-mono font-bold text-sm">?</span>}
+                  {mark === 'YES' && <span className="text-emerald-400 font-black text-sm">✓</span>}
+                  {mark === 'EMPTY' && <span className="text-slate-500 font-mono font-bold text-sm">-</span>}
+                </div>
               </td>
             );
           }
 
-          const cellVal = matrixNotes[id]?.[p.id] || '?';
+          const cellVal: MatrixMark = matrixNotes[id]?.[p.id] || '-';
           const isSmartDisproved = smartAssist && smartDisprovedMap.get(p.id)?.has(id);
 
           return (
@@ -160,29 +160,34 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
               onClick={() => handleMatrixCellClick(id, p.id)}
               className="p-1.5 text-center cursor-pointer hover:bg-slate-800/60 border-l border-slate-800/50 transition-colors select-none"
             >
-              {cellVal === 'O' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300">
-                  O
-                </span>
-              )}
-              {cellVal === 'X' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 border border-rose-500/60 text-rose-300">
-                  X
-                </span>
-              )}
-              {cellVal === '?' && (
-                <div className="flex items-center justify-center gap-0.5">
-                  <span className="text-slate-600 font-mono text-xs">·</span>
-                  {isSmartDisproved && (
-                    <span 
-                      title={`${p.name} ${t.smartClueDisprovedTag}`}
-                      className="text-[9px] text-amber-400 animate-pulse font-mono"
-                    >
-                      💡
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center justify-center gap-0.5">
+                {cellVal === 'X' && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 border border-rose-500/60 text-rose-300">
+                    X
+                  </span>
+                )}
+                {cellVal === '?' && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 border border-amber-500/60 text-amber-300">
+                    ?
+                  </span>
+                )}
+                {cellVal === 'O' && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 border border-emerald-500/60 text-emerald-300">
+                    O
+                  </span>
+                )}
+                {cellVal === '-' && (
+                  <span className="text-slate-600 font-mono text-xs">-</span>
+                )}
+                {isSmartDisproved && (
+                  <span 
+                    title={`${p.name} ${t.smartClueDisprovedTag}`}
+                    className="text-[9px] text-amber-400 animate-pulse font-mono"
+                  >
+                    💡
+                  </span>
+                )}
+              </div>
             </td>
           );
         })}

@@ -12,7 +12,7 @@ interface AccusationModalProps {
   t: TranslationStrings;
   getCardName: (id: string) => string;
   getRoomName: (id: string) => string;
-  getEffectiveCardStatus?: (id: string) => { mark: 'YES' | 'NO' | 'UNKNOWN'; tag: string; label: string };
+  getEffectiveCardStatus?: (id: string) => { mark: 'YES' | 'NO' | 'UNKNOWN' | 'EMPTY'; tag: string; label: string };
 }
 
 export const AccusationModal: React.FC<AccusationModalProps> = ({
@@ -26,19 +26,22 @@ export const AccusationModal: React.FC<AccusationModalProps> = ({
 }) => {
   const getStatus = (id: string) => {
     if (getEffectiveCardStatus) return getEffectiveCardStatus(id);
-    return { mark: 'UNKNOWN' as const, tag: '', label: '' };
+    return { mark: 'EMPTY' as const, tag: '', label: '' };
   };
 
   const initialSuspect = SUSPECTS.find(s => getStatus(s.id).mark === 'YES')?.id
     || SUSPECTS.find(s => getStatus(s.id).mark === 'UNKNOWN')?.id
+    || SUSPECTS.find(s => getStatus(s.id).mark === 'EMPTY')?.id
     || SUSPECTS[0].id;
 
   const initialLocation = LOCATIONS.find(l => getStatus(l.id).mark === 'YES')?.id
     || LOCATIONS.find(l => getStatus(l.id).mark === 'UNKNOWN')?.id
+    || LOCATIONS.find(l => getStatus(l.id).mark === 'EMPTY')?.id
     || LOCATIONS[0].id;
 
   const initialWeapon = WEAPONS.find(w => getStatus(w.id).mark === 'YES')?.id
     || WEAPONS.find(w => getStatus(w.id).mark === 'UNKNOWN')?.id
+    || WEAPONS.find(w => getStatus(w.id).mark === 'EMPTY')?.id
     || WEAPONS[0].id;
 
   const [suspect, setSuspect] = useState(initialSuspect);
