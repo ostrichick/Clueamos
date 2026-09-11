@@ -1304,14 +1304,62 @@ export const useGameStore = create<GameStore>((set, get) => {
           if (action.type === 'MOVE_AND_SUGGEST') {
             get().performSuggestion(action.suggestion);
             triggerAIDialogue(currentP, 'suggest');
+          } else if (action.type === 'ACCUSE') {
+            get().performAccusation(action.accusation);
+          } else {
+            get().performEndTurn();
           }
         } catch (err) {
           console.error('AI suggest error:', err);
+          get().performEndTurn();
+        }
+        return;
+      }
+
+      // If in PLAYING_MOVE phase (dice was rolled, need to decide move):
+      if (gameState.phase === 'PLAYING_MOVE') {
+        try {
+          const action = currentP.type === 'ai_logic'
+            ? decideArthurAction(gameState, memory)
+            : decideBlakeAction(gameState, memory);
+
+          if (action.type === 'ACCUSE') {
+            get().performAccusation(action.accusation);
+          } else {
+            const accessible = gameState.accessibleRoomIds || [currentP.currentRoomId];
+            const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
+              ? action.targetRoomId
+              : accessible[0];
+
+            if (!targetRoomId) {
+              get().performWaitInHallway();
+              return;
+            }
+
+            get().performMove(targetRoomId);
+            triggerAIDialogue(currentP, 'move');
+
+            setTimeout(() => {
+              try {
+                const stateAfterMove = get().gameState;
+                if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
+                  get().performSuggestion(action.suggestion);
+                  triggerAIDialogue(currentP, 'suggest');
+                }
+              } catch (err) {
+                console.error('AI suggestion error:', err);
+              }
+            }, 900);
+          }
+        } catch (err) {
+          console.error('AI turn move decision error:', err);
+          get().performWaitInHallway();
         }
         return;
       }
 
       if (gameState.phase !== 'PLAYING_ROLL') return;
+      if (get().isRollingDice) return;
 
       // 1. AI rolls dice
       sounds.playDice();
@@ -1331,12 +1379,16 @@ export const useGameStore = create<GameStore>((set, get) => {
             get().performAccusation(action.accusation);
           } else {
             const accessible = stateAfterRoll.accessibleRoomIds || [currentP.currentRoomId];
-            if (accessible.length === 0 || !action.targetRoomId) {
+            const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
+              ? action.targetRoomId
+              : accessible[0];
+
+            if (!targetRoomId) {
               get().performWaitInHallway();
               return;
             }
 
-            get().performMove(action.targetRoomId);
+            get().performMove(targetRoomId);
             triggerAIDialogue(currentP, 'move');
 
             setTimeout(() => {
@@ -1486,6 +1538,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             }
             get().performMove(targetRoomId);
             setTimeout(() => {
+              if (!get().isAutoPlaying) return;
               try {
                 const stateAfterMove = get().gameState;
                 if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
@@ -1510,6 +1563,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         get().performRollDice();
 
         setTimeout(() => {
+          if (!get().isAutoPlaying) return;
           try {
             const stateAfterRoll = get().gameState;
             if (stateAfterRoll.phase !== 'PLAYING_MOVE') return;
@@ -1529,6 +1583,7 @@ export const useGameStore = create<GameStore>((set, get) => {
               get().performMove(targetRoomId);
 
               setTimeout(() => {
+                if (!get().isAutoPlaying) return;
                 try {
                   const stateAfterMove = get().gameState;
                   if (stateAfterMove.phase === 'PLAYING_SUGGEST') {

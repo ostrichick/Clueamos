@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { ScrollText, ListChecks, LayoutGrid, Check, X, Sparkles, RotateCcw, ArrowLeft } from 'lucide-react';
+import { ScrollText, ListChecks, LayoutGrid, Check, X, Sparkles, RotateCcw } from 'lucide-react';
 import { Player, LogEntry } from '@/engine/types';
 import { SUSPECTS, LOCATIONS, WEAPONS } from '@/engine/data';
 import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
@@ -24,7 +24,6 @@ interface DeductionNotebookProps {
   getRoomName: (id: string) => string;
   logs?: LogEntry[];
   onResetNotes?: () => void;
-  onBackToBoard?: () => void;
 }
 
 export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
@@ -40,7 +39,6 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
   getRoomName,
   logs = [],
   onResetNotes,
-  onBackToBoard,
 }) => {
   const [notebookViewMode, setNotebookViewMode] = useState<'simple' | 'matrix'>('simple');
   const [smartAssist, setSmartAssist] = useState<boolean>(true);
@@ -198,22 +196,11 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
   return (
     <div id="deduction-notebook" className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-        <div className="flex items-center gap-2.5">
-          {onBackToBoard && (
-            <button
-              onClick={onBackToBoard}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/25 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>{t.backToBoard}</span>
-            </button>
-          )}
-          <div className="flex items-center gap-2">
-            <ScrollText className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm font-bold text-slate-200">
-              {t.notebookTitle}
-            </h2>
-          </div>
+        <div className="flex items-center gap-2">
+          <ScrollText className="w-4 h-4 text-amber-400" />
+          <h2 className="text-sm font-bold text-slate-200">
+            {t.notebookTitle}
+          </h2>
         </div>
 
         {/* 컨트롤: 스마트 어시스트 토글 & 보기 모드 전환 & 초기화 */}
@@ -350,19 +337,6 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
               {WEAPONS.map(w => renderMatrixRow(w.id, getCardName(w.id)))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {/* 하단: 보드로 돌아가기 편의 버튼 */}
-      {onBackToBoard && (
-        <div className="pt-3 border-t border-slate-800/80 flex justify-center">
-          <button
-            onClick={onBackToBoard}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>{t.backToBoard}</span>
-          </button>
         </div>
       )}
     </div>

@@ -201,14 +201,26 @@ export default function Home() {
     if (gameState.phase === 'GAME_OVER') return;
     if (turnReviewState && turnReviewState.active) return;
 
-    if (gameState.phase === 'PLAYING_ROLL' && !isRollingDice) {
-      const currentP = gameState.players[gameState.currentPlayerIndex];
-      if (currentP && currentP.type.startsWith('ai_')) {
+    const currentP = gameState.players[gameState.currentPlayerIndex];
+    if (!currentP || !currentP.type.startsWith('ai_')) return;
+
+    if (gameState.phase === 'PLAYING_ROLL') {
+      if (!isRollingDice) {
         const timer = setTimeout(() => {
           runAITurnIfNeeded();
         }, 600);
         return () => clearTimeout(timer);
       }
+    } else if (
+      gameState.phase === 'PLAYING_MOVE' ||
+      gameState.phase === 'PLAYING_SUGGEST' ||
+      gameState.phase === 'PLAYING_ACTION_DONE'
+    ) {
+      // AI가 롤 외의 단계(이동, 가설, 행동완료)에 머물러 있는 경우 자동 진행 보장 (AFK 해제 시 멈춤 방지)
+      const timer = setTimeout(() => {
+        runAITurnIfNeeded();
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, [isGameStarted, gameState.phase, gameState.currentPlayerIndex, gameState.players, isRollingDice, runAITurnIfNeeded, turnReviewState]);
 
@@ -389,6 +401,14 @@ export default function Home() {
     setIsAutoPlaying(false);
     lastActivityTime.current = Date.now();
     setAfkSecondsRemaining(null);
+
+    // AI 플레이어 턴 중에 제어권을 복구한 경우, 멈추지 않고 AI가 턴을 정상 완수하도록 킥스타트
+    const currentP = gameState.players[gameState.currentPlayerIndex];
+    if (currentP && currentP.type.startsWith('ai_')) {
+      setTimeout(() => {
+        runAITurnIfNeeded();
+      }, 200);
+    }
   };
 
   // AFK 경고 모달 확인 (저 여기 있어요!)
@@ -893,9 +913,6 @@ export default function Home() {
             onResetNotes={() => {
               setUserNotes({});
               setMatrixNotes({});
-            }}
-            onBackToBoard={() => {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
 
