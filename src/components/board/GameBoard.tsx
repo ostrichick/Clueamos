@@ -12,11 +12,12 @@ import {
 import { SECRET_PASSAGES, getPlayerDisplayName } from '@/engine/engine';
 import { Player } from '@/engine/types';
 import { TranslationStrings, SupportedLocale } from '@/i18n/translations';
-import { Sparkles, Dices, ArrowRight, X, ShieldAlert, Flame, BookOpenCheck, Clock } from 'lucide-react';
+import { Sparkles, Dices, ArrowRight, X, ShieldAlert } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
 import { haptics } from '@/utils/haptics';
 import { OnBoardDiceOverlay } from './OnBoardDiceOverlay';
-import { TurnReviewState, PlayerRole } from '@/store/useGameStore';
+import { OnBoardActionOverlay } from './OnBoardActionOverlay';
+import { TurnReviewState, PlayerRole, PlayMode } from '@/store/useGameStore';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 const WEAPON_ICONS: Record<string, string> = {
@@ -50,6 +51,7 @@ interface GameBoardProps {
   turnReview?: TurnReviewState | null;
   onConfirmTurnReview?: () => void;
   myPlayerRole?: PlayerRole;
+  playMode?: PlayMode;
   isAutoPlaying?: boolean;
 }
 
@@ -73,6 +75,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   turnReview,
   onConfirmTurnReview,
   myPlayerRole,
+  playMode = 'local',
   isAutoPlaying,
 }) => {
   const currentPlayer = players[currentPlayerIndex];
@@ -80,7 +83,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const isMovePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_MOVE' && !isAutoPlaying;
   const isRollPhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ROLL' && !isAutoPlaying;
   const isActionDonePhase = isMyTurn && isHumanTurn && phase === 'PLAYING_ACTION_DONE' && !isAutoPlaying;
-  const isTurnReviewReady = Boolean(turnReview?.readyRoles?.includes(myPlayerRole || 'p1'));
 
   const [walkingState, setWalkingState] = useState<{
     playerId: string;
@@ -365,49 +367,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <span>{t.waitInHallway}</span>
             </button>
           )}
-
-          {/* C. 보드 내 턴 넘기기 (Pass Turn) 및 최종 고발 (Accusation) */}
-          {isActionDonePhase && onEndTurn && (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={onEndTurn}
-                className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95 animate-pulse"
-              >
-                <span>{t.endTurnBtn}</span>
-              </button>
-
-              {onOpenAccuse && !currentPlayer?.isEliminated && (
-                <button
-                  onClick={onOpenAccuse}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-all duration-200 flex items-center justify-center gap-1.5 shadow-lg shadow-rose-900/40 cursor-pointer active:scale-95 ring-1 ring-rose-400/50"
-                >
-                  <Flame className="w-3.5 h-3.5 text-rose-200" />
-                  <span>{t.makeAccusationBtn}</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* D. 보드 내 노트 확인 완료 (Notes Ready) */}
-          {turnReview && turnReview.active && onConfirmTurnReview && (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              {!isTurnReviewReady ? (
-                <button
-                  onClick={onConfirmTurnReview}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer animate-pulse"
-                >
-                  <BookOpenCheck className="w-4 h-4 text-slate-950" />
-                  <span>{t.turnReviewConfirmBtn}</span>
-                  <Sparkles className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <div className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                  <span>{t.turnReviewWaitingPeer}</span>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -681,6 +640,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             t={t}
             canRollManually={isRollPhase && !isRollingDice}
             onManualRoll={onRollDice}
+          />
+
+          {/* E. 보드판 내부 턴 완료 및 수첩 정리 인터랙션 오버레이 */}
+          <OnBoardActionOverlay
+            isActionDonePhase={isActionDonePhase}
+            onEndTurn={onEndTurn}
+            onOpenAccuse={onOpenAccuse}
+            canAccuse={!currentPlayer?.isEliminated}
+            turnReview={turnReview}
+            onConfirmTurnReview={onConfirmTurnReview}
+            myPlayerRole={myPlayerRole}
+            playMode={playMode}
+            isAutoPlaying={isAutoPlaying}
+            t={t}
           />
         </div>
 

@@ -19,7 +19,6 @@ import { TurnPhaseStepper } from '@/components/board/TurnPhaseStepper';
 import { TableEmotesBar } from '@/components/board/TableEmotesBar';
 import { AfkWarningModal } from '@/components/modals/AfkWarningModal';
 import { AutoPlayBanner } from '@/components/game/AutoPlayBanner';
-import { TurnReviewBanner } from '@/components/game/TurnReviewBanner';
 import { sounds } from '@/utils/sounds';
 import { translations, SupportedLocale } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
@@ -709,17 +708,7 @@ export default function Home() {
             isAITurn={!isHumanTurn}
           />
 
-          {/* 턴 종료 후 수첩 정리 및 플레이어 확인 배너 (보드판 위 배치) */}
-          <TurnReviewBanner
-            review={turnReviewState}
-            playMode={playMode}
-            myPlayerRole={myPlayerRole}
-            isAutoPlaying={isAutoPlaying}
-            onConfirm={confirmTurnReview}
-            t={t}
-          />
-
-          {/* 보드판 (Mansion Game Board) */}
+          {/* 보드판 (Mansion Game Board) - 내부에서 주사위, 패스 턴, 노트 확인 완료 직접 처리 */}
           <GameBoard
             players={gameState.players}
             currentPlayerIndex={gameState.currentPlayerIndex}
@@ -740,6 +729,7 @@ export default function Home() {
             turnReview={turnReviewState}
             onConfirmTurnReview={confirmTurnReview}
             myPlayerRole={myPlayerRole}
+            playMode={playMode}
             isAutoPlaying={isAutoPlaying}
           />
         </div>
