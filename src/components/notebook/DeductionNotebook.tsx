@@ -80,6 +80,36 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
     return map;
   }, [logs, smartAssist, myPlayer]);
 
+  // Derive top 3 recent deduction hints from disproves
+  const recentDeductionHints = useMemo(() => {
+    if (!smartAssist) return [];
+    const hints: { text: string; id: string }[] = [];
+    logs.slice(-8).reverse().forEach((log) => {
+      if (log.type === 'disprove' && log.metadata) {
+        const asker = players.find((p) => p.id === log.metadata?.askerId)?.name || '누군가';
+        const responder = players.find((p) => p.id === log.metadata?.responderId)?.name;
+        if (responder) {
+          if (log.metadata.shownCardId && (log.metadata.askerId === myPlayer?.id || !myPlayer)) {
+            const cardName = getCardName(log.metadata.shownCardId);
+            hints.push({
+              id: `${log.id}-shown`,
+              text: `🔍 [직접 확인] ${responder}님이 당신에게 [${cardName}] 카드를 보여주었습니다.`,
+            });
+          } else {
+            const sName = log.metadata.suspectId ? getCardName(log.metadata.suspectId) : '';
+            const lName = log.metadata.locationId ? getRoomName(log.metadata.locationId) : '';
+            const wName = log.metadata.weaponId ? getCardName(log.metadata.weaponId) : '';
+            hints.push({
+              id: `${log.id}-indirect`,
+              text: `💡 [연역 단서] ${responder}님이 ${asker}님의 질문에 반증함 → [${sName}, ${lName}, ${wName}] 중 최소 1장 보유`,
+            });
+          }
+        }
+      }
+    });
+    return hints.slice(0, 2);
+  }, [logs, smartAssist, players, myPlayer, getCardName, getRoomName]);
+
   const renderSimpleRow = (id: string, name: string) => {
     const isMyCard = myPlayer?.hand?.some(c => c.id === id);
     const mark: NoteMark = userNotes[id] || 'EMPTY';
@@ -265,6 +295,21 @@ export const DeductionNotebook: React.FC<DeductionNotebookProps> = ({
           )}
         </div>
       </div>
+
+      {/* Smart Deduction Hints Banner */}
+      {smartAssist && recentDeductionHints.length > 0 && (
+        <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono">
+          <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[11px]">
+            <Sparkles className="w-3 h-3 animate-spin" />
+            <span>AI 연역 추리 보조 브리핑</span>
+          </div>
+          {recentDeductionHints.map((hint) => (
+            <div key={hint.id} className="text-slate-300 text-[11px] leading-relaxed">
+              {hint.text}
+            </div>
+          ))}
+        </div>
+      )}
 
       {notebookViewMode === 'simple' ? (
         /* 1. 간편 체크리스트 뷰 */
