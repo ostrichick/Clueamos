@@ -1,4 +1,4 @@
-import mqtt, { MqttClient } from 'mqtt';
+import mqtt, { type MqttClient } from 'mqtt';
 
 export type PeerMessageType =
   | 'LOBBY_UPDATE'
@@ -34,10 +34,21 @@ export interface PeerMessage {
 const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
 const TOPIC_PREFIX = 'clueamos/v4/';
 
+function sanitizePassword(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const digits = value.trim().replace(/\D/g, '');
+  return digits.length >= 4 && digits.length <= 6 ? digits : null;
+}
+
+function generatePassword(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 export class PeerManager {
   private client: MqttClient | null = null;
   private isHost: boolean = false;
   private roomCode: string | null = null;
+  private roomSecret: string | null = null;
   private connected: boolean = false;
 
   public onMessageReceived?: (msg: PeerMessage) => void;
@@ -45,6 +56,10 @@ export class PeerManager {
 
   public getRoomCode(): string | null {
     return this.roomCode;
+  }
+
+  public getRoomSecret(): string | null {
+    return this.roomSecret;
   }
 
   public getIsHost(): boolean {
@@ -55,19 +70,27 @@ export class PeerManager {
     return this.connected;
   }
 
+  private makeTopic(code: string, secret: string, direction: 'to_host' | 'to_guest'): string {
+    return `${TOPIC_PREFIX}${code}/${secret}/${direction}`;
+  }
+
   /**
-   * Host: Create a new room with a 4-digit code (1000-9999)
+   * Host: Create a new room with a 4-digit code and a shared 4~6 digit room password.
+   * Both are required to compute the MQTT topic, so random eavesdroppers on the
+   * public broker cannot join or snoop without knowing the password.
    */
-  public async createRoom(desiredCode?: unknown): Promise<string> {
+  public async createRoom(desiredCode?: unknown, roomPassword?: unknown): Promise<string> {
     this.cleanup();
     this.isHost = true;
     const sanitized = (typeof desiredCode === 'string') ? desiredCode.trim().replace(/\D/g, '') : '';
     const code = (sanitized.length === 4)
       ? sanitized
       : Math.floor(1000 + Math.random() * 9000).toString();
+    const secret = sanitizePassword(roomPassword) || generatePassword();
     this.roomCode = code;
+    this.roomSecret = secret;
 
-    const myReceiveTopic = `${TOPIC_PREFIX}${code}/to_host`;
+    const myReceiveTopic = this.makeTopic(code, secret, 'to_host');
 
     return new Promise((resolve, reject) => {
       let isSettled = false;
@@ -155,16 +178,18 @@ export class PeerManager {
   }
 
   /**
-   * Guest: Connect to an existing room using 2-digit room code
+   * Guest: Connect to an existing room using the 4-digit code + shared password.
    */
-  public async joinRoom(code: string): Promise<void> {
+  public async joinRoom(code: string, roomPassword: string): Promise<void> {
     this.cleanup();
     this.isHost = false;
     const cleanCode = code.trim().replace(/\D/g, '');
+    const cleanSecret = sanitizePassword(roomPassword) || '';
     this.roomCode = cleanCode;
+    this.roomSecret = cleanSecret;
 
-    const myReceiveTopic = `${TOPIC_PREFIX}${cleanCode}/to_guest`;
-    const hostTopic = `${TOPIC_PREFIX}${cleanCode}/to_host`;
+    const myReceiveTopic = this.makeTopic(cleanCode, cleanSecret, 'to_guest');
+    const hostTopic = this.makeTopic(cleanCode, cleanSecret, 'to_host');
 
     return new Promise((resolve, reject) => {
       let isSettled = false;
@@ -175,7 +200,7 @@ export class PeerManager {
           isSettled = true;
           if (pingInterval) clearInterval(pingInterval);
           this.cleanup();
-          const err = new Error(`Connection timed out. Room ${cleanCode} may not exist or host is offline.`);
+          const err = new Error(`Connection timed out. Room ${cleanCode} may not exist, the host is offline, or the room password is incorrect.`);
           if (this.onConnectionStateChange) {
             this.onConnectionStateChange(false, err.message);
           }
@@ -267,13 +292,13 @@ export class PeerManager {
   }
 
   /**
-   * Send message across the room channel
+   * Send message across the room channel (topic includes the room secret)
    */
   public sendMessage(msg: PeerMessage): boolean {
-    if (this.client && this.client.connected && this.roomCode) {
+    if (this.client && this.client.connected && this.roomCode && this.roomSecret) {
       const targetTopic = this.isHost
-        ? `${TOPIC_PREFIX}${this.roomCode}/to_guest`
-        : `${TOPIC_PREFIX}${this.roomCode}/to_host`;
+        ? this.makeTopic(this.roomCode, this.roomSecret, 'to_guest')
+        : this.makeTopic(this.roomCode, this.roomSecret, 'to_host');
       this.client.publish(targetTopic, JSON.stringify(msg), { qos: 1 });
       return true;
     }
@@ -289,6 +314,7 @@ export class PeerManager {
     }
     this.connected = false;
     this.roomCode = null;
+    this.roomSecret = null;
     this.isHost = false;
   }
 }

@@ -12,8 +12,8 @@ import {
   ArrowRight 
 } from 'lucide-react';
 import { SUSPECTS, CHARACTER_PROFILES } from '@/engine/data';
-import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
-import { PlayMode } from '@/store/useGameStore';
+import { type SupportedLocale, type TranslationStrings } from '@/i18n/translations';
+import { type PlayMode } from '@/store/useGameStore';
 
 interface LobbyScreenProps {
   locale: SupportedLocale;
@@ -26,13 +26,16 @@ interface LobbyScreenProps {
   handleSelectP1: (charId: string) => void;
   handleSelectP2: (charId: string) => void;
   roomCode: string | null;
+  roomSecret: string | null;
   inputRoomCode: string;
   setInputRoomCode: (code: string) => void;
+  inputRoomPassword: string;
+  setInputRoomPassword: (code: string) => void;
   isConnecting: boolean;
   isConnected: boolean;
   connectionError: string | null;
   createRoom: () => void;
-  joinRoom: (code: string) => void;
+  joinRoom: (code: string, password: string) => void;
   disconnectRoom: () => void;
   handleCopyInviteLink: () => void;
   copySuccessToast: boolean;
@@ -53,8 +56,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   handleSelectP1,
   handleSelectP2,
   roomCode,
+  roomSecret,
   inputRoomCode,
   setInputRoomCode,
+  inputRoomPassword,
+  setInputRoomPassword,
   isConnecting,
   isConnected,
   connectionError,
@@ -177,22 +183,33 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       <Smartphone className="w-4 h-4 text-indigo-400" /> {t.joinRoomTitle}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      {locale === 'ko' ? '전달받은 4자리 방 코드를 입력합니다.' : 'Enter the 4-digit room code sent by Player 1.'}
+                      {locale === 'ko' ? '방 코드와 비밀번호(4~6자리)를 함께 입력합니다.' : 'Enter the room code and 4~6 digit password sent by Player 1.'}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      maxLength={4}
-                      placeholder="1042"
-                      value={inputRoomCode}
-                      onChange={(e) => setInputRoomCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      className="w-24 text-center uppercase tracking-widest font-mono font-black text-base bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-indigo-400 focus:outline-none"
-                    />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="1042"
+                        value={inputRoomCode}
+                        onChange={(e) => setInputRoomCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        className="w-24 text-center uppercase tracking-widest font-mono font-black text-base bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-indigo-400 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder={locale === 'ko' ? '비밀번호' : 'Password'}
+                        value={inputRoomPassword}
+                        onChange={(e) => setInputRoomPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="flex-1 text-center uppercase tracking-widest font-mono font-black text-base bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 placeholder:text-sm placeholder:tracking-normal placeholder:font-normal focus:border-indigo-400 focus:outline-none"
+                      />
+                    </div>
                     <button
-                      disabled={isConnecting || inputRoomCode.length < 4}
-                      onClick={() => joinRoom(inputRoomCode.trim())}
-                      className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow"
+                      disabled={isConnecting || inputRoomCode.length < 4 || inputRoomPassword.length < 4}
+                      onClick={() => joinRoom(inputRoomCode.trim(), inputRoomPassword.trim())}
+                      className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow"
                     >
                       {isConnecting && playMode === 'guest' ? t.connectingToRoom : t.joinRoomBtn}
                     </button>
@@ -200,51 +217,66 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 </div>
               </div>
             ) : (
-              /* 방 개설 완료 화면 (2자리 코드 및 초대 복사) */
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/50 flex flex-col items-center justify-center">
-                    <span className="text-[10px] text-amber-400 font-bold leading-none">ROOM</span>
-                    <span className="text-lg font-black text-amber-300 font-mono leading-tight">{roomCode}</span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-200">
-                        {playMode === 'host' ? t.waitingForPlayer2 : t.connectedToRoom}
-                      </span>
-                      {isConnected ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          {t.player2Connected}
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-bold text-amber-400 flex items-center gap-1 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          {t.waitingForPlayer2}
-                        </span>
-                      )}
+              /* 방 개설 완료 화면 (방 코드 + 비밀번호 및 초대 복사) */
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-amber-500/40 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/50 flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-amber-400 font-bold leading-none">ROOM</span>
+                      <span className="text-lg font-black text-amber-300 font-mono leading-tight">{roomCode}</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {locale === 'ko' ? '아래 초대 링크를 복사하여 상대방에게 전송하세요.' : 'Share the invite link with Player 2 to join immediately.'}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-200">
+                          {playMode === 'host' ? t.waitingForPlayer2 : t.connectedToRoom}
+                        </span>
+                        {isConnected ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            {t.player2Connected}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-bold text-amber-400 flex items-center gap-1 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            {t.waitingForPlayer2}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {locale === 'ko'
+                          ? '아래 초대 링크와 비밀번호를 상대방에게 함께 전달하세요.'
+                          : 'Share the invite link AND the room password with Player 2.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyInviteLink}
+                      className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow transition-colors"
+                    >
+                      {copySuccessToast ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copySuccessToast ? t.inviteLinkCopied : t.copyInviteLink}</span>
+                    </button>
+                    <button
+                      onClick={disconnectRoom}
+                      className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 font-semibold text-xs border border-slate-700 transition-colors"
+                    >
+                      {locale === 'ko' ? '방 나가기' : 'Leave Room'}
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleCopyInviteLink}
-                    className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow transition-colors"
-                  >
-                    {copySuccessToast ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copySuccessToast ? t.inviteLinkCopied : t.copyInviteLink}</span>
-                  </button>
-                  <button
-                    onClick={disconnectRoom}
-                    className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 font-semibold text-xs border border-slate-700 transition-colors"
-                  >
-                    {locale === 'ko' ? '방 나가기' : 'Leave Room'}
-                  </button>
-                </div>
+                {playMode === 'host' && roomSecret && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40">
+                    <div className="text-[11px] text-indigo-300 font-bold flex items-center gap-1.5">
+                      🔑 {locale === 'ko' ? '방 비밀번호 (상대방에게 알려주세요):' : 'Room Password (share with Player 2):'}
+                    </div>
+                    <span className="px-3 py-1 rounded-md bg-indigo-500/20 border border-indigo-500/50 text-indigo-200 font-mono font-black text-sm tracking-widest text-center">
+                      {roomSecret}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

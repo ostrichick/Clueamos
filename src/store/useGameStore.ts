@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, Solution, Suggestion, Card, Player, HypothesisVisualState } from '@/engine/types';
+import { type GameState, type Solution, type Suggestion, type Card, type Player, type HypothesisVisualState } from '@/engine/types';
 import { 
   initGame, 
   rollDice, 
@@ -12,7 +12,7 @@ import {
   nextTurn
 } from '@/engine/engine';
 import { 
-  AIMemory, 
+  type AIMemory, 
   initAIMemory, 
   decideArthurAction, 
   decideBlakeAction, 
@@ -21,8 +21,9 @@ import {
   recordObservedDisprove,
   shouldAIAccuse
 } from '@/engine/ai';
-import { SupportedLocale, translations } from '@/i18n/translations';
-import { peerManager, PeerMessage } from '@/network/peerManager';
+import { type SupportedLocale, translations } from '@/i18n/translations';
+import { randomSeed } from '@/utils/rng';
+import { peerManager, type PeerMessage } from '@/network/peerManager';
 import { sounds } from '@/utils/sounds';
 
 export type PlayMode = 'solo' | 'local' | 'host' | 'guest';
@@ -65,7 +66,7 @@ export const INITIAL_ROOM_WEAPONS: Record<string, string[]> = {
 
 const SESSION_KEY = 'clueamos_session_v1';
 
-function saveSession(data: { roomCode: string; playMode: PlayMode; role: PlayerRole }) {
+function saveSession(data: { roomCode: string; roomSecret: string; playMode: PlayMode; role: PlayerRole }) {
   if (typeof window !== 'undefined') {
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
@@ -92,6 +93,7 @@ interface GameStore {
   playMode: PlayMode;
   myPlayerRole: PlayerRole;
   roomCode: string | null;
+  roomSecret: string | null;
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
@@ -122,8 +124,8 @@ interface GameStore {
   triggerEmote: (emoteKey: string) => void;
   dismissEmote: () => void;
   setPlayMode: (mode: PlayMode) => void;
-  createRoom: (desiredCode?: string) => Promise<string>;
-  joinRoom: (code: string) => Promise<void>;
+  createRoom: (desiredCode?: string, desiredPassword?: string) => Promise<string>;
+  joinRoom: (code: string, password?: string) => Promise<void>;
   disconnectRoom: () => void;
   restoreSessionIfNeeded: () => Promise<boolean>;
   startNewGame: (p1CharacterId?: string, p2CharacterId?: string, locale?: SupportedLocale) => void;
@@ -381,6 +383,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     playMode: 'host',
     myPlayerRole: 'p1',
     roomCode: null,
+    roomSecret: null,
     isConnected: false,
     isConnecting: false,
     connectionError: null,
@@ -525,8 +528,9 @@ export const useGameStore = create<GameStore>((set, get) => {
       });
     },
 
-    createRoom: async (desiredCode?: unknown) => {
+    createRoom: async (desiredCode?: string, desiredPassword?: string) => {
       const codeParam = typeof desiredCode === 'string' ? desiredCode : undefined;
+      const passwordParam = typeof desiredPassword === 'string' ? desiredPassword : undefined;
       set({ isConnecting: true, connectionError: null });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
@@ -549,11 +553,13 @@ export const useGameStore = create<GameStore>((set, get) => {
       };
 
       try {
-        const code = await peerManager.createRoom(codeParam);
+        const code = await peerManager.createRoom(codeParam, passwordParam);
         const codeStr = String(code);
-        saveSession({ roomCode: codeStr, playMode: 'host', role: 'p1' });
+        const secret = peerManager.getRoomSecret() || '';
+        saveSession({ roomCode: codeStr, roomSecret: secret, playMode: 'host', role: 'p1' });
         set({
           roomCode: codeStr,
+          roomSecret: secret,
           playMode: 'host',
           myPlayerRole: 'p1',
           isConnecting: false,
@@ -566,8 +572,9 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
     },
 
-    joinRoom: async (code: string) => {
+    joinRoom: async (code: string, password?: string) => {
       const cleanCode = typeof code === 'string' ? code.trim() : '';
+      const cleanPassword = typeof password === 'string' ? password.trim() : '';
       set({ isConnecting: true, connectionError: null });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
@@ -578,10 +585,12 @@ export const useGameStore = create<GameStore>((set, get) => {
       };
 
       try {
-        await peerManager.joinRoom(cleanCode);
-        saveSession({ roomCode: cleanCode, playMode: 'guest', role: 'p2' });
+        await peerManager.joinRoom(cleanCode, cleanPassword);
+        const secret = peerManager.getRoomSecret() || '';
+        saveSession({ roomCode: cleanCode, roomSecret: secret, playMode: 'guest', role: 'p2' });
         set({
           roomCode: cleanCode,
+          roomSecret: secret,
           playMode: 'guest',
           myPlayerRole: 'p2',
           isConnecting: false,
@@ -607,6 +616,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       const curMode = get().playMode;
       set({
         roomCode: null,
+        roomSecret: null,
         isConnected: false,
         isConnecting: false,
         connectionError: null,
@@ -624,10 +634,10 @@ export const useGameStore = create<GameStore>((set, get) => {
         const session = JSON.parse(raw);
         if (session.roomCode && session.playMode) {
           if (session.playMode === 'guest') {
-            await get().joinRoom(session.roomCode);
+            await get().joinRoom(session.roomCode, session.roomSecret || '');
             return true;
           } else if (session.playMode === 'host') {
-            await get().createRoom(session.roomCode);
+            await get().createRoom(session.roomCode, session.roomSecret || undefined);
             return true;
           }
         }
@@ -664,12 +674,14 @@ export const useGameStore = create<GameStore>((set, get) => {
     startNewGame: (p1CharacterId, p2CharacterId, locale) => {
       const { playMode, aiPlayerCount } = get();
       const isSinglePlayer = playMode === 'solo';
+      const seed = randomSeed();
       const newState = initGame({ 
         isSinglePlayer,
         player1CharacterId: p1CharacterId, 
         player2CharacterId: p2CharacterId, 
         locale,
         aiPlayerCount,
+        seed,
       });
       
       const memories: Record<string, AIMemory> = {};
@@ -719,6 +731,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         activeHypothesisVisual: null,
         activeDialogue: null,
         roomCode: null,
+        roomSecret: null,
         isConnected: false,
         isConnecting: false,
         connectionError: null,
