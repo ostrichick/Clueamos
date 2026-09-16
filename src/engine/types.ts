@@ -98,6 +98,8 @@ export interface GameState {
   accessibleRoomIds?: string[];
   logs: LogEntry[];
   winnerId?: string;
+  seed?: number;
+  rngCounter?: number;
 }
 
 export interface HypothesisVisualState {

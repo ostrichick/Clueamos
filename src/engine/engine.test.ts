@@ -208,3 +208,52 @@ describe('Clueamos Core Game Engine', () => {
     expect(result.state.currentPlayerIndex).toBe(1);
   });
 });
+
+describe('결정적 시드 RNG', () => {
+  describe('initGame', () => {
+    it('동일한 seed는 항상 동일한 정답 봉투와 동일한 손패 분배를 만든다', () => {
+      const a = initGame({ seed: 1234, player1CharacterId: 'suspect_scarlett', player2CharacterId: 'suspect_mustard', locale: 'ko' });
+      const b = initGame({ seed: 1234, player1CharacterId: 'suspect_scarlett', player2CharacterId: 'suspect_mustard', locale: 'ko' });
+
+      expect(a.solution).toEqual(b.solution);
+      expect(a.seed).toBe(b.seed);
+      expect(a.rngCounter).toBe(b.rngCounter);
+      for (let i = 0; i < a.players.length; i++) {
+        expect(a.players[i].hand.map(c => c.id)).toEqual(b.players[i].hand.map(c => c.id));
+      }
+    });
+
+    it('seed가 없는 게임은 seed 미지정(rngCounter 0) 상태로 실행된다', () => {
+      const state = initGame();
+      expect(state.seed).toBeUndefined();
+      expect(state.rngCounter).toBe(0);
+    });
+  });
+
+  describe('rollDice', () => {
+    it('같은 seed + 같은 카운터에서 주사위 결과와 도달 가능 방이 재현 가능하다', () => {
+      const a = initGame({ seed: 2024 });
+      const b = initGame({ seed: 2024 });
+
+      const rolledA = rollDice(a);
+      const rolledB = rollDice(b);
+
+      expect(rolledA.diceRolls).toEqual(rolledB.diceRolls);
+      expect(rolledA.currentDiceRoll).toBe(rolledB.currentDiceRoll);
+      expect(rolledA.accessibleRoomIds).toEqual(rolledB.accessibleRoomIds);
+      expect(rolledA.rngCounter).toBe(rolledB.rngCounter);
+    });
+
+    it('rngCounter는 롤마다 증가해 다음 롤 결과가 달라질 수 있다', () => {
+      const a = initGame({ seed: 777 });
+      const rolled1 = rollDice(a);
+      const rolled2 = rollDice({ ...rolled1 });
+      expect(rolled1.rngCounter).toBe(1);
+      expect(rolled2.rngCounter).toBe(2);
+
+      // 같은 카운터를 재사용하면 같은 결과
+      const replay = rollDice({ ...rolled1 });
+      expect(replay.diceRolls).toEqual(rolled2.diceRolls);
+    });
+  });
+});

@@ -1,16 +1,17 @@
 import { 
-  Card, 
-  Player, 
-  Solution, 
-  GameState, 
-  GamePhase,
-  Suggestion, 
-  LogEntry,
-  PlayerRoleType 
+  type Card, 
+  type Player, 
+  type Solution, 
+  type GameState, 
+  type GamePhase,
+  type Suggestion, 
+  type LogEntry,
+  type PlayerRoleType 
 } from './types';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS, LOCATIONS, ALL_CARDS, CHARACTER_PROFILES } from './data';
 import { calculateReachablePaths } from './boardGrid';
-import { translations, SupportedLocale } from '../i18n/translations';
+import { translations, type SupportedLocale } from '../i18n/translations';
+import { type RNG, mulberry32 } from '../utils/rng';
 
 // 비밀 통로 (Clue의 대표 요소: 모서리 방 간 직통 통로!)
 // 서재 <-> 주방, 연회장 <-> 옥상 정원
@@ -21,11 +22,12 @@ export const SECRET_PASSAGES: Record<string, string> = {
   room_rooftop: 'room_ballroom',
 };
 
-// Fisher-Yates 셔플 유틸리티
-export function shuffle<T>(array: T[]): T[] {
+// Fisher-Yates 셔플 유틸리티 (rng 미지정 시 Math.random 사용)
+export function shuffle<T>(array: T[], rng?: RNG): T[] {
+  const rand = rng || Math.random;
   const result = [...array];
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
@@ -41,6 +43,7 @@ export interface InitGameOptions {
   locale?: SupportedLocale;
   maxTurns?: number;
   aiPlayerCount?: number;
+  seed?: number;
 }
 
 /**
@@ -89,11 +92,12 @@ export function initGame(options?: InitGameOptions): GameState {
     p2CharId = p1CharId === 'suspect_mustard' ? 'suspect_scarlett' : 'suspect_mustard';
   }
   const maxTurns = options?.maxTurns || 16;
+  const rng: RNG | undefined = options?.seed !== undefined ? mulberry32(options.seed) : undefined;
 
   // 1. 카테고리별 셔플 (용의자, 장소, 흉기 3대 요소)
-  const shuffledSuspects = shuffle(SUSPECTS);
-  const shuffledLocations = shuffle(LOCATION_CARDS);
-  const shuffledWeapons = shuffle(WEAPONS);
+  const shuffledSuspects = shuffle(SUSPECTS, rng);
+  const shuffledLocations = shuffle(LOCATION_CARDS, rng);
+  const shuffledWeapons = shuffle(WEAPONS, rng);
 
   // 정답 봉투 (비밀 격리 3장)
   const solution: Solution = {
@@ -109,7 +113,7 @@ export function initGame(options?: InitGameOptions): GameState {
     ...shuffledWeapons.slice(1),
   ];
 
-  const shuffledDeck = shuffle(remainingCards);
+  const shuffledDeck = shuffle(remainingCards, rng);
 
   // 2. 플레이어 캐릭터 및 AI 무작위 캐릭터 할당
   const rawPlayers: Omit<Player, 'name'>[] = [];
@@ -145,7 +149,8 @@ export function initGame(options?: InitGameOptions): GameState {
     });
 
     const remainingSuspects = shuffle(
-      SUSPECTS.filter(s => s.id !== p1CharId && s.id !== p2CharId)
+      SUSPECTS.filter(s => s.id !== p1CharId && s.id !== p2CharId),
+      rng
     );
 
     const defaultAiCount = 2;
@@ -174,7 +179,8 @@ export function initGame(options?: InitGameOptions): GameState {
   } else {
     // 1인 싱글 플레이: P1(사람), 그리고 1~5명의 AI 탐정 (기본 1명: 1 player vs 1 AI)
     const remainingSuspects = shuffle(
-      SUSPECTS.filter(s => s.id !== p1CharId)
+      SUSPECTS.filter(s => s.id !== p1CharId),
+      rng
     );
 
     const defaultAiCount = 1;
@@ -231,6 +237,8 @@ export function initGame(options?: InitGameOptions): GameState {
     allCards: ALL_CARDS,
     solution,
     logs: [initialLog],
+    seed: options?.seed,
+    rngCounter: 0,
   };
 }
 
@@ -243,8 +251,11 @@ export const DIE_MAX_VALUE = 3;
  */
 export function rollDice(state: GameState, maxVal: number = DIE_MAX_VALUE): GameState {
   const currentPlayer = state.players[state.currentPlayerIndex];
-  const d1 = Math.floor(Math.random() * maxVal) + 1;
-  const d2 = Math.floor(Math.random() * maxVal) + 1;
+  const nextCounter = (state.rngCounter || 0) + 1;
+  // seed가 지정된 게임은 결정적 주사위 (검증/재생 가능), 아니면 Math.random
+  const rng: RNG | typeof Math.random = state.seed !== undefined ? mulberry32(state.seed + nextCounter) : Math.random;
+  const d1 = Math.floor(rng() * maxVal) + 1;
+  const d2 = Math.floor(rng() * maxVal) + 1;
   const diceValue = d1 + d2;
 
   const { reachableRoomIds } = calculateReachablePaths(currentPlayer.currentRoomId, diceValue);
@@ -264,6 +275,8 @@ export function rollDice(state: GameState, maxVal: number = DIE_MAX_VALUE): Game
     diceRolls: [d1, d2],
     accessibleRoomIds: reachableRoomIds,
     logs: [...state.logs, newLog],
+    seed: state.seed,
+    rngCounter: nextCounter,
   };
 }
 
