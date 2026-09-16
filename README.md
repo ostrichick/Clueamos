@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Clueamos
 
-## Getting Started
+> **문서 역할:** 프로젝트 전체 진입 문서 (사용자/신규 기여자용).
 
-First, run the development server:
+클래식 **Clue(클루)** 보드게임을 기반으로 한 **4인 미스터리 추리 웹게임**. 1920년대 누아르 스타일의 호텔 "Grand Velvet Hotel"을 배경으로, 아내와 둘이 플레이하면서 최대 4명의 공정한 AI 탐정이 함께 사건을 추리합니다.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **2인 구성:** 2명의 인간 플레이어 + 2~4명의 AI 탐정 (AI는 숨겨진 정답을 절대 알지 못함)
+- **플레이 모드:** 솔로(1:1 vs AI) / 로컬 패스앤플레이 / 온라인 멀티플레이(룸 코드 4자리)
+- **PWA 지원:** 모바일에서 앱처럼 설치 가능
+
+## ✨ 주요 기능
+
+- **정통 Clue 룰:** 6 용의자 × 6 장소 × 8 흉기 = 20장 카드 체계, 정답 봉투 비밀 격리
+- **13×13 맨션 보드:** BFS 도달 가능 경로 시각화, 주사위 2개(3D 애니메이션), 비밀 통로(서재⇄주방, 연회장⇄옥상)
+- **AI 탐정 2명의 성격:** 아서(논리 소거형, 확신 시에만 고발) / 블레이크(직감·블러핑형, 과감한 고발)
+- **추리 수첩 & 매트릭스:** 카드별 O/X/? 마킹, 탐정 매트릭스, 사건 일지(필터 지원)
+- **실시간 멀티플레이어:** MQTT 기반 직접 통신, 방 코드로 호스트/게스트 연결
+- **AFK 대리 플레이:** 자리 비움 시 AI가 자동으로 턴 진행 (60초 경고 → 90초 대리 플레이)
+- **사운드 & 햅틱:** Web Audio 절차적 효과음·누아르 BGM(무에셋), 모바일 햅틱 피드백
+- **다국어:** 한국어 / 영어 / 스페인어 원클릭 전환
+
+## 🎮 플레이 방법
+
+1. 로비 화면에서 **플레이 모드**를 선택합니다.
+   - **솔로:** 나(1인) vs AI 탐정 (AI 수 1~5명 커스터마이즈)
+   - **로컬:** 한 기기에서 2인이 번갈아 플레이
+   - **온라인:** 호스트가 방을 만들고 4자리 코드를 상대와 공유
+2. 캐릭터(용의자)를 선택하고 게임을 시작합니다.
+3. 턴이 오면 주사위를 굴려 이동 → 같은 방에 있는 용의자/흉기를 지목하는 **가설(질문)** 제기 → 반증 카드 확인 → 추리 수첩 갱신 → 최종 확신이 서면 **고발**합니다.
+
+## 🛠 기술 스택
+
+| 항목 | 사용 |
+|---|---|
+| 프레임워크 | Next.js 16 (App Router) |
+| UI | React 19, TypeScript, Tailwind CSS v4, lucide-react |
+| 상태 관리 | Zustand 5 |
+| 멀티플레이어 | MQTT (Public EMQX 브로커) |
+| 테스트 | Vitest (엔진 단위 테스트), Playwright |
+| 기타 | PWA, canvas-confetti, Web Audio |
+
+## 📁 프로젝트 구조
+
+```
+src/
+├── app/                  # Next.js App Router (page.tsx, layout, globals.css)
+├── engine/               # 순수 게임 로직 (엔진, 타입, 게임 데이터, AI, 보드 그리드)
+│   ├── engine.ts         # 주사위/이동/가설/반증/고발/턴 전환
+│   ├── ai.ts             # AI 탐정 알고리즘 (아서·블레이크)
+│   ├── boardGrid.ts      # 13×13 보드 그리드 + BFS 경로 탐색
+│   └── types.ts          # 핵심 타입 정의 (GameState, Player, Card, ...)
+├── store/                # Zustand 스토어 (게임 상태, 멀티플레이어, AFK, 세션 복원)
+├── network/              # MQTT 기반 P2P 멀티플레이어 매니저
+├── components/           # UI 컴포넌트 (보드, 로비, 카드, 모달, 수첩, 레이아웃)
+├── hooks/                # 커스텀 훅 (드래그 가능한 모달)
+├── i18n/                 # 다국어 번역 (ko / en / es)
+└── utils/                # 사운드·햅틱 유틸리티
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 시작하기
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+브라우저에서 [http://localhost:3000](http://localhost:3000) 접속.
 
-## Learn More
+## 🧪 테스트 / 빌드 / 린트
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test        # Vitest 엔진 단위 테스트
+npm run lint    # ESLint
+npm run build   # 프로덕션 빌드
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🌐 배포
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+배포 방법은 [`DEPLOY.md`](./DEPLOY.md)를 참고하세요.
 
-## Deploy on Vercel
+## 📚 관련 문서
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| 문서 | 역할 |
+|---|---|
+| [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md) | 게임 기획·룰·기술 원칙 (AI 인수인계용) |
+| [`PROGRESS.md`](./PROGRESS.md) | 진행 현황 및 다음 할 일 (AI 인수인계용) |
+| [`DEPLOY.md`](./DEPLOY.md) | Vercel 배포 가이드 |
+| [`ENGINEERING.md`](./ENGINEERING.md) | AI 코딩 도우미 공통 규칙 (단일 소스) |
+| [`AGENTS.md`](./AGENTS.md) | Next.js 버전 경고 (자동 생성, 수정 금지) |

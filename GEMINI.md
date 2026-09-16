@@ -1,0 +1,5 @@
+﻿# 🥋⚡ Gemini Engineering Rules
+
+> **문서 역할:** Gemini용 규칙. 본 내용은 [`ENGINEERING.md`](./ENGINEERING.md)를 참조합니다.
+
+@ENGINEERING.md
