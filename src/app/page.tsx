@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/store/useGameStore';
-import { HelpCircle, ScrollText, ArrowRight, Flame } from 'lucide-react';
 import { SUSPECTS, WEAPONS } from '@/engine/data';
 import { GameBoard } from '@/components/board/GameBoard';
 import { CardHandTray } from '@/components/cards/CardHandTray';
 import { CardPassModal } from '@/components/cards/CardPassModal';
 import { LobbyScreen } from '@/components/lobby/LobbyScreen';
 import { GameHeader } from '@/components/layout/GameHeader';
-import { DeductionNotebook, NoteMark, MatrixMark } from '@/components/notebook/DeductionNotebook';
+import { DeductionNotebook, type NoteMark, type MatrixMark } from '@/components/notebook/DeductionNotebook';
 import { AccusationModal } from '@/components/modals/AccusationModal';
 import { GameOverModal } from '@/components/modals/GameOverModal';
 import { DisprovePromptModal } from '@/components/modals/DisprovePromptModal';
@@ -19,11 +18,17 @@ import { TurnPhaseStepper } from '@/components/board/TurnPhaseStepper';
 import { TableEmotesBar } from '@/components/board/TableEmotesBar';
 import { AfkWarningModal } from '@/components/modals/AfkWarningModal';
 import { AutoPlayBanner } from '@/components/game/AutoPlayBanner';
+import { AskHypothesisPanel } from '@/components/game/AskHypothesisPanel';
+import { ActionDonePanel } from '@/components/game/ActionDonePanel';
+import { DetectiveRoster } from '@/components/game/DetectiveRoster';
+import { GameLogPanel } from '@/components/game/GameLogPanel';
 import { sounds } from '@/utils/sounds';
-import { translations, SupportedLocale } from '@/i18n/translations';
+import { translations, type SupportedLocale } from '@/i18n/translations';
+import { getInitialLocale, persistLocale } from '@/i18n/locales';
 import { getPlayerDisplayName } from '@/engine/engine';
 import confetti from 'canvas-confetti';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
+import { useAFKMonitor } from '@/hooks/useAFKMonitor';
 
 export default function Home() {
   const {
@@ -48,7 +53,8 @@ export default function Home() {
     joinRoom,
     disconnectRoom,
     restoreSessionIfNeeded,
-    roomCode,
+roomCode,
+    roomSecret,
     isConnected,
     isConnecting,
     connectionError,
@@ -76,8 +82,8 @@ export default function Home() {
     setLocale: setStoreLocale,
   } = useGameStore();
 
-  // 언어 선택 상태: 영어 ('en'), 스페인어 ('es'), 한국어 ('ko')
-  const [locale, setLocaleState] = useState<SupportedLocale>('ko');
+  // 언어 선택 상태: 브라우저/저장된 로케일을 초기값으로 사용
+  const [locale, setLocaleState] = useState<SupportedLocale>(getInitialLocale);
   const t = translations[locale];
 
   useEffect(() => {
@@ -88,6 +94,7 @@ export default function Home() {
 
   const setLocale = (newLoc: SupportedLocale) => {
     setLocaleState(newLoc);
+    persistLocale(newLoc);
     setStoreLocale(newLoc);
   };
 
@@ -106,6 +113,7 @@ export default function Home() {
     return '';
   });
   const [copySuccessToast, setCopySuccessToast] = useState(false);
+  const [inputRoomPassword, setInputRoomPassword] = useState('');
   const [selectedDisproveCard, setSelectedDisproveCard] = useState<string | null>(null);
   const [isPassingCard, setIsPassingCard] = useState(false);
   const [passingToPlayerName, setPassingToPlayerName] = useState<string>('');
@@ -138,9 +146,6 @@ export default function Home() {
   // 메인 로비 나가기 확인 모달 상태
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const exitModalDraggable = useDraggableModal({ isOpen: isExitModalOpen });
-
-  // 수사 일지 카테고리 필터 상태
-  const [logFilter, setLogFilter] = useState<'all' | 'suggestion' | 'disprove' | 'accusation'>('all');
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human';
@@ -224,86 +229,11 @@ export default function Home() {
     }
   }, [isGameStarted, gameState.phase, gameState.currentPlayerIndex, gameState.players, isRollingDice, runAITurnIfNeeded, turnReviewState]);
 
-  // AFK(자리 비움) 감지 타이머 및 대리 플레이 상태
-  const lastActivityTime = useRef<number>(0);
-  const [afkSecondsRemaining, setAfkSecondsRemaining] = useState<number | null>(null);
-
-  // 사용자 인터랙션 감지 (화면 터치, 클릭, 키보드)
-  useEffect(() => {
-    lastActivityTime.current = Date.now();
-    const handleUserActivity = () => {
-      lastActivityTime.current = Date.now();
-    };
-    window.addEventListener('pointerdown', handleUserActivity);
-    window.addEventListener('keydown', handleUserActivity);
-    window.addEventListener('touchstart', handleUserActivity);
-    return () => {
-      window.removeEventListener('pointerdown', handleUserActivity);
-      window.removeEventListener('keydown', handleUserActivity);
-      window.removeEventListener('touchstart', handleUserActivity);
-    };
-  }, []);
-
-  // 턴 전환 시 활동 기준 시간 갱신
-  useEffect(() => {
-    lastActivityTime.current = Date.now();
-  }, [isMyTurn, gameState.currentPlayerIndex, gameState.phase]);
-
-  // AFK 타이머 주기 검사 (매 초마다 비동기 인터벌로 동작)
-  useEffect(() => {
-    if (!isGameStarted || gameState.phase === 'GAME_OVER') {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      // 이미 AI 대리 플레이 중인 경우
-      if (isAutoPlaying) {
-        setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
-
-        // 1. 턴 검토 배너(Notes Ready)가 활성화되어 있는 경우 자동 확인
-        if (turnReviewState && turnReviewState.active) {
-          const isMultiplayer = playMode === 'host' || playMode === 'guest';
-          if (!isMultiplayer || !turnReviewState.readyRoles.includes(myPlayerRole)) {
-            confirmTurnReview();
-            return;
-          }
-        }
-
-        // 2. 내 턴인 경우 단계별 자동 수행 (주사위, 이동, 질문, 턴 종료 등)
-        if (isMyTurn) {
-          executeAutoPlayTurn();
-        }
-        return;
-      }
-
-      // 내 턴이 아닐 때는 경고를 띄우지 않음
-      if (!isMyTurn) {
-        setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
-        return;
-      }
-
-      if (lastActivityTime.current === 0) {
-        lastActivityTime.current = Date.now();
-      }
-
-      const elapsedSec = (Date.now() - lastActivityTime.current) / 1000;
-
-      // 1분(60초) + 30초 = 90초 경과 시 AI 자동 대리 플레이 시작
-      if (elapsedSec >= 90) {
-        setAfkSecondsRemaining(null);
-        setIsAutoPlaying(true);
-        executeAutoPlayTurn();
-      } else if (elapsedSec >= 60) {
-        // 60초 경과 시 30초 카운트다운 팝업 노출
-        const remaining = Math.max(0, Math.ceil(90 - elapsedSec));
-        setAfkSecondsRemaining(remaining);
-      } else {
-        setAfkSecondsRemaining(prev => (prev !== null ? null : prev));
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isGameStarted, gameState.phase, isMyTurn, isAutoPlaying, setIsAutoPlaying, executeAutoPlayTurn, turnReviewState, playMode, myPlayerRole, confirmTurnReview]);
+  // AFK(자리 비움) 감지 - setTimeout 경계 기반 타이머 훅 (60초 경고 -> 90초 자동 대리 플레이)
+  const { afkSecondsRemaining, markActivity, dismissAfkWarning } = useAFKMonitor({
+    gameStarted: isGameStarted,
+    isMyTurn,
+  });
 
   // AI 대리 플레이(AFK) 중 턴 검토 배너(Notes Ready) 자동 확인
   useEffect(() => {
@@ -398,9 +328,8 @@ export default function Home() {
 
   // 직접 조작으로 제어권 되찾기
   const handleResumeControl = () => {
+    markActivity();
     setIsAutoPlaying(false);
-    lastActivityTime.current = Date.now();
-    setAfkSecondsRemaining(null);
 
     // AI 플레이어 턴 중에 제어권을 복구한 경우, 멈추지 않고 AI가 턴을 정상 완수하도록 킥스타트
     const currentP = gameState.players[gameState.currentPlayerIndex];
@@ -413,8 +342,7 @@ export default function Home() {
 
   // AFK 경고 모달 확인 (저 여기 있어요!)
   const handleDismissAfkWarning = () => {
-    lastActivityTime.current = Date.now();
-    setAfkSecondsRemaining(null);
+    dismissAfkWarning();
   };
 
   // 메인 설정 화면으로 나가기 핸들러
@@ -432,17 +360,15 @@ export default function Home() {
     restoreSessionIfNeeded().catch(() => {});
   }, [restoreSessionIfNeeded]);
 
-  // URL 쿼리스트링 `?room=XXXX` 자동 감지 및 자동 접속
+  // URL 쿼리스트링 `?room=XXXX` 감지 시 게스트 모드로 전환 (코드는 state 초기값에서 미리 채움, 비밀번호는 사용자가 입력 후 접속)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const roomParam = params.get('room');
-      if (roomParam && !isConnected && !roomCode) {
-        setPlayMode('guest');
-        joinRoom(roomParam.trim()).catch(() => {});
-      }
+    if (typeof window === 'undefined') return;
+    if (isConnected || roomCode) return;
+    const roomParam = new URLSearchParams(window.location.search).get('room');
+    if (roomParam) {
+      setPlayMode('guest');
     }
-  }, [isConnected, roomCode, joinRoom, setPlayMode]);
+  }, [isConnected, roomCode, setPlayMode]);
 
   // 음향 효과 토글
   const toggleSound = () => {
@@ -498,8 +424,8 @@ export default function Home() {
     createRoom();
   };
 
-  const handleJoinRoom = (code: string) => {
-    joinRoom(code);
+  const handleJoinRoom = (code: string, password: string) => {
+    joinRoom(code, password);
   };
 
   const handleStartGame = () => {
@@ -603,13 +529,6 @@ export default function Home() {
   const getCardName = (id: string) => t.cards[id]?.name || id;
   const getRoomName = (id: string) => t.rooms[id]?.name || id;
 
-  // 수사 일지 필터링 목록
-  const filteredLogs = useMemo(() => {
-    const reversed = gameState.logs.slice().reverse();
-    if (logFilter === 'all') return reversed;
-    return reversed.filter(log => log.type === logFilter);
-  }, [gameState.logs, logFilter]);
-
   // 로비 화면
   if (!isGameStarted) {
     return (
@@ -624,8 +543,11 @@ export default function Home() {
         handleSelectP1={handleSelectP1}
         handleSelectP2={handleSelectP2}
         roomCode={roomCode}
+        roomSecret={roomSecret}
         inputRoomCode={inputRoomCode}
         setInputRoomCode={setInputRoomCode}
+        inputRoomPassword={inputRoomPassword}
+        setInputRoomPassword={setInputRoomPassword}
         isConnecting={isConnecting}
         isConnected={isConnected}
         connectionError={connectionError}
@@ -758,143 +680,27 @@ export default function Home() {
         <div className="xl:col-start-8 xl:col-span-5 xl:row-start-1 xl:row-span-2 flex flex-col gap-4 order-2">
           {/* 1. 플레이어 질문 작성 패널 (내 차례일 때 수첩 바로 위에 노출) */}
           {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_SUGGEST' && (
-            <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/95 to-amber-950/40 border-2 border-amber-500/60 rounded-2xl p-4 sm:p-5 flex flex-col gap-3.5 shadow-xl shadow-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center justify-between border-b border-amber-500/20 pb-2.5">
-                <div className="text-xs font-bold text-amber-400 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                  <HelpCircle className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm font-extrabold text-amber-300">{t.askHypothesis}</span>
-                </div>
-                <div className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold font-mono">
-                  📍 {t.currentRoom}: {getRoomName(currentPlayer.currentRoomId)}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
-                    <span>{t.selectSuspect}</span>
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      {getEffectiveCardStatus(activeSuspect).label}
-                    </span>
-                  </label>
-                  <select 
-                    value={activeSuspect} 
-                    onChange={e => setSelectedSuspect(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl p-2.5 text-slate-100 font-medium transition-colors cursor-pointer"
-                  >
-                    {SUSPECTS.map(s => {
-                      const status = getEffectiveCardStatus(s.id);
-                      return (
-                        <option key={s.id} value={s.id}>
-                          {getCardName(s.id)}{status.tag}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
-                    <span>{t.selectWeapon}</span>
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      {getEffectiveCardStatus(activeWeapon).label}
-                    </span>
-                  </label>
-                  <select 
-                    value={activeWeapon} 
-                    onChange={e => setSelectedWeapon(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl p-2.5 text-slate-100 font-medium transition-colors cursor-pointer"
-                  >
-                    {WEAPONS.map(w => {
-                      const status = getEffectiveCardStatus(w.id);
-                      return (
-                        <option key={w.id} value={w.id}>
-                          {getCardName(w.id)}{status.tag}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
-
-              {/* 빠른 후보 칩 (아직 배제되지 않은 미확인/미작성 후보들 원터치 선택) */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider mr-1">미확인 후보:</span>
-                {SUSPECTS.filter(s => getEffectiveCardStatus(s.id).mark !== 'NO').slice(0, 3).map(s => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSelectedSuspect(s.id)}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
-                      activeSuspect === s.id 
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
-                        : 'bg-slate-800/80 text-amber-200/90 border-slate-700 hover:bg-slate-700'
-                    }`}
-                  >
-                    {getCardName(s.id)}
-                  </button>
-                ))}
-                {WEAPONS.filter(w => getEffectiveCardStatus(w.id).mark !== 'NO').slice(0, 3).map(w => (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => setSelectedWeapon(w.id)}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
-                      activeWeapon === w.id 
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
-                        : 'bg-slate-800/80 text-amber-200/90 border-slate-700 hover:bg-slate-700'
-                    }`}
-                  >
-                    {getCardName(w.id)}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex gap-2 justify-end mt-1 pt-2 border-t border-slate-800/80">
-                <button
-                  onClick={handleSuggestion}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95"
-                >
-                  <span>{t.askQuestionBtn}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <AskHypothesisPanel
+              t={t}
+              currentRoomName={getRoomName(currentPlayer.currentRoomId)}
+              getCardName={getCardName}
+              getEffectiveCardStatus={getEffectiveCardStatus}
+              selectedSuspect={selectedSuspect}
+              onSelectSuspect={setSelectedSuspect}
+              selectedWeapon={selectedWeapon}
+              onSelectWeapon={setSelectedWeapon}
+              onSuggest={handleSuggestion}
+            />
           )}
 
           {/* 2. 플레이어 행동 완료 후 턴 넘기기 vs 최종 고발 결정 패널 (내 차례일 때 수첩 바로 위에 노출) */}
           {isHumanTurn && isMyTurn && gameState.phase === 'PLAYING_ACTION_DONE' && (
-            <div className="bg-gradient-to-r from-slate-900/95 via-slate-850 to-slate-900/95 border-2 border-amber-500/60 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex flex-col gap-1">
-                <div className="text-sm font-extrabold text-amber-300 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {t.actionDoneTitle}
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed max-w-md">
-                  {t.actionDoneDesc}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                <button
-                  onClick={performEndTurn}
-                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer active:scale-95"
-                >
-                  <span>{t.endTurnBtn}</span>
-                </button>
-
-                {!currentPlayer.isEliminated && (
-                  <button
-                    onClick={() => setIsAccuseModalOpen(true)}
-                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-rose-900/40 cursor-pointer active:scale-95 ring-1 ring-rose-400/50"
-                  >
-                    <Flame className="w-4 h-4 text-rose-200" />
-                    <span>{t.makeAccusationBtn}</span>
-                  </button>
-                )}
-              </div>
-            </div>
+            <ActionDonePanel
+              t={t}
+              isEliminated={currentPlayer.isEliminated}
+              onEndTurn={performEndTurn}
+              onOpenAccuse={() => setIsAccuseModalOpen(true)}
+            />
           )}
 
           {/* 3. 사건 추리 수첩 (항상 상시 노출) */}
@@ -934,91 +740,15 @@ export default function Home() {
         <div className="xl:col-start-1 xl:col-span-7 xl:row-start-2 flex flex-col gap-4 order-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* 탐정 현황 (Detectives Roster) */}
-            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-md">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.detectivesListTitle}</h3>
-              <div className="flex flex-col gap-2">
-                {gameState.players.map((p, idx) => (
-                  <div 
-                    key={p.id}
-                    className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                      idx === gameState.currentPlayerIndex
-                        ? 'border-amber-500/60 bg-amber-500/10'
-                        : 'border-slate-800 bg-slate-900/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{p.avatar}</span>
-                      <span className="font-semibold text-slate-200">{getPlayerDisplayName(p, locale)}</span>
-                    </div>
-                    {p.isEliminated ? (
-                      <span className="text-[10px] text-rose-400 font-bold">{t.eliminated}</span>
-                    ) : (
-                      <span className="text-[11px] text-slate-500">
-                        {p.hand.length} {t.cardsCount}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <DetectiveRoster
+              t={t}
+              players={gameState.players}
+              currentPlayerIndex={gameState.currentPlayerIndex}
+              getPlayerName={p => getPlayerDisplayName(p, locale)}
+            />
 
             {/* 사건 수사 일지 (Live Activity Log) */}
-            <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 flex-1 min-h-[260px] shadow-md">
-              <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-800/60 pb-2">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-                  {t.liveLogTitle}
-                </h3>
-                {/* 로그 카테고리 필터 탭 */}
-                <div className="flex items-center gap-1 bg-slate-950/60 p-0.5 rounded-lg border border-slate-800/80">
-                  {(['all', 'suggestion', 'disprove', 'accusation'] as const).map(filterKey => {
-                    const label = filterKey === 'all' ? t.logFilterAll
-                      : filterKey === 'suggestion' ? t.logFilterSuggestion
-                      : filterKey === 'disprove' ? t.logFilterDisprove
-                      : t.logFilterAccusation;
-                    const isActive = logFilter === filterKey;
-                    return (
-                      <button
-                        key={filterKey}
-                        onClick={() => setLogFilter(filterKey)}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all ${
-                          isActive
-                            ? 'bg-amber-500/25 text-amber-300 font-bold border border-amber-500/40 shadow-sm'
-                            : 'text-slate-400 hover:text-slate-200 border border-transparent'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto max-h-[300px] flex flex-col gap-2 pr-1 text-xs">
-                {filteredLogs.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600 text-xs italic">
-                    -
-                  </div>
-                ) : (
-                  filteredLogs.map(log => (
-                    <div 
-                      key={log.id} 
-                      className={`p-2.5 rounded-lg border leading-relaxed ${
-                        log.type === 'accusation'
-                          ? 'border-rose-500/50 bg-rose-950/20 text-rose-200'
-                          : log.type === 'disprove'
-                            ? 'border-indigo-500/40 bg-indigo-950/20 text-indigo-200'
-                            : log.type === 'suggestion'
-                              ? 'border-amber-500/30 bg-amber-950/10 text-amber-200/90'
-                              : 'border-slate-800 bg-slate-900/50 text-slate-300'
-                      }`}
-                    >
-                      <span className="text-[10px] text-slate-500 block">{t.round} {log.turn}</span>
-                      {log.message}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <GameLogPanel t={t} logs={gameState.logs} />
           </div>
         </div>
 
