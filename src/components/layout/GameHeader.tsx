@@ -10,9 +10,9 @@ import {
   RotateCcw,
   LogOut 
 } from 'lucide-react';
-import { Player } from '@/engine/types';
-import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
-import { PlayMode } from '@/store/useGameStore';
+import { type Player } from '@/engine/types';
+import { type SupportedLocale, type TranslationStrings } from '@/i18n/translations';
+import { type PlayMode } from '@/store/useGameStore';
 import { getPlayerDisplayName } from '@/engine/engine';
 
 interface GameHeaderProps {

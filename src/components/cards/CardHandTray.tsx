@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Card } from '@/engine/types';
+import { type Card } from '@/engine/types';
 import { ClueCard } from './ClueCard';
 import { Eye, EyeOff, Layers, ArrowUpDown, ScrollText } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 
 export interface CardHandTrayProps {
   cards: Card[];

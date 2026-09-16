@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { BookOpenCheck, CheckCircle2, Clock, Sparkles } from 'lucide-react';
-import { TranslationStrings } from '@/i18n/translations';
-import { TurnReviewState, PlayMode, PlayerRole } from '@/store/useGameStore';
+import { type TranslationStrings } from '@/i18n/translations';
+import { type TurnReviewState, type PlayMode, type PlayerRole } from '@/store/useGameStore';
 
 interface TurnReviewBannerProps {
   review: TurnReviewState | null;

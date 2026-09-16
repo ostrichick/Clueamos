@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 
 interface OnBoardDiceOverlayProps {
   isRolling: boolean;

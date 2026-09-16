@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Eye } from 'lucide-react';
 import { SUSPECTS, LOCATIONS, WEAPONS } from '@/engine/data';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 interface AccusationModalProps {

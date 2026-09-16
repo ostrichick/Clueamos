@@ -7,17 +7,17 @@ import {
   generateBoardGrid, 
   calculateReachablePaths, 
   findShortestCorridorPath,
-  BoardCell 
+  type BoardCell 
 } from '@/engine/boardGrid';
 import { SECRET_PASSAGES, getPlayerDisplayName } from '@/engine/engine';
-import { Player } from '@/engine/types';
-import { TranslationStrings, SupportedLocale } from '@/i18n/translations';
+import { type Player } from '@/engine/types';
+import { type TranslationStrings, type SupportedLocale } from '@/i18n/translations';
 import { Sparkles, Dices, ArrowRight, X, ShieldAlert } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
 import { haptics } from '@/utils/haptics';
 import { OnBoardDiceOverlay } from './OnBoardDiceOverlay';
 import { OnBoardActionOverlay } from './OnBoardActionOverlay';
-import { TurnReviewState, PlayerRole, PlayMode } from '@/store/useGameStore';
+import { type TurnReviewState, type PlayerRole, type PlayMode } from '@/store/useGameStore';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 const WEAPON_ICONS: Record<string, string> = {

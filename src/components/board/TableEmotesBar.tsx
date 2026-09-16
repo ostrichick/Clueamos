@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ActiveEmote } from '@/store/useGameStore';
-import { TranslationStrings } from '@/i18n/translations';
+import { type ActiveEmote } from '@/store/useGameStore';
+import { type TranslationStrings } from '@/i18n/translations';
 
 interface TableEmotesBarProps {
   activeEmote: ActiveEmote | null;

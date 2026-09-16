@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { HypothesisVisualState } from '@/engine/types';
-import { TranslationStrings } from '@/i18n/translations';
+import { type HypothesisVisualState } from '@/engine/types';
+import { type TranslationStrings } from '@/i18n/translations';
 import { ClueCard } from '@/components/cards/ClueCard';
 import { sounds } from '@/utils/sounds';
 import { ShieldCheck, HelpCircle, AlertTriangle, ArrowRight, BookMarked, X } from 'lucide-react';

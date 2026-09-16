@@ -24,10 +24,10 @@ import {
   recordUndisprovenSuggestion,
   recordObservedDisprove,
   shouldAIAccuse,
-  AIMemory
+  type AIMemory
 } from '../src/engine/ai';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS } from '../src/engine/data';
-import { GameState, Suggestion } from '../src/engine/types';
+import { type GameState, type Suggestion } from '../src/engine/types';
 
 interface HumanDetectiveBrain {
   playerId: string;

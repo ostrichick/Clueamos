@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 interface AfkWarningModalProps {

@@ -11,8 +11,8 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import { TranslationStrings } from '@/i18n/translations';
-import { TurnReviewState, PlayMode, PlayerRole } from '@/store/useGameStore';
+import { type TranslationStrings } from '@/i18n/translations';
+import { type TurnReviewState, type PlayMode, type PlayerRole } from '@/store/useGameStore';
 import { sounds } from '@/utils/sounds';
 
 export interface OnBoardActionOverlayProps {

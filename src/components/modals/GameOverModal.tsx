@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { Sparkles, ScrollText, ChevronUp, ChevronDown } from 'lucide-react';
-import { Solution, Player, LogEntry, GamePhase } from '@/engine/types';
-import { SupportedLocale, TranslationStrings } from '@/i18n/translations';
+import { type Solution, type Player, type LogEntry, type GamePhase } from '@/engine/types';
+import { type SupportedLocale, type TranslationStrings } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 

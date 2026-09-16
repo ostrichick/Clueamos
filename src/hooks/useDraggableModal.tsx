@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, CSSProperties } from 'react';
+import React, { useState, useRef, useCallback, type CSSProperties } from 'react';
 
 interface Position {
   x: number;

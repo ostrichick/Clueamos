@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { Eye, ArrowRight } from 'lucide-react';
-import { Card } from '@/engine/types';
+import { type Card } from '@/engine/types';
 import { ClueCard } from '@/components/cards/ClueCard';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 import { sounds } from '@/utils/sounds';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 

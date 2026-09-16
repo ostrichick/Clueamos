@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Bot, Gamepad2 } from 'lucide-react';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 
 interface AutoPlayBannerProps {
   isActive: boolean;

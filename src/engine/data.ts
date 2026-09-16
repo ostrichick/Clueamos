@@ -1,4 +1,4 @@
-import { Card, Room } from './types';
+import { type Card, type Room } from './types';
 
 // 1. 용의자 6명 (색깔에서 이름을 따오고, 이름 옆에 해당 색깔 이모지 부여)
 export const SUSPECTS: Card[] = [

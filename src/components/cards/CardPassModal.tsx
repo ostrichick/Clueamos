@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card } from '@/engine/types';
+import { type Card } from '@/engine/types';
 import { ClueCard } from './ClueCard';
 import { Sparkles, CheckCheck, X } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
-import { TranslationStrings } from '@/i18n/translations';
+import { type TranslationStrings } from '@/i18n/translations';
 import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 
 export interface CardPassModalProps {

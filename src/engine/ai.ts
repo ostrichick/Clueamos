@@ -1,4 +1,4 @@
-import { Card, GameState, Player, Suggestion, Solution } from './types';
+import { type Card, type GameState, type Player, type Suggestion, type Solution } from './types';
 import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
 
 export type DeductionMark = 'UNKNOWN' | 'POSSIBLE' | 'IMPOSSIBLE' | 'CONFIRMED';
