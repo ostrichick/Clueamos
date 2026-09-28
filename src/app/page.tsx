@@ -801,8 +801,10 @@ roomCode,
         solution={gameState.solution}
         players={gameState.players}
         logs={gameState.logs}
+        turnCount={gameState.turnCount}
         t={t}
         locale={locale}
+        trackedPlayerId={playMode === 'local' ? undefined : myPlayer?.id}
         getCardName={getCardName}
         getRoomName={getRoomName}
         onPlayAgain={() => {
