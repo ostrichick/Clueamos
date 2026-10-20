@@ -265,6 +265,7 @@ export function calculateReachablePaths(
     [1, 0],
     [-1, 0],
   ];
+  const rooms = Object.values(BOARD_ROOMS);
 
   // Map of all doors of other rooms
   const otherRoomDoors = new Map<string, string>(); // `${r},${c}` -> roomId
@@ -316,7 +317,7 @@ export function calculateReachablePaths(
           // Can only walk on corridor tiles
           // (Not in rooms, not in center)
           let inAnyRoom = false;
-          for (const room of Object.values(BOARD_ROOMS)) {
+          for (const room of rooms) {
             if (
               nr >= room.rowRange[0] &&
               nr <= room.rowRange[1] &&
