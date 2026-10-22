@@ -321,15 +321,30 @@ export function makeSuggestion(
   state: GameState, 
   suggestion: Omit<Suggestion, 'askerId'>
 ): GameState {
+  if (state.phase !== 'PLAYING_SUGGEST') {
+    throw new Error('Cannot make a suggestion during this phase.');
+  }
+
   const asker = state.players[state.currentPlayerIndex];
+  if (suggestion.locationId !== asker.currentRoomId) {
+    throw new Error('Suggestions must use the current room.');
+  }
+
+  const suspectCard = state.allCards.find(c => c.id === suggestion.suspectId && c.category === 'suspect');
+  const locationCard = state.allCards.find(c => c.id === suggestion.locationId && c.category === 'location');
+  const weaponCard = state.allCards.find(c => c.id === suggestion.weaponId && c.category === 'weapon');
+  if (!suspectCard || !locationCard || !weaponCard) {
+    throw new Error('Suggestion contains an invalid card.');
+  }
+
   const fullSuggestion: Suggestion = {
     ...suggestion,
     askerId: asker.id,
   };
 
-  const suspect = state.allCards.find(c => c.id === suggestion.suspectId)?.name;
-  const location = state.allCards.find(c => c.id === suggestion.locationId)?.name;
-  const weapon = state.allCards.find(c => c.id === suggestion.weaponId)?.name;
+  const suspect = suspectCard.name;
+  const location = locationCard.name;
+  const weapon = weaponCard.name;
 
   const newLog: LogEntry = {
     id: `log_${Date.now()}_sugg`,
@@ -439,12 +454,29 @@ export function resolveDisprove(
   responderId: string, 
   shownCardId?: string
 ): GameState {
-  const responder = state.players.find(p => p.id === responderId);
+  if (state.phase !== 'WAITING_DISPROVE' || !state.currentSuggestion) {
+    throw new Error('No suggestion is awaiting disproof.');
+  }
+
   const asker = state.players[state.currentPlayerIndex];
+  const suggestion = state.currentSuggestion;
+  if (suggestion.askerId !== asker.id) {
+    throw new Error('Suggestion asker does not match the current player.');
+  }
+
+  const firstDisprover = findNextDisprovingPlayer(state.players, state.currentPlayerIndex, suggestion);
+  const responder = firstDisprover ? state.players[firstDisprover.playerIndex] : undefined;
+  if (responder) {
+    if (responder.id !== responderId || !shownCardId || !firstDisprover!.availableCards.some(c => c.id === shownCardId)) {
+      throw new Error('Invalid disproof responder or shown card.');
+    }
+  } else if (responderId !== 'none' || shownCardId !== undefined) {
+    throw new Error('No player can disprove this suggestion.');
+  }
   
   let newLog: LogEntry;
 
-  if (shownCardId && responder) {
+  if (responder && shownCardId) {
     newLog = {
       id: `log_${Date.now()}_disprove`,
       turn: state.turnCount,
@@ -455,9 +487,9 @@ export function resolveDisprove(
         askerId: asker.id,
         responderId: responder.id,
         shownCardId,
-        suspectId: state.currentSuggestion?.suspectId,
-        locationId: state.currentSuggestion?.locationId,
-        weaponId: state.currentSuggestion?.weaponId,
+        suspectId: suggestion.suspectId,
+        locationId: suggestion.locationId,
+        weaponId: suggestion.weaponId,
       },
     };
   } else {
@@ -470,9 +502,9 @@ export function resolveDisprove(
       metadata: {
         askerId: asker.id,
         responderId: 'none',
-        suspectId: state.currentSuggestion?.suspectId,
-        locationId: state.currentSuggestion?.locationId,
-        weaponId: state.currentSuggestion?.weaponId,
+        suspectId: suggestion.suspectId,
+        locationId: suggestion.locationId,
+        weaponId: suggestion.weaponId,
       },
     };
   }

@@ -74,21 +74,21 @@ export function getRemainingCandidates(memory: AIMemory, category: 'suspect' | '
 
 /**
  * 가설 제기 시 아무도 반증하지 못했을 때(Nobody could disprove)
- * -> 질문자 본인이거나 질문자가 블러핑하지 않는 논리형 AI(아서)인 경우 100% CONFIRMED!
- * -> 블러핑 가능성이 있는 상대(블레이크, 인간 플레이어)인 경우 낚시성 오인 탈락 방지를 위해 POSSIBLE 처리
+ * -> 질문자 본인은 자기 손패를 알기 때문에 손패에 없는 질문 카드만 확정 가능
+ * -> 다른 플레이어의 질문은 AI 유형과 관계없이 질문자 손패를 모르므로 POSSIBLE 처리
  */
 export function recordUndisprovenSuggestion(
   memory: AIMemory,
   suggestion: Suggestion,
   myHand: Card[],
-  askerType?: Player['type']
+  _askerType?: Player['type']
 ): void {
+  // 호출자와의 인자 호환성만 유지하며, 질문자의 유형으로 확신도를 높이지 않는다.
+  void _askerType;
   const myHandIds = new Set(myHand.map(c => c.id));
   const isMeTheAsker = memory.playerId === suggestion.askerId;
-  const isNonBluffingAsker = askerType === 'ai_logic';
-  const canConfirmAbsolute = isMeTheAsker || isNonBluffingAsker;
 
-  if (canConfirmAbsolute) {
+  if (isMeTheAsker) {
     // 1. 용의자: 내 손패에 없다면 정답 봉투에 있는 진범 확정!
     if (!myHandIds.has(suggestion.suspectId)) {
       memory.cardStatus.set(suggestion.suspectId, 'CONFIRMED');
@@ -119,15 +119,14 @@ export function recordUndisprovenSuggestion(
       });
     }
   } else {
-    // 질문자가 블러핑(손패 카드를 섞어 질문)했을 가능성이 있으므로,
-    // 다른 사람들에게 없다는 것은 확실하나 성급히 모든 타 후보를 IMPOSSIBLE 처리하지 않음
-    if (!myHandIds.has(suggestion.suspectId) && memory.cardStatus.get(suggestion.suspectId) !== 'IMPOSSIBLE') {
+    // 질문자 손패에 해당 카드가 있을 수 있으므로 다른 후보를 제거할 수 없음
+    if (!myHandIds.has(suggestion.suspectId) && memory.cardStatus.get(suggestion.suspectId) === 'UNKNOWN') {
       memory.cardStatus.set(suggestion.suspectId, 'POSSIBLE');
     }
-    if (!myHandIds.has(suggestion.locationId) && memory.cardStatus.get(suggestion.locationId) !== 'IMPOSSIBLE') {
+    if (!myHandIds.has(suggestion.locationId) && memory.cardStatus.get(suggestion.locationId) === 'UNKNOWN') {
       memory.cardStatus.set(suggestion.locationId, 'POSSIBLE');
     }
-    if (!myHandIds.has(suggestion.weaponId) && memory.cardStatus.get(suggestion.weaponId) !== 'IMPOSSIBLE') {
+    if (!myHandIds.has(suggestion.weaponId) && memory.cardStatus.get(suggestion.weaponId) === 'UNKNOWN') {
       memory.cardStatus.set(suggestion.weaponId, 'POSSIBLE');
     }
   }
@@ -192,10 +191,12 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
     };
   }
 
-  // 이동할 방 결정: 주사위로 도달 가능한 방(state.accessibleRoomIds) 중 미지의 방 선호
-  const accessible = (state.accessibleRoomIds && state.accessibleRoomIds.length > 0)
-    ? state.accessibleRoomIds
-    : [me.currentRoomId];
+  // 이미 방에 도착해 질문할 차례라면 반드시 현재 방으로 질문
+  const accessible = state.phase === 'PLAYING_SUGGEST'
+    ? [me.currentRoomId]
+    : state.accessibleRoomIds?.length
+      ? state.accessibleRoomIds
+      : [me.currentRoomId];
 
   // 도달 가능한 방 중 아직 용의선상에 있는 방 우선 선택
   const targetRoomId = accessible.find(roomId => 
@@ -264,10 +265,12 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
     };
   }
 
-  // 이동 결정 (도달 가능한 방 중 선택)
-  const accessible = (state.accessibleRoomIds && state.accessibleRoomIds.length > 0)
-    ? state.accessibleRoomIds
-    : [me.currentRoomId];
+  // 이미 이동을 마쳤다면 선택지는 현재 방 하나뿐
+  const accessible = state.phase === 'PLAYING_SUGGEST'
+    ? [me.currentRoomId]
+    : state.accessibleRoomIds?.length
+      ? state.accessibleRoomIds
+      : [me.currentRoomId];
   const targetRoomId = accessible[Math.floor(Math.random() * accessible.length)] || me.currentRoomId;
 
   // 블러핑 기법: 25% 확률로 자신의 손패에 있는 카드를 질문에 섞음

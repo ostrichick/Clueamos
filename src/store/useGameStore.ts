@@ -24,6 +24,7 @@ import {
 import { type SupportedLocale, translations } from '@/i18n/translations';
 import { randomSeed } from '@/utils/rng';
 import { peerManager, type PeerMessage } from '@/network/peerManager';
+import { guestView } from '@/network/guestView';
 import { sounds } from '@/utils/sounds';
 
 export type PlayMode = 'solo' | 'local' | 'host' | 'guest';
@@ -65,6 +66,7 @@ export const INITIAL_ROOM_WEAPONS: Record<string, string[]> = {
 };
 
 const SESSION_KEY = 'clueamos_session_v1';
+const HOST_STATE_KEY = 'clueamos_host_game_v1';
 
 function saveSession(data: { roomCode: string; roomSecret: string; playMode: PlayMode; role: PlayerRole }) {
   if (typeof window !== 'undefined') {
@@ -78,8 +80,28 @@ function clearSession() {
   if (typeof window !== 'undefined') {
     try {
       sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(HOST_STATE_KEY);
     } catch {}
   }
+}
+
+type SavedAIMemory = {
+  playerId: string;
+  cardStatus: [string, string][];
+  knownPlayerCards: [string, string[]][];
+  pastSuggestions: Suggestion[];
+};
+
+function readHostSnapshot(): {
+  gameState: GameState;
+  roomWeapons: Record<string, string[]>;
+  turnReviewState: TurnReviewState | null;
+  aiMemories: Record<string, SavedAIMemory>;
+} | null {
+  try {
+    const raw = sessionStorage.getItem(HOST_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
 interface GameStore {
@@ -156,12 +178,31 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
+  const sendGuestState = (type: 'START_GAME' | 'STATE_SYNC', state: GameState, weapons = get().roomWeapons) => {
+    peerManager.sendMessage({ type, payload: { gameState: guestView(state), roomWeapons: weapons } });
+  };
+
+  const guestTurn = (phase?: GameState['phase']) => {
+    const { gameState, turnReviewState } = get();
+    const actor = gameState.players[gameState.currentPlayerIndex];
+    return actor?.roleType === 'p2' && actor.type === 'human' && !actor.isEliminated &&
+      !turnReviewState?.active && (phase === undefined || gameState.phase === phase);
+  };
+
+  const guestDisprover = () => {
+    const { gameState } = get();
+    if (gameState.phase !== 'WAITING_DISPROVE' || !gameState.currentSuggestion) return false;
+    const next = findNextDisprovingPlayer(gameState.players, gameState.currentPlayerIndex, gameState.currentSuggestion);
+    return Boolean(next && gameState.players[next.playerIndex].roleType === 'p2');
+  };
+
   // Setup peer message handler
   const handleIncomingPeerMessage = (msg: PeerMessage) => {
     const { playMode } = get();
 
     switch (msg.type) {
       case 'LOBBY_UPDATE': {
+        if (playMode !== 'guest') break;
         if (msg.payload?.p1Character) {
           set({ hostSelectedCharacter: msg.payload.p1Character as string });
         }
@@ -175,7 +216,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       case 'GUEST_SELECT_CHAR': {
-        if (playMode === 'host' && msg.payload?.characterId) {
+        if (playMode === 'host' && get().gameState.phase === 'LOBBY' && msg.payload?.characterId) {
           set({ guestSelectedCharacter: msg.payload.characterId as string });
           // Broadcast back to guest
           peerManager.sendMessage({
@@ -186,6 +227,30 @@ export const useGameStore = create<GameStore>((set, get) => {
               aiCount: get().aiPlayerCount,
             },
           });
+        }
+        break;
+      }
+
+      case 'GUEST_JOIN': {
+        if (playMode === 'host') {
+          const { gameState, roomWeapons, turnReviewState } = get();
+          if (gameState.phase !== 'LOBBY') {
+            sendGuestState('START_GAME', gameState, roomWeapons);
+            if (turnReviewState?.active) {
+              peerManager.sendMessage({ type: 'TURN_REVIEW_UPDATE', payload: { turnReview: turnReviewState as unknown as Record<string, unknown> } });
+            }
+            if (gameState.phase === 'WAITING_DISPROVE' && gameState.currentSuggestion) {
+              const next = findNextDisprovingPlayer(gameState.players, gameState.currentPlayerIndex, gameState.currentSuggestion);
+              if (next && gameState.players[next.playerIndex].roleType === 'p2') {
+                peerManager.sendMessage({ type: 'DISPROVE_REQUEST', payload: { availableCards: next.availableCards, askerId: gameState.currentSuggestion.askerId } });
+              }
+            }
+          } else {
+            peerManager.sendMessage({
+              type: 'LOBBY_UPDATE',
+              payload: { p1Character: get().hostSelectedCharacter || 'suspect_scarlett', p2Character: get().guestSelectedCharacter || 'suspect_mustard', aiCount: get().aiPlayerCount },
+            });
+          }
         }
         break;
       }
@@ -215,49 +280,58 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // Guest requests an action to Host
       case 'ACTION_ROLL': {
-        if (playMode === 'host') {
+        if (playMode === 'host' && guestTurn('PLAYING_ROLL') && !get().isRollingDice) {
           get().performRollDice();
         }
         break;
       }
 
       case 'ACTION_MOVE': {
-        if (playMode === 'host' && msg.payload?.roomId) {
+        if (playMode === 'host' && guestTurn('PLAYING_MOVE') && typeof msg.payload?.roomId === 'string' &&
+            get().gameState.accessibleRoomIds?.includes(msg.payload.roomId)) {
           get().performMove(msg.payload.roomId as string);
         }
         break;
       }
 
       case 'ACTION_SUGGEST': {
-        if (playMode === 'host' && msg.payload?.suggestion) {
-          get().performSuggestion(msg.payload.suggestion as Omit<Suggestion, 'askerId'>);
+        const s = msg.payload?.suggestion as Partial<Suggestion> | undefined;
+        if (playMode === 'host' && guestTurn('PLAYING_SUGGEST') && s &&
+            typeof s.suspectId === 'string' && typeof s.locationId === 'string' && typeof s.weaponId === 'string' &&
+            s.locationId === get().gameState.players[get().gameState.currentPlayerIndex].currentRoomId) {
+          get().performSuggestion(s as Omit<Suggestion, 'askerId'>);
         }
         break;
       }
 
       case 'ACTION_DISPROVE': {
-        if (playMode === 'host') {
+        if (playMode === 'host' && guestDisprover() && typeof msg.payload?.cardId === 'string') {
           get().performDisprove(msg.payload?.cardId as string | undefined);
         }
         break;
       }
 
       case 'ACTION_ACCUSE': {
-        if (playMode === 'host' && msg.payload?.accusation) {
-          get().performAccusation(msg.payload.accusation as Solution);
+        const a = msg.payload?.accusation as Partial<Solution> | undefined;
+        if (playMode === 'host' && guestTurn() && get().gameState.phase.startsWith('PLAYING_') && a &&
+            typeof a.suspectId === 'string' && typeof a.locationId === 'string' && typeof a.weaponId === 'string' &&
+            get().gameState.allCards.some(c => c.category === 'suspect' && c.id === a.suspectId) &&
+            get().gameState.allCards.some(c => c.category === 'location' && c.id === a.locationId) &&
+            get().gameState.allCards.some(c => c.category === 'weapon' && c.id === a.weaponId)) {
+          get().performAccusation(a as Solution);
         }
         break;
       }
 
       case 'ACTION_WAIT_HALLWAY': {
-        if (playMode === 'host') {
+        if (playMode === 'host' && guestTurn('PLAYING_MOVE')) {
           get().performWaitInHallway();
         }
         break;
       }
 
       case 'ACTION_END_TURN': {
-        if (playMode === 'host') {
+        if (playMode === 'host' && guestTurn('PLAYING_ACTION_DONE')) {
           get().performEndTurn();
         }
         break;
@@ -283,7 +357,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // Private Clue revealed to the asker
       case 'PRIVATE_CLUE_REVEALED': {
-        if (msg.payload?.card && msg.payload?.fromName) {
+        if (playMode === 'guest' && msg.payload?.card && msg.payload?.fromName) {
           set({
             lastSecretClue: {
               card: msg.payload.card as Card,
@@ -324,20 +398,20 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       case 'HYPOTHESIS_VISUAL': {
-        set({ activeHypothesisVisual: (msg.payload?.visual as HypothesisVisualState) || null });
+        if (playMode === 'guest') set({ activeHypothesisVisual: (msg.payload?.visual as HypothesisVisualState) || null });
         break;
       }
 
       case 'TURN_REVIEW_UPDATE': {
-        set({ turnReviewState: (msg.payload?.turnReview as unknown as TurnReviewState) || null });
+        if (playMode === 'guest') set({ turnReviewState: (msg.payload?.turnReview as unknown as TurnReviewState) || null });
         break;
       }
 
       case 'TURN_REVIEW_CONFIRM': {
         if (playMode === 'host') {
           const { turnReviewState } = get();
-          if (turnReviewState) {
-            const incomingRole = (msg.payload?.role as PlayerRole) || 'p2';
+          if (turnReviewState?.active && msg.payload?.role === 'p2' && msg.payload?.turnNumber === turnReviewState.turnNumber) {
+            const incomingRole: PlayerRole = 'p2';
             const updatedRoles = Array.from(new Set([...turnReviewState.readyRoles, incomingRole]));
             if (updatedRoles.includes('p1') && updatedRoles.includes('p2')) {
               get().proceedToNextTurn();
@@ -531,7 +605,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     createRoom: async (desiredCode?: string, desiredPassword?: string) => {
       const codeParam = typeof desiredCode === 'string' ? desiredCode : undefined;
       const passwordParam = typeof desiredPassword === 'string' ? desiredPassword : undefined;
-      set({ isConnecting: true, connectionError: null });
+      set({ isConnecting: true, connectionError: null, playMode: 'host', myPlayerRole: 'p1' });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
           isConnected: connected, 
@@ -575,7 +649,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     joinRoom: async (code: string, password?: string) => {
       const cleanCode = typeof code === 'string' ? code.trim() : '';
       const cleanPassword = typeof password === 'string' ? password.trim() : '';
-      set({ isConnecting: true, connectionError: null });
+      set({ isConnecting: true, connectionError: null, playMode: 'guest', myPlayerRole: 'p2' });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
           isConnected: connected, 
@@ -597,13 +671,13 @@ export const useGameStore = create<GameStore>((set, get) => {
           isConnected: true,
         });
 
-        // Immediately inform host of player 2 presence
-        peerManager.sendMessage({
-          type: 'GUEST_SELECT_CHAR',
-          payload: {
-            characterId: get().guestSelectedCharacter || 'suspect_mustard',
-          },
-        });
+        // A reconnecting player keeps the host's existing character selection.
+        if (get().gameState.phase === 'LOBBY') {
+          peerManager.sendMessage({
+            type: 'GUEST_SELECT_CHAR',
+            payload: { characterId: get().guestSelectedCharacter || 'suspect_mustard' },
+          });
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to join room';
         set({ isConnecting: false, connectionError: message });
@@ -628,17 +702,31 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     restoreSessionIfNeeded: async () => {
       if (typeof window === 'undefined') return false;
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      let raw: string | null = null;
+      try { raw = sessionStorage.getItem(SESSION_KEY); } catch { return false; }
       if (!raw) return false;
       try {
         const session = JSON.parse(raw);
         if (session.roomCode && session.playMode) {
           if (session.playMode === 'guest') {
             await get().joinRoom(session.roomCode, session.roomSecret || '');
-            return true;
+            return get().isConnected;
           } else if (session.playMode === 'host') {
+            const saved = readHostSnapshot();
+            if (saved?.gameState && saved.aiMemories) {
+              const memories: Record<string, AIMemory> = {};
+              for (const [id, memory] of Object.entries(saved.aiMemories)) {
+                memories[id] = {
+                  playerId: memory.playerId,
+                  cardStatus: new Map(memory.cardStatus) as AIMemory['cardStatus'],
+                  knownPlayerCards: new Map(memory.knownPlayerCards.map(([playerId, cards]) => [playerId, new Set(cards)])),
+                  pastSuggestions: memory.pastSuggestions,
+                };
+              }
+              set({ gameState: saved.gameState, aiMemories: memories, roomWeapons: saved.roomWeapons, turnReviewState: saved.turnReviewState });
+            }
             await get().createRoom(session.roomCode, session.roomSecret || undefined);
-            return true;
+            return Boolean(get().roomCode);
           }
         }
       } catch {}
@@ -673,6 +761,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     startNewGame: (p1CharacterId, p2CharacterId, locale) => {
       const { playMode, aiPlayerCount } = get();
+      if (playMode === 'guest') return;
       const isSinglePlayer = playMode === 'solo';
       const seed = randomSeed();
       const newState = initGame({ 
@@ -698,16 +787,16 @@ export const useGameStore = create<GameStore>((set, get) => {
         activeEmote: null,
         selectedRoomId: null,
         isRollingDice: false,
+        pendingDisprovePrompt: null,
+        lastSecretClue: null,
+        activeDialogue: null,
         activeHypothesisVisual: null,
         isAutoPlaying: false,
         turnReviewState: null,
       });
 
       if (playMode === 'host') {
-        peerManager.sendMessage({
-          type: 'START_GAME',
-          payload: { gameState: newState, roomWeapons: INITIAL_ROOM_WEAPONS },
-        });
+        sendGuestState('START_GAME', newState, INITIAL_ROOM_WEAPONS);
       }
     },
 
@@ -756,17 +845,16 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       const { gameState } = get();
+      if (gameState.phase !== 'PLAYING_ROLL' || get().isRollingDice || get().turnReviewState?.active) return;
       set({ isRollingDice: true });
 
       setTimeout(() => {
+        if (get().gameState !== gameState || !get().isRollingDice) return;
         const nextState = rollDice(gameState);
         set({ gameState: nextState, isRollingDice: false });
 
         if (playMode === 'host') {
-          peerManager.sendMessage({
-            type: 'STATE_SYNC',
-            payload: { gameState: nextState },
-          });
+          sendGuestState('STATE_SYNC', nextState);
         }
       }, 600);
     },
@@ -788,10 +876,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         set({ gameState: nextState, selectedRoomId: null });
 
         if (playMode === 'host') {
-          peerManager.sendMessage({
-            type: 'STATE_SYNC',
-            payload: { gameState: nextState, roomWeapons: get().roomWeapons },
-          });
+          sendGuestState('STATE_SYNC', nextState);
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Cannot move to this room.';
@@ -812,10 +897,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ gameState: nextState, selectedRoomId: null });
 
       if (playMode === 'host') {
-        peerManager.sendMessage({
-          type: 'STATE_SYNC',
-          payload: { gameState: nextState, roomWeapons: get().roomWeapons },
-        });
+        sendGuestState('STATE_SYNC', nextState);
       }
 
       // If active player is AI, trigger AI decision in PLAYING_ACTION_DONE
@@ -874,10 +956,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       if (playMode === 'host') {
-        peerManager.sendMessage({
-          type: 'STATE_SYNC',
-          payload: { gameState: nextState, roomWeapons: curWeapons },
-        });
+        sendGuestState('STATE_SYNC', nextState, curWeapons);
         peerManager.sendMessage({
           type: 'HYPOTHESIS_VISUAL',
           payload: { visual: initialVisual as unknown as Record<string, unknown> },
@@ -897,6 +976,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         // Case 1: AI disproves
         if (player.type.startsWith('ai_')) {
           setTimeout(() => {
+            if (get().gameState !== nextState) return;
             const shownCard = disprover.availableCards[0];
             if (aiMemories[asker.id]) {
               recordShownCard(aiMemories[asker.id], player.id, shownCard.id);
@@ -963,6 +1043,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       } else {
         // Nobody could disprove
         setTimeout(() => {
+          if (get().gameState !== nextState) return;
           const undisprovenVisual: HypothesisVisualState = {
             askerId: asker.id,
             askerName: asker.name,
@@ -1005,8 +1086,6 @@ export const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
-      set({ pendingDisprovePrompt: null });
-
       const disprover = findNextDisprovingPlayer(
         gameState.players,
         gameState.currentPlayerIndex,
@@ -1016,6 +1095,9 @@ export const useGameStore = create<GameStore>((set, get) => {
       const responderId = disprover ? gameState.players[disprover.playerIndex].id : 'none';
       const responder = disprover ? gameState.players[disprover.playerIndex] : undefined;
       const asker = gameState.players[gameState.currentPlayerIndex];
+      // Validate the card and responding player before updating any AI memory.
+      const nextState = resolveDisprove(gameState, responderId, cardId);
+      set({ pendingDisprovePrompt: null });
 
       if (responder && responder.type.startsWith('ai_')) {
         triggerAIDialogue(responder, cardId ? 'disprove' : 'cannotDisprove');
@@ -1073,14 +1155,10 @@ export const useGameStore = create<GameStore>((set, get) => {
         }
       }
 
-      const nextState = resolveDisprove(gameState, responderId, cardId);
       set({ gameState: nextState });
 
       if (playMode === 'host') {
-        peerManager.sendMessage({
-          type: 'STATE_SYNC',
-          payload: { gameState: nextState, roomWeapons: get().roomWeapons },
-        });
+        sendGuestState('STATE_SYNC', nextState);
       }
 
       // If activeHypothesisVisual is displayed, wait until dismissed before triggering AI turn
@@ -1107,10 +1185,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ gameState: nextState });
 
       if (playMode === 'host') {
-        peerManager.sendMessage({
-          type: 'STATE_SYNC',
-          payload: { gameState: nextState },
-        });
+        sendGuestState('STATE_SYNC', nextState);
       }
 
       if (!isCorrect && nextState.phase !== 'GAME_OVER') {
@@ -1123,6 +1198,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     performEndTurn: () => {
       const { playMode, gameState } = get();
+      if (get().turnReviewState?.active) return;
 
       if (playMode === 'guest') {
         peerManager.sendMessage({ type: 'ACTION_END_TURN' });
@@ -1196,7 +1272,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (playMode === 'guest') {
         peerManager.sendMessage({
           type: 'TURN_REVIEW_CONFIRM',
-          payload: { role: myPlayerRole },
+          payload: { role: myPlayerRole, turnNumber: turnReviewState.turnNumber },
         });
         set({
           turnReviewState: {
@@ -1221,21 +1297,8 @@ export const useGameStore = create<GameStore>((set, get) => {
           });
         }
       } else if (playMode === 'local') {
-        const humanPlayers = gameState.players.filter(p => p.type === 'human');
-        if (humanPlayers.length <= 1) {
-          get().proceedToNextTurn();
-        } else {
-          if (!turnReviewState.readyRoles.includes('p1')) {
-            set({
-              turnReviewState: {
-                ...turnReviewState,
-                readyRoles: ['p1'],
-              },
-            });
-          } else {
-            get().proceedToNextTurn();
-          }
-        }
+        // Pass-and-play: one confirmation on the shared device completes the review.
+        get().proceedToNextTurn();
       } else {
         // Solo mode: immediate proceed
         get().proceedToNextTurn();
@@ -1259,15 +1322,12 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ gameState: nextState });
 
       if (playMode === 'host') {
-        peerManager.sendMessage({
-          type: 'STATE_SYNC',
-          payload: { gameState: nextState, roomWeapons: get().roomWeapons },
-        });
+        sendGuestState('STATE_SYNC', nextState);
       }
 
       // Trigger AI turn if next player is AI
       setTimeout(() => {
-        get().runAITurnIfNeeded();
+        if (get().gameState === nextState) get().runAITurnIfNeeded();
       }, 800);
     },
 
@@ -1279,6 +1339,11 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       const currentP = gameState.players[gameState.currentPlayerIndex];
       if (!currentP) return;
+      const sameTurn = () => {
+        const current = get().gameState;
+        return current.seed === gameState.seed && current.turnCount === gameState.turnCount &&
+          current.players[current.currentPlayerIndex]?.id === currentP.id;
+      };
 
       // If current player is human: if in AutoPlay (AFK), let AI take over
       if (currentP.type === 'human') {
@@ -1302,7 +1367,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           get().performAccusation(accusation);
         } else {
           setTimeout(() => {
-            get().performEndTurn();
+            if (sameTurn() && get().gameState.phase === 'PLAYING_ACTION_DONE') get().performEndTurn();
           }, 800);
         }
         return;
@@ -1353,6 +1418,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             triggerAIDialogue(currentP, 'move');
 
             setTimeout(() => {
+              if (!sameTurn()) return;
               try {
                 const stateAfterMove = get().gameState;
                 if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
@@ -1380,6 +1446,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // Wait for dice roll animation (600ms roll + 500ms result impact = 1100ms)
       setTimeout(() => {
+        if (!sameTurn()) return;
         try {
           const stateAfterRoll = get().gameState;
           if (stateAfterRoll.phase !== 'PLAYING_MOVE') return;
@@ -1405,6 +1472,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             triggerAIDialogue(currentP, 'move');
 
             setTimeout(() => {
+              if (!sameTurn()) return;
               try {
                 const stateAfterMove = get().gameState;
                 if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
@@ -1615,4 +1683,26 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
     },
   };
+});
+
+// Keep the authoritative host's in-progress game available across browser refreshes.
+useGameStore.subscribe((state, previous) => {
+  if (typeof window === 'undefined' || state.playMode !== 'host' || !state.roomCode || state.gameState.phase === 'LOBBY') return;
+  if (state.gameState === previous.gameState && state.aiMemories === previous.aiMemories &&
+      state.roomWeapons === previous.roomWeapons && state.turnReviewState === previous.turnReviewState) return;
+  try {
+    const aiMemories: Record<string, SavedAIMemory> = {};
+    for (const [id, memory] of Object.entries(state.aiMemories)) {
+      aiMemories[id] = {
+        playerId: memory.playerId,
+        cardStatus: [...memory.cardStatus.entries()],
+        knownPlayerCards: [...memory.knownPlayerCards.entries()].map(([playerId, cards]) => [playerId, [...cards]]),
+        pastSuggestions: memory.pastSuggestions,
+      };
+    }
+    sessionStorage.setItem(HOST_STATE_KEY, JSON.stringify({
+      gameState: state.gameState, roomWeapons: state.roomWeapons,
+      turnReviewState: state.turnReviewState, aiMemories,
+    }));
+  } catch { /* Storage may be disabled or full; the live session continues. */ }
 });

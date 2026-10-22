@@ -113,7 +113,11 @@ roomCode,
     return '';
   });
   const [copySuccessToast, setCopySuccessToast] = useState(false);
-  const [inputRoomPassword, setInputRoomPassword] = useState('');
+  const [inputRoomPassword, setInputRoomPassword] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const key = new URLSearchParams(window.location.hash.slice(1)).get('key');
+    return key && /^[a-f0-9]{32}$/i.test(key) ? key.toLowerCase() : '';
+  });
   const [selectedDisproveCard, setSelectedDisproveCard] = useState<string | null>(null);
   const [isPassingCard, setIsPassingCard] = useState(false);
   const [passingToPlayerName, setPassingToPlayerName] = useState<string>('');
@@ -157,7 +161,8 @@ roomCode,
   // 게임 시작 여부:
   // 1. 호스트/1인 플레이어가 시작 버튼을 눌렀을 때 (hasStarted === true)
   // 2. 게스트 모드에서 호스트가 게임을 시작하여 게임 상태가 LOBBY가 아니고 카드가 분배되었을 때
-  const isGameStarted = hasStarted || 
+  const isGameStarted = hasStarted ||
+    (playMode === 'host' && gameState.phase !== 'LOBBY') ||
     (playMode === 'guest' && gameState.phase !== 'LOBBY' && (gameState.players[1]?.hand?.length ?? 0) > 0);
 
   // 멀티플레이어 기기별 관점 (호스트=p1, 게스트=p2, 솔로=p1 human, 로컬=현재 차례)
@@ -412,11 +417,12 @@ roomCode,
   };
 
   const handleCopyInviteLink = () => {
-    if (typeof window !== 'undefined' && roomCode) {
-      const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
-      navigator.clipboard.writeText(url);
-      setCopySuccessToast(true);
-      setTimeout(() => setCopySuccessToast(false), 3500);
+    if (typeof window !== 'undefined' && roomCode && roomSecret) {
+      const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}#key=${encodeURIComponent(roomSecret)}`;
+      navigator.clipboard.writeText(url).then(() => {
+        setCopySuccessToast(true);
+        setTimeout(() => setCopySuccessToast(false), 3500);
+      }).catch(() => {});
     }
   };
 
@@ -593,7 +599,7 @@ roomCode,
         isHumanTurn={isHumanTurn}
         isMyTurn={isMyTurn}
         onOpenAccuse={() => setIsAccuseModalOpen(true)}
-        onNewGame={() => {
+        onNewGame={playMode === 'guest' ? undefined : () => {
           startNewGame(effectiveP1, effectiveP2, locale);
         }}
         onExitToLobby={() => setIsExitModalOpen(true)}
@@ -807,7 +813,7 @@ roomCode,
         trackedPlayerId={playMode === 'local' ? undefined : myPlayer?.id}
         getCardName={getCardName}
         getRoomName={getRoomName}
-        onPlayAgain={() => {
+        onPlayAgain={playMode === 'guest' ? undefined : () => {
           setUserNotes({});
           setMatrixNotes({});
           startNewGame(effectiveP1, effectiveP2, locale);

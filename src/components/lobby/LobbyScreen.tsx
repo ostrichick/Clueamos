@@ -183,7 +183,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       <Smartphone className="w-4 h-4 text-indigo-400" /> {t.joinRoomTitle}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      {locale === 'ko' ? '방 코드와 비밀번호(4~6자리)를 함께 입력합니다.' : 'Enter the room code and 4~6 digit password sent by Player 1.'}
+                      {locale === 'ko' ? '초대 링크를 열면 보안 키가 자동 입력됩니다. 직접 참가하려면 방 코드와 32자리 보안 키가 필요합니다.' : 'Open the invite link to fill the secure key automatically, or enter the room code and 32-character key.'}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -198,16 +198,15 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       />
                       <input
                         type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        placeholder={locale === 'ko' ? '비밀번호' : 'Password'}
+                        maxLength={32}
+                        placeholder={locale === 'ko' ? '32자리 보안 키' : '32-character key'}
                         value={inputRoomPassword}
-                        onChange={(e) => setInputRoomPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        className="flex-1 text-center uppercase tracking-widest font-mono font-black text-base bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 placeholder:text-sm placeholder:tracking-normal placeholder:font-normal focus:border-indigo-400 focus:outline-none"
+                        onChange={(e) => setInputRoomPassword(e.target.value.replace(/[^0-9a-f]/gi, '').slice(0, 32).toLowerCase())}
+                        className="flex-1 min-w-0 text-center font-mono font-bold text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-600 placeholder:text-sm placeholder:tracking-normal placeholder:font-normal focus:border-indigo-400 focus:outline-none"
                       />
                     </div>
                     <button
-                      disabled={isConnecting || inputRoomCode.length < 4 || inputRoomPassword.length < 4}
+                      disabled={isConnecting || inputRoomCode.length !== 4 || inputRoomPassword.length !== 32}
                       onClick={() => joinRoom(inputRoomCode.trim(), inputRoomPassword.trim())}
                       className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow"
                     >
@@ -244,8 +243,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       </div>
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         {locale === 'ko'
-                          ? '아래 초대 링크와 비밀번호를 상대방에게 함께 전달하세요.'
-                          : 'Share the invite link AND the room password with Player 2.'}
+                          ? '초대 링크에 보안 키가 포함되어 있습니다. 링크를 상대방에게 안전하게 전달하세요.'
+                          : 'The invite link includes the secure key. Share it privately with Player 2.'}
                       </p>
                     </div>
                   </div>
@@ -270,9 +269,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 {playMode === 'host' && roomSecret && (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40">
                     <div className="text-[11px] text-indigo-300 font-bold flex items-center gap-1.5">
-                      🔑 {locale === 'ko' ? '방 비밀번호 (상대방에게 알려주세요):' : 'Room Password (share with Player 2):'}
+                      🔑 {locale === 'ko' ? '직접 참가용 보안 키:' : 'Secure key for manual joining:'}
                     </div>
-                    <span className="px-3 py-1 rounded-md bg-indigo-500/20 border border-indigo-500/50 text-indigo-200 font-mono font-black text-sm tracking-widest text-center">
+                    <span className="px-3 py-1 rounded-md bg-indigo-500/20 border border-indigo-500/50 text-indigo-200 font-mono font-bold text-xs break-all text-center select-text">
                       {roomSecret}
                     </span>
                   </div>
@@ -518,7 +517,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                           ? '💡 Presiona [Crear Sala] arriba para crear una sala o selecciona Un Jugador.'
                           : '💡 Tap [Host Room] above to create a room, or choose Option 2 for Solo Play.')
                     : (locale === 'ko'
-                        ? '💡 상대방(플레이어 2)이 4자리 코드로 접속하면 게임을 시작할 수 있습니다.'
+                        ? '💡 상대방(플레이어 2)이 초대 링크로 접속하면 게임을 시작할 수 있습니다.'
                         : locale === 'es'
                           ? '💡 Puedes comenzar cuando el Jugador 2 se una con el código de 4 dígitos.'
                           : '💡 You can start once Player 2 joins with the 4-digit code.')}

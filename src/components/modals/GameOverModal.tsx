@@ -25,7 +25,7 @@ interface GameOverModalProps {
   trackedPlayerId?: string;
   getCardName: (id: string) => string;
   getRoomName: (id: string) => string;
-  onPlayAgain: () => void;
+  onPlayAgain?: () => void;
   onExitToLobby?: () => void;
 }
 
@@ -224,12 +224,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         </button>
 
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
-          <button
-            onClick={onPlayAgain}
-            className="flex-1 w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
-          >
-            {t.playAgain}
-          </button>
+          {onPlayAgain && (
+            <button
+              onClick={onPlayAgain}
+              className="flex-1 w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
+            >
+              {t.playAgain}
+            </button>
+          )}
           {onExitToLobby && (
             <button
               onClick={onExitToLobby}

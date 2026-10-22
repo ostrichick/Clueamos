@@ -29,295 +29,390 @@ export interface PeerMessage {
   payload?: Record<string, unknown>;
 }
 
-// Highly reliable global public MQTT WebSocket broker (WSS port 8084)
-// Bypasses all carrier NAT, cellular firewalls, and router restrictions with sub-50ms latency
-const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
-const TOPIC_PREFIX = 'clueamos/v4/';
+type Direction = 'to_host' | 'to_guest';
 
-function sanitizePassword(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const digits = value.trim().replace(/\D/g, '');
-  return digits.length >= 4 && digits.length <= 6 ? digits : null;
+interface SecureEnvelope {
+  v: 5;
+  d: Direction;
+  s: string;
+  seq: number;
+  iv: string;
+  data: string;
 }
 
-function generatePassword(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+interface RoomKeys {
+  topicId: string;
+  to_host: CryptoKey;
+  to_guest: CryptoKey;
+}
+
+const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+const TOPIC_PREFIX = 'clueamos/v5/';
+const SECRET_PATTERN = /^[a-f0-9]{32}$/i;
+const SESSION_PATTERN = /^[a-f0-9]{32}$/;
+const IV_PATTERN = /^[a-f0-9]{24}$/;
+const HEX_DATA_PATTERN = /^(?:[a-f0-9]{2})+$/;
+const JOIN_INTERVAL_MS = 12000;
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+const MESSAGE_TYPES = new Set<PeerMessageType>([
+  'LOBBY_UPDATE', 'GUEST_JOIN', 'GUEST_SELECT_CHAR', 'START_GAME', 'STATE_SYNC',
+  'ACTION_ROLL', 'ACTION_MOVE', 'ACTION_WAIT_HALLWAY', 'ACTION_SUGGEST',
+  'ACTION_DISPROVE', 'DISPROVE_REQUEST', 'PRIVATE_CLUE_REVEALED',
+  'ACTION_ACCUSE', 'ACTION_END_TURN', 'EVENT_DIALOGUE', 'EVENT_EMOTE',
+  'HYPOTHESIS_VISUAL', 'TURN_REVIEW_UPDATE', 'TURN_REVIEW_CONFIRM',
+  'HEARTBEAT', 'PING', 'PONG',
+]);
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function randomHex(length: number): string {
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(length)));
+}
+
+function normalizeSecret(value: unknown): string {
+  if (typeof value !== 'string' || !SECRET_PATTERN.test(value.trim())) {
+    throw new Error('Room password must be exactly 32 hexadecimal characters (128 random bits).');
+  }
+  return value.trim().toLowerCase();
+}
+
+async function deriveRoomKeys(code: string, secret: string): Promise<RoomKeys> {
+  const material = await crypto.subtle.importKey('raw', hexToBytes(secret), 'HKDF', false, ['deriveKey', 'deriveBits']);
+  const salt = encoder.encode(`clueamos/v5/room/${code}`);
+  const params = (purpose: string): HkdfParams => ({
+    name: 'HKDF', hash: 'SHA-256', salt, info: encoder.encode(purpose),
+  });
+  const [topicBits, toHost, toGuest] = await Promise.all([
+    crypto.subtle.deriveBits(params('topic-id'), material, 256),
+    crypto.subtle.deriveKey(params('to_host'), material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']),
+    crypto.subtle.deriveKey(params('to_guest'), material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']),
+  ]);
+  return { topicId: bytesToHex(new Uint8Array(topicBits)), to_host: toHost, to_guest: toGuest };
+}
+
+function isSecureEnvelope(value: unknown): value is SecureEnvelope {
+  if (!value || typeof value !== 'object') return false;
+  const msg = value as Partial<SecureEnvelope>;
+  return msg.v === 5 && (msg.d === 'to_host' || msg.d === 'to_guest') &&
+    typeof msg.s === 'string' && SESSION_PATTERN.test(msg.s) &&
+    typeof msg.seq === 'number' && Number.isSafeInteger(msg.seq) && msg.seq > 0 &&
+    typeof msg.iv === 'string' && IV_PATTERN.test(msg.iv) &&
+    typeof msg.data === 'string' && msg.data.length <= 2 * 1024 * 1024 &&
+    HEX_DATA_PATTERN.test(msg.data);
+}
+
+function isPeerMessage(value: unknown): value is PeerMessage {
+  if (!value || typeof value !== 'object') return false;
+  const msg = value as Partial<PeerMessage>;
+  return typeof msg.type === 'string' && MESSAGE_TYPES.has(msg.type as PeerMessageType) &&
+    (msg.payload === undefined || (msg.payload !== null && typeof msg.payload === 'object' && !Array.isArray(msg.payload)));
+}
+
+function authenticatedHeader(topicId: string, message: SecureEnvelope): Uint8Array<ArrayBuffer> {
+  return encoder.encode(`${TOPIC_PREFIX}${topicId}|${message.v}|${message.d}|${message.s}|${message.seq}`);
 }
 
 export class PeerManager {
   private client: MqttClient | null = null;
-  private isHost: boolean = false;
+  private isHost = false;
   private roomCode: string | null = null;
   private roomSecret: string | null = null;
-  private connected: boolean = false;
+  private keys: RoomKeys | null = null;
+  private connected = false;
+  private generation = 0;
+  private sendSequence = 0;
+  private sessionId = '';
+  private inboundSequences = new Map<string, number>();
+  private sendQueue: Promise<void> = Promise.resolve();
+  private receiveQueue: Promise<void> = Promise.resolve();
+  private joinInterval: ReturnType<typeof setInterval> | null = null;
+  private guestChallenge: string | null = null;
+  private hostSession: string | null = null;
+  private activeGuestSession: string | null = null;
+  private pendingGuest: { session: string; challenge: string; response: string; resync: boolean } | null = null;
+  private finishGuestJoin: (() => void) | null = null;
 
   public onMessageReceived?: (msg: PeerMessage) => void;
   public onConnectionStateChange?: (connected: boolean, error?: string) => void;
 
-  public getRoomCode(): string | null {
-    return this.roomCode;
+  public getRoomCode(): string | null { return this.roomCode; }
+  public getRoomSecret(): string | null { return this.roomSecret; }
+  public getIsHost(): boolean { return this.isHost; }
+  public isConnected(): boolean { return this.connected; }
+
+  private makeTopic(direction: Direction): string {
+    return `${TOPIC_PREFIX}${this.keys!.topicId}/${direction}`;
   }
 
-  public getRoomSecret(): string | null {
-    return this.roomSecret;
+  private reportConnected(connected: boolean, error?: string): void {
+    if (this.connected !== connected || error) {
+      this.connected = connected;
+      this.onConnectionStateChange?.(connected, error);
+    }
   }
 
-  public getIsHost(): boolean {
-    return this.isHost;
-  }
-
-  public isConnected(): boolean {
-    return this.connected;
-  }
-
-  private makeTopic(code: string, secret: string, direction: 'to_host' | 'to_guest'): string {
-    return `${TOPIC_PREFIX}${code}/${secret}/${direction}`;
-  }
-
-  /**
-   * Host: Create a new room with a 4-digit code and a shared 4~6 digit room password.
-   * Both are required to compute the MQTT topic, so random eavesdroppers on the
-   * public broker cannot join or snoop without knowing the password.
-   */
-  public async createRoom(desiredCode?: unknown, roomPassword?: unknown): Promise<string> {
+  private async initialize(code: string, secret: string, isHost: boolean): Promise<number> {
     this.cleanup();
-    this.isHost = true;
-    const sanitized = (typeof desiredCode === 'string') ? desiredCode.trim().replace(/\D/g, '') : '';
-    const code = (sanitized.length === 4)
-      ? sanitized
-      : Math.floor(1000 + Math.random() * 9000).toString();
-    const secret = sanitizePassword(roomPassword) || generatePassword();
+    const generation = this.generation;
+    this.isHost = isHost;
     this.roomCode = code;
     this.roomSecret = secret;
+    this.sessionId = randomHex(16);
+    const keys = await deriveRoomKeys(code, secret);
+    if (this.generation !== generation) throw new Error('Room connection was replaced.');
+    this.keys = keys;
+    return generation;
+  }
 
-    const myReceiveTopic = this.makeTopic(code, secret, 'to_host');
+  /** Creates a room with a cryptographically random printable 128-bit room password. */
+  public async createRoom(desiredCode?: unknown, roomPassword?: unknown): Promise<string> {
+    const suppliedCode = typeof desiredCode === 'string' ? desiredCode.trim() : '';
+    const code = /^[0-9]{4}$/.test(suppliedCode) ? suppliedCode : String(crypto.getRandomValues(new Uint32Array(1))[0] % 9000 + 1000);
+    const secret = roomPassword === undefined ? randomHex(16) : normalizeSecret(roomPassword);
+    const generation = await this.initialize(code, secret, true);
 
-    return new Promise((resolve, reject) => {
-      let isSettled = false;
-      const timeoutId = setTimeout(() => {
-        if (!isSettled) {
-          isSettled = true;
-          this.cleanup();
-          const timeoutErr = new Error('Room creation timed out. Please check your network and try again.');
-          if (this.onConnectionStateChange) {
-            this.onConnectionStateChange(false, timeoutErr.message);
-          }
-          reject(timeoutErr);
-        }
-      }, 10000);
+    return new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const timeout = setTimeout(() => fail(new Error('Room creation timed out. Please check your network and try again.')), 10000);
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        this.cleanup();
+        this.onConnectionStateChange?.(false, error.message);
+        reject(error);
+      };
 
       try {
         const client = mqtt.connect(MQTT_BROKER, {
-          clientId: `clue_host_${code}_${Math.random().toString(36).substring(2, 7)}`,
-          clean: true,
-          connectTimeout: 8000,
-          reconnectPeriod: 2000,
+          clientId: `clue_${randomHex(16)}`, clean: true,
+          connectTimeout: 8000, reconnectPeriod: 2000,
         });
         this.client = client;
-
         client.on('connect', () => {
-          client.subscribe(myReceiveTopic, { qos: 1 }, (err) => {
-            if (isSettled) return;
-            isSettled = true;
-            clearTimeout(timeoutId);
-            if (err) {
-              reject(err);
-            } else {
+          if (this.generation !== generation) return;
+          client.subscribe(this.makeTopic('to_host'), { qos: 1 }, err => {
+            if (err) { fail(err); return; }
+            if (!settled) {
+              settled = true;
+              clearTimeout(timeout);
               resolve(code);
             }
           });
         });
-
-        client.on('message', (_topic, payload) => {
-          try {
-            const msg: PeerMessage = JSON.parse(payload.toString());
-
-            // First message from guest establishes connected status
-            if (!this.connected) {
-              this.connected = true;
-              if (this.onConnectionStateChange) {
-                this.onConnectionStateChange(true);
-              }
-            }
-
-            // Immediately acknowledge guest join or ping
-            if (msg.type === 'GUEST_JOIN' || msg.type === 'PING') {
-              this.sendMessage({ type: 'PONG' });
-            }
-
-            if (this.onMessageReceived) {
-              this.onMessageReceived(msg);
-            }
-          } catch {}
+        client.on('message', (topic, payload) => this.enqueueReceived(client, topic, payload, 'to_host'));
+        client.on('error', err => {
+          if (!settled) fail(err);
+          else if (this.client === client) this.reportConnected(false, err.message);
         });
-
-        client.on('error', (err) => {
-          if (!isSettled) {
-            isSettled = true;
-            clearTimeout(timeoutId);
-            this.cleanup();
-            reject(err);
-          }
-          if (this.onConnectionStateChange) {
-            this.onConnectionStateChange(false, err.message);
-          }
-        });
-
         client.on('close', () => {
-          if (this.connected) {
-            this.connected = false;
-            if (this.onConnectionStateChange) {
-              this.onConnectionStateChange(false, 'Disconnected');
-            }
-          }
+          if (this.client === client) this.reportConnected(false, 'Disconnected');
         });
-      } catch (e: unknown) {
-        reject(e);
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error('Room connection failed.'));
       }
     });
   }
 
-  /**
-   * Guest: Connect to an existing room using the 4-digit code + shared password.
-   */
+  /** Joins only with the complete 128-bit password supplied by the host. */
   public async joinRoom(code: string, roomPassword: string): Promise<void> {
-    this.cleanup();
-    this.isHost = false;
-    const cleanCode = code.trim().replace(/\D/g, '');
-    const cleanSecret = sanitizePassword(roomPassword) || '';
-    this.roomCode = cleanCode;
-    this.roomSecret = cleanSecret;
+    if (typeof code !== 'string' || !/^[0-9]{4}$/.test(code.trim())) {
+      throw new Error('Room code must be exactly 4 digits.');
+    }
+    const secret = normalizeSecret(roomPassword);
+    const generation = await this.initialize(code.trim(), secret, false);
 
-    const myReceiveTopic = this.makeTopic(cleanCode, cleanSecret, 'to_guest');
-    const hostTopic = this.makeTopic(cleanCode, cleanSecret, 'to_host');
-
-    return new Promise((resolve, reject) => {
-      let isSettled = false;
-      let pingInterval: NodeJS.Timeout | null = null;
-
-      const connectionTimeout = setTimeout(() => {
-        if (!isSettled) {
-          isSettled = true;
-          if (pingInterval) clearInterval(pingInterval);
-          this.cleanup();
-          const err = new Error(`Connection timed out. Room ${cleanCode} may not exist, the host is offline, or the room password is incorrect.`);
-          if (this.onConnectionStateChange) {
-            this.onConnectionStateChange(false, err.message);
-          }
-          reject(err);
-        }
-      }, 10000);
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const timeout = setTimeout(() => fail(new Error(`Connection timed out. Room ${code.trim()} may not exist, the host is offline, or the room password is incorrect.`)), 10000);
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        this.cleanup();
+        this.onConnectionStateChange?.(false, error.message);
+        reject(error);
+      };
+      this.finishGuestJoin = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        this.finishGuestJoin = null;
+        resolve();
+      };
 
       try {
         const client = mqtt.connect(MQTT_BROKER, {
-          clientId: `clue_guest_${cleanCode}_${Math.random().toString(36).substring(2, 7)}`,
-          clean: true,
-          connectTimeout: 8000,
-          reconnectPeriod: 2000,
+          clientId: `clue_${randomHex(16)}`, clean: true,
+          connectTimeout: 8000, reconnectPeriod: 2000,
         });
         this.client = client;
-
         client.on('connect', () => {
-          client.subscribe(myReceiveTopic, { qos: 1 }, (err) => {
-            if (err) {
-              if (!isSettled) {
-                isSettled = true;
-                clearTimeout(connectionTimeout);
-                reject(err);
-              }
-              return;
-            }
-
-            // Immediately and periodically ping host until host responds with handshake
-            const sendJoinPing = () => {
-              if (client.connected) {
-                client.publish(hostTopic, JSON.stringify({ type: 'GUEST_JOIN' }));
-              }
-            };
-            sendJoinPing();
-            pingInterval = setInterval(sendJoinPing, 600);
+          if (this.generation !== generation) return;
+          client.subscribe(this.makeTopic('to_guest'), { qos: 1 }, err => {
+            if (err) { fail(err); return; }
+            this.sendGuestJoin(true);
           });
         });
-
-        client.on('message', (_topic, payload) => {
-          try {
-            const msg: PeerMessage = JSON.parse(payload.toString());
-
-            // First message received from host confirms connection!
-            if (!this.connected) {
-              this.connected = true;
-              if (pingInterval) clearInterval(pingInterval);
-              if (!isSettled) {
-                isSettled = true;
-                clearTimeout(connectionTimeout);
-                if (this.onConnectionStateChange) {
-                  this.onConnectionStateChange(true);
-                }
-                resolve();
-              }
-            }
-
-            if (this.onMessageReceived) {
-              this.onMessageReceived(msg);
-            }
-          } catch {}
+        client.on('message', (topic, payload) => this.enqueueReceived(client, topic, payload, 'to_guest'));
+        client.on('error', err => {
+          if (!settled) fail(err);
+          else if (this.client === client) this.reportConnected(false, err.message);
         });
-
-        client.on('error', (err) => {
-          if (!isSettled) {
-            isSettled = true;
-            if (pingInterval) clearInterval(pingInterval);
-            clearTimeout(connectionTimeout);
-            reject(err);
-          }
-        });
-
         client.on('close', () => {
-          if (this.connected) {
-            this.connected = false;
-            if (this.onConnectionStateChange) {
-              this.onConnectionStateChange(false, 'Disconnected');
-            }
-          }
+          if (this.client !== client) return;
+          this.hostSession = null;
+          this.reportConnected(false, 'Disconnected');
         });
-      } catch (e: unknown) {
-        if (!isSettled) {
-          isSettled = true;
-          if (pingInterval) clearInterval(pingInterval);
-          clearTimeout(connectionTimeout);
-          reject(e);
-        }
+        // A still-connected guest must discover a host whose browser has restarted.
+        this.joinInterval = setInterval(() => {
+          if (this.client === client && client.connected) this.sendGuestJoin(false);
+        }, JOIN_INTERVAL_MS);
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error('Room connection failed.'));
       }
     });
   }
 
-  /**
-   * Send message across the room channel (topic includes the room secret)
-   */
-  public sendMessage(msg: PeerMessage): boolean {
-    if (this.client && this.client.connected && this.roomCode && this.roomSecret) {
-      const targetTopic = this.isHost
-        ? this.makeTopic(this.roomCode, this.roomSecret, 'to_guest')
-        : this.makeTopic(this.roomCode, this.roomSecret, 'to_host');
-      this.client.publish(targetTopic, JSON.stringify(msg), { qos: 1 });
-      return true;
-    }
-    return false;
+  private sendGuestJoin(resync: boolean): void {
+    this.guestChallenge = randomHex(16);
+    this.queueSend({ type: 'GUEST_JOIN', payload: { challenge: this.guestChallenge, resync } });
   }
 
-  public cleanup() {
-    if (this.client) {
+  private enqueueReceived(client: MqttClient, topic: string, payload: Buffer, direction: Direction): void {
+    if (this.client !== client || topic !== this.makeTopic(direction)) return;
+    const generation = this.generation;
+    this.receiveQueue = this.receiveQueue.then(async () => {
+      if (this.generation !== generation || this.client !== client || !this.keys) return;
+      let envelope: unknown;
+      try { envelope = JSON.parse(payload.toString()); } catch { return; }
+      if (!isSecureEnvelope(envelope) || envelope.d !== direction) return;
+      const sequenceKey = `${direction}:${envelope.s}`;
+      if (envelope.seq <= (this.inboundSequences.get(sequenceKey) ?? 0)) return;
+
+      let message: unknown;
       try {
-        this.client.end(true);
-      } catch {}
-      this.client = null;
+        const raw = await crypto.subtle.decrypt({
+          name: 'AES-GCM', iv: hexToBytes(envelope.iv),
+          additionalData: authenticatedHeader(this.keys.topicId, envelope),
+        }, this.keys[direction], hexToBytes(envelope.data));
+        message = JSON.parse(decoder.decode(raw));
+      } catch { return; } // Also rejects malformed, unauthenticated and tampered messages.
+      if (!isPeerMessage(message)) return;
+      if (this.generation !== generation || this.client !== client) return;
+      this.inboundSequences.set(sequenceKey, envelope.seq);
+      this.handleAuthenticatedMessage(message, envelope.s);
+    }).catch(() => { /* Ignore malformed broker traffic and application callback failures. */ });
+  }
+
+  private handleAuthenticatedMessage(message: PeerMessage, sender: string): void {
+    if (this.isHost) {
+      if (message.type === 'GUEST_JOIN') {
+        const challenge = message.payload?.challenge;
+        if (typeof challenge !== 'string' || !SESSION_PATTERN.test(challenge)) return;
+        if (this.pendingGuest?.session !== sender || this.pendingGuest.challenge !== challenge) {
+          this.pendingGuest = { session: sender, challenge, response: randomHex(16), resync: message.payload?.resync === true };
+        }
+        this.queueSend({ type: 'PONG', payload: { challenge, response: this.pendingGuest.response } });
+        return;
+      }
+      if (message.type === 'PING') {
+        if (this.pendingGuest?.session !== sender || message.payload?.response !== this.pendingGuest.response) return;
+        const notifyJoin = this.activeGuestSession !== sender || !this.connected || this.pendingGuest.resync;
+        this.activeGuestSession = sender;
+        this.reportConnected(true);
+        if (notifyJoin) this.onMessageReceived?.({ type: 'GUEST_JOIN' });
+        return;
+      }
+      if (!this.connected || sender !== this.activeGuestSession) return;
+      this.onMessageReceived?.(message);
+      return;
+    }
+
+    if (message.type === 'PONG') {
+      const challenge = message.payload?.challenge;
+      const response = message.payload?.response;
+      if (challenge !== this.guestChallenge || typeof response !== 'string' || !SESSION_PATTERN.test(response)) return;
+      this.hostSession = sender;
+      this.queueSend({ type: 'PING', payload: { response } });
+      this.reportConnected(true);
+      this.finishGuestJoin?.();
+      return;
+    }
+    if (!this.connected || sender !== this.hostSession) return;
+    this.onMessageReceived?.(message);
+  }
+
+  private queueSend(message: PeerMessage): boolean {
+    const client = this.client;
+    const keys = this.keys;
+    if (!client?.connected || !keys) return false;
+    const generation = this.generation;
+    const direction: Direction = this.isHost ? 'to_guest' : 'to_host';
+    const topic = this.makeTopic(direction);
+    this.sendQueue = this.sendQueue.then(async () => {
+      if (this.client !== client || this.generation !== generation || !client.connected) return;
+      const envelope: SecureEnvelope = {
+        v: 5, d: direction, s: this.sessionId,
+        seq: ++this.sendSequence, iv: randomHex(12), data: '',
+      };
+      const encrypted = await crypto.subtle.encrypt({
+        name: 'AES-GCM', iv: hexToBytes(envelope.iv),
+        additionalData: authenticatedHeader(keys.topicId, envelope),
+      }, keys[direction], encoder.encode(JSON.stringify(message)));
+      envelope.data = bytesToHex(new Uint8Array(encrypted));
+      if (this.client === client && this.generation === generation && client.connected) {
+        client.publish(topic, JSON.stringify(envelope), { qos: 1 });
+      }
+    }).catch(() => {
+      if (this.client === client && this.generation === generation) {
+        this.reportConnected(false, 'Unable to encrypt outgoing message.');
+      }
+    });
+    return true;
+  }
+
+  public sendMessage(message: PeerMessage): boolean {
+    return this.queueSend(message);
+  }
+
+  public cleanup(): void {
+    this.generation++;
+    if (this.joinInterval) clearInterval(this.joinInterval);
+    this.joinInterval = null;
+    const oldClient = this.client;
+    this.client = null;
+    if (oldClient) {
+      try { oldClient.end(true); } catch { /* Best-effort socket close. */ }
     }
     this.connected = false;
     this.roomCode = null;
     this.roomSecret = null;
+    this.keys = null;
     this.isHost = false;
+    this.sessionId = '';
+    this.sendSequence = 0;
+    this.inboundSequences.clear();
+    this.sendQueue = Promise.resolve();
+    this.receiveQueue = Promise.resolve();
+    this.guestChallenge = null;
+    this.hostSession = null;
+    this.activeGuestSession = null;
+    this.pendingGuest = null;
+    this.finishGuestJoin = null;
   }
 }
 
-// Global Singleton PeerManager for the app session
 export const peerManager = new PeerManager();

@@ -5,6 +5,7 @@ import {
   movePlayer, 
   makeSuggestion, 
   findNextDisprovingPlayer, 
+  resolveDisprove,
   makeAccusation 
 } from './engine';
 import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
@@ -159,12 +160,13 @@ describe('Clueamos Core Game Engine', () => {
   });
 
   it('질문(Suggestion) 생성 시 반증 플레이어가 감지되어야 한다', () => {
-    const state = initGame();
+    const rolled = rollDice(initGame());
+    const state = movePlayer(rolled, rolled.accessibleRoomIds![0]);
 
     // 질문 가설 생성
     const suggestState = makeSuggestion(state, {
       suspectId: state.allCards.find(c => c.category === 'suspect')!.id,
-      locationId: state.allCards.find(c => c.category === 'location')!.id,
+      locationId: state.players[0].currentRoomId,
       weaponId: state.allCards.find(c => c.category === 'weapon')!.id,
     });
 
@@ -182,6 +184,100 @@ describe('Clueamos Core Game Engine', () => {
       expect(disprover.playerIndex).toBeGreaterThan(0);
       expect(disprover.availableCards.length).toBeGreaterThan(0);
     }
+  });
+
+  it('질문은 이동 후 현재 방에서 올바른 세 카테고리의 카드로만 가능하다', () => {
+    const initial = initGame();
+    const rolled = rollDice(initial);
+    const moved = movePlayer(rolled, rolled.accessibleRoomIds![0]);
+    const validSuggestion = {
+      suspectId: SUSPECTS[0].id,
+      locationId: moved.players[0].currentRoomId,
+      weaponId: WEAPONS[0].id,
+    };
+
+    expect(() => makeSuggestion(initial, validSuggestion)).toThrow(/phase/i);
+    expect(() => makeSuggestion(rolled, validSuggestion)).toThrow(/phase/i);
+    expect(() => makeSuggestion(moved, {
+      ...validSuggestion,
+      locationId: LOCATION_CARDS.find(c => c.id !== validSuggestion.locationId)!.id,
+    })).toThrow(/current room/i);
+    expect(() => makeSuggestion(moved, { ...validSuggestion, suspectId: WEAPONS[1].id })).toThrow(/invalid card/i);
+    expect(() => makeSuggestion(moved, { ...validSuggestion, weaponId: SUSPECTS[1].id })).toThrow(/invalid card/i);
+    expect(() => makeSuggestion(moved, { ...validSuggestion, suspectId: 'suspect_unknown' })).toThrow(/invalid card/i);
+    const invalidRoomState = {
+      ...moved,
+      players: moved.players.map((p, i) => i === 0 ? { ...p, currentRoomId: WEAPONS[1].id } : p),
+    };
+    expect(() => makeSuggestion(invalidRoomState, {
+      ...validSuggestion,
+      locationId: WEAPONS[1].id,
+    })).toThrow(/invalid card/i);
+
+    const suggested = makeSuggestion(moved, validSuggestion);
+    expect(suggested.currentSuggestion).toMatchObject(validSuggestion);
+    expect(() => makeSuggestion(suggested, validSuggestion)).toThrow(/phase/i);
+  });
+
+  it('반증은 시계방향 최초 해당 카드 소유자만 질문에 포함된 자신의 카드로 할 수 있다', () => {
+    const initial = initGame();
+    const ready = {
+      ...initial,
+      phase: 'PLAYING_SUGGEST' as const,
+      players: initial.players.map((p, i) => ({
+        ...p,
+        hand: i === 1 ? [WEAPONS[0], WEAPONS[1]] : i === 2 ? [SUSPECTS[0]] : [],
+      })),
+    };
+    const suggested = makeSuggestion(ready, {
+      suspectId: SUSPECTS[0].id,
+      locationId: ready.players[0].currentRoomId,
+      weaponId: WEAPONS[0].id,
+    });
+
+    const valid = resolveDisprove(suggested, ready.players[1].id, WEAPONS[0].id);
+    expect(valid.phase).toBe('PLAYING_ACTION_DONE');
+    expect(valid.currentSuggestion).toBeUndefined();
+    expect(valid.logs.at(-1)?.metadata?.shownCardId).toBe(WEAPONS[0].id);
+
+    expect(() => resolveDisprove(suggested, ready.players[2].id, SUSPECTS[0].id)).toThrow(/responder/i);
+    expect(() => resolveDisprove(suggested, ready.players[1].id, SUSPECTS[0].id)).toThrow(/shown card/i);
+    expect(() => resolveDisprove(suggested, ready.players[1].id, WEAPONS[1].id)).toThrow(/shown card/i);
+    expect(() => resolveDisprove(suggested, ready.players[1].id)).toThrow(/shown card/i);
+    expect(() => resolveDisprove(suggested, 'none')).toThrow(/responder/i);
+    expect(() => resolveDisprove(ready, ready.players[1].id, WEAPONS[0].id)).toThrow(/awaiting disproof/i);
+    expect(() => resolveDisprove(valid, ready.players[1].id, WEAPONS[0].id)).toThrow(/awaiting disproof/i);
+
+    const eliminatedOwner = {
+      ...suggested,
+      players: suggested.players.map((p, i) => i === 1 ? { ...p, isEliminated: true } : p),
+    };
+    expect(resolveDisprove(eliminatedOwner, ready.players[1].id, WEAPONS[0].id).phase).toBe('PLAYING_ACTION_DONE');
+  });
+
+  it('아무도 반증할 수 없을 때에만 none 응답을 정상적으로 처리한다', () => {
+    const initial = initGame({ seed: 42 });
+    const ready = {
+      ...initial,
+      phase: 'PLAYING_SUGGEST' as const,
+      players: initial.players.map((p, index) => index === 0
+        ? { ...p, currentRoomId: initial.solution.locationId }
+        : p),
+    };
+    const suggested = makeSuggestion(ready, {
+      suspectId: initial.solution.suspectId,
+      locationId: initial.solution.locationId,
+      weaponId: initial.solution.weaponId,
+    });
+
+    expect(findNextDisprovingPlayer(suggested.players, 0, suggested.currentSuggestion!)).toBeNull();
+    const resolved = resolveDisprove(suggested, 'none');
+    expect(resolved.phase).toBe('PLAYING_ACTION_DONE');
+    expect(resolved.currentSuggestion).toBeUndefined();
+    expect(resolved.logs.at(-1)?.metadata?.responderId).toBe('none');
+
+    expect(() => resolveDisprove(suggested, ready.players[1].id)).toThrow(/no player/i);
+    expect(() => resolveDisprove(suggested, 'none', WEAPONS[0].id)).toThrow(/no player/i);
   });
 
   it('정답을 정확히 맞힌 최종 고발(Accusation)은 승리로 끝나야 한다', () => {

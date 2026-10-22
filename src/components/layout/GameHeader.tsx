@@ -35,7 +35,7 @@ interface GameHeaderProps {
   isHumanTurn: boolean;
   isMyTurn: boolean;
   onOpenAccuse: () => void;
-  onNewGame: () => void;
+  onNewGame?: () => void;
   onExitToLobby?: () => void;
 }
 
@@ -168,13 +168,15 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
           </button>
         )}
 
-        <button 
-          onClick={onNewGame}
-          title={t.newGame}
-          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
+        {onNewGame && (
+          <button
+            onClick={onNewGame}
+            title={t.newGame}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        )}
 
         {onExitToLobby && (
           <button

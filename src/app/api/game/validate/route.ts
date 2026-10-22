@@ -7,10 +7,9 @@ const MAX_BODY_BYTES = 512 * 1024;
 
 function fingerprint(state: GameState): string {
   const seed = state.seed ?? 0;
-  const rngCounter = state.rngCounter ?? 0;
   const solution = `${state.solution.suspectId}|${state.solution.locationId}|${state.solution.weaponId}`;
   const hands = state.players.map(p => p.id + ':' + p.hand.map(c => c.id).join(',')).sort().join(';');
-  const id = `${seed}|${rngCounter}|${solution}|${hands}`;
+  const id = `${seed}|${solution}|${hands}`;
   let hash = 2166136261;
   for (let i = 0; i < id.length; i++) {
     hash ^= id.charCodeAt(i);
@@ -30,7 +29,27 @@ export async function POST(request: Request) {
 
   let body: unknown;
   try {
-    body = await request.json();
+    const reader = request.body?.getReader();
+    if (!reader) throw new Error('Missing JSON body');
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return Response.json({ valid: false, error: 'Payload too large' }, { status: 413 });
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    body = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return Response.json({ valid: false, error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -73,7 +92,14 @@ export async function POST(request: Request) {
       if (!state || typeof state.seed !== 'number') {
         return Response.json({ valid: false, error: 'state with seed is required' }, { status: 400 });
       }
-      const replayed = initGame({ seed: state.seed });
+      const isSinglePlayer = !state.players.some(p => p.roleType === 'p2');
+      const replayed = initGame({
+        seed: state.seed,
+        isSinglePlayer,
+        aiPlayerCount: state.players.filter(p => p.type.startsWith('ai_')).length,
+        player1CharacterId: state.players[0]?.characterId,
+        player2CharacterId: state.players.find(p => p.roleType === 'p2')?.characterId,
+      });
       return Response.json({
         valid: fingerprint(replayed) === fingerprint(state),
         fingerprint: fingerprint(state),

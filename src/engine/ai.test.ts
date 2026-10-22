@@ -102,6 +102,50 @@ describe('AI 메모리', () => {
     expect(WEAPONS.every(c => c.id === w.id || memory.cardStatus.get(c.id) === 'IMPOSSIBLE')).toBe(true);
   });
 
+  it('내 질문에 손패의 카드를 포함했다면 무반증이어도 그 카드는 정답으로 확정하지 않는다', () => {
+    const state = makeState();
+    const asker = { ...state.players[2], hand: [LOCATION_CARDS[0]] };
+    const memory = initAIMemory(asker);
+    const suggestion = {
+      askerId: asker.id,
+      suspectId: SUSPECTS[0].id,
+      locationId: LOCATION_CARDS[0].id,
+      weaponId: WEAPONS[0].id,
+    };
+
+    recordUndisprovenSuggestion(memory, suggestion, asker.hand, 'ai_logic');
+
+    expect(memory.cardStatus.get(suggestion.locationId)).toBe('IMPOSSIBLE');
+    expect(memory.cardStatus.get(suggestion.suspectId)).toBe('CONFIRMED');
+    expect(memory.cardStatus.get(suggestion.weaponId)).toBe('CONFIRMED');
+  });
+
+  it('다른 논리형 AI의 무반증 질문도 질문자 손패 가능성 때문에 확정할 수 없다', () => {
+    const state = makeState();
+    const observer = { ...state.players[3], hand: [WEAPONS[1]] };
+    const memory = initAIMemory(observer);
+    const suggestion = {
+      askerId: state.players[2].id,
+      suspectId: SUSPECTS[0].id,
+      locationId: LOCATION_CARDS[0].id,
+      weaponId: WEAPONS[0].id,
+    };
+    // 질문자가 LOCATION_CARDS[0]을 소유하고 있고, 다른 누구도 제시한 카드를
+    // 갖고 있지 않다면 무반증이더라도 LOCATION_CARDS[0]은 정답이 될 수 없다.
+    recordUndisprovenSuggestion(memory, suggestion, observer.hand, 'ai_logic');
+
+    expect(memory.cardStatus.get(suggestion.locationId)).toBe('POSSIBLE');
+    expect(memory.cardStatus.get(LOCATION_CARDS[1].id)).toBe('UNKNOWN');
+    expect(getRemainingCandidates(memory, 'location')).toContainEqual(LOCATION_CARDS[1]);
+    expect(memory.cardStatus.get(suggestion.suspectId)).toBe('POSSIBLE');
+    expect(memory.cardStatus.get(suggestion.weaponId)).toBe('POSSIBLE');
+
+    // 이미 확정한 사실을 다른 사람의 질문만으로 약화시키지 않는다.
+    memory.cardStatus.set(suggestion.suspectId, 'CONFIRMED');
+    recordUndisprovenSuggestion(memory, suggestion, observer.hand, 'ai_logic');
+    expect(memory.cardStatus.get(suggestion.suspectId)).toBe('CONFIRMED');
+  });
+
   it('recordUndisprovenSuggestion: 블러핑 가능성이 있는 상대의 무반증은 POSSIBLE 처리한다', () => {
     const state = makeState();
     const ai = state.players[2];
@@ -122,7 +166,7 @@ describe('AI 메모리', () => {
 
   it('recordObservedDisprove: 후보가 1장으로 좁혀지면 반증자의 보유 카드로 확정한다', () => {
     const state = makeState();
-    const ai = state.players[2];
+    const ai = { ...state.players[2], hand: [WEAPONS[0], LOCATION_CARDS[0]] };
     const memory = initAIMemory(ai);
     const responder = state.players[1];
     const handIds = new Set(ai.hand.map(c => c.id));
@@ -196,6 +240,33 @@ describe('AI 행동 결정', () => {
     if (action.type === 'MOVE_AND_SUGGEST') {
       const candidates = rolledState.accessibleRoomIds ?? [rolledState.players[2].currentRoomId];
       expect(candidates).toContain(action.targetRoomId);
+    }
+  });
+
+  it('AI가 이동을 마친 상태에서 재결정해도 실제 현재 방으로만 질문한다', () => {
+    const state = makeState();
+    const currentRoomId = state.players[2].currentRoomId;
+    const otherRoomId = LOCATION_CARDS.find(c => c.id !== currentRoomId)!.id;
+    const moved = {
+      ...state,
+      currentPlayerIndex: 2,
+      phase: 'PLAYING_SUGGEST' as const,
+      accessibleRoomIds: [otherRoomId, currentRoomId],
+    };
+    const memory = initAIMemory(state.players[2]);
+
+    const arthur = decideArthurAction(moved, memory);
+    expect(arthur.type).toBe('MOVE_AND_SUGGEST');
+    if (arthur.type === 'MOVE_AND_SUGGEST') {
+      expect(arthur.targetRoomId).toBe(currentRoomId);
+      expect(arthur.suggestion.locationId).toBe(currentRoomId);
+    }
+
+    const blake = decideBlakeAction(moved, initAIMemory(state.players[2]));
+    expect(blake.type).toBe('MOVE_AND_SUGGEST');
+    if (blake.type === 'MOVE_AND_SUGGEST') {
+      expect(blake.targetRoomId).toBe(currentRoomId);
+      expect(blake.suggestion.locationId).toBe(currentRoomId);
     }
   });
 
