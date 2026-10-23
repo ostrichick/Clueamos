@@ -250,6 +250,9 @@ export const DIE_MAX_VALUE = 3;
  * 13x13 복도 그리드 BFS 경로 탐색으로 도달 가능한 방 목록 및 비밀 통로 계산
  */
 export function rollDice(state: GameState, maxVal: number = DIE_MAX_VALUE): GameState {
+  if (state.phase !== 'PLAYING_ROLL') {
+    throw new Error('Cannot roll dice during this phase.');
+  }
   const currentPlayer = state.players[state.currentPlayerIndex];
   const nextCounter = (state.rngCounter || 0) + 1;
   // seed가 지정된 게임은 결정적 주사위 (검증/재생 가능), 아니면 Math.random
@@ -284,8 +287,11 @@ export function rollDice(state: GameState, maxVal: number = DIE_MAX_VALUE): Game
  * 플레이어 이동 처리 (주사위 눈금으로 도달 가능한 방인지 검증)
  */
 export function movePlayer(state: GameState, targetRoomId: string): GameState {
+  if (state.phase !== 'PLAYING_MOVE') {
+    throw new Error('Cannot move during this phase.');
+  }
   const currentPlayer = state.players[state.currentPlayerIndex];
-  const accessible = state.accessibleRoomIds || [currentPlayer.currentRoomId];
+  const accessible = state.accessibleRoomIds ?? [];
 
   if (!accessible.includes(targetRoomId)) {
     throw new Error('Not enough dice steps to reach this room!');
@@ -427,6 +433,9 @@ export function findNextDisprovingPlayer(
  * 주사위 굴림 후 방에 진입하지 않고 복도에서 대기(턴 넘기기)
  */
 export function waitInHallway(state: GameState): GameState {
+  if (state.phase !== 'PLAYING_MOVE') {
+    throw new Error('Cannot wait in the hallway during this phase.');
+  }
   const player = state.players[state.currentPlayerIndex];
   const waitLog: LogEntry = {
     id: `log_${Date.now()}_wait`,
@@ -528,6 +537,9 @@ export function makeAccusation(
   accusation: Solution
 ): { state: GameState; isCorrect: boolean } {
   const player = state.players[state.currentPlayerIndex];
+  if (!isTurnPhase(state) || !player || player.isEliminated) {
+    throw new Error('Cannot make an accusation now.');
+  }
   const sol = state.solution;
 
   const isCorrect = 
@@ -579,10 +591,18 @@ export function makeAccusation(
   }
 }
 
+/** 현재 플레이어가 고발하거나 턴을 넘길 수 있는 단계 (반증 대기·로비·종료 제외) */
+function isTurnPhase(state: GameState): boolean {
+  return state.phase.startsWith('PLAYING_');
+}
+
 /**
  * 다음 턴으로 전환
  */
 export function nextTurn(state: GameState): GameState {
+  if (!isTurnPhase(state)) {
+    throw new Error('Cannot end the turn during this phase.');
+  }
   const activePlayers = state.players.filter(p => !p.isEliminated);
   if (activePlayers.length === 0) {
     return {

@@ -6,7 +6,9 @@ import {
   makeSuggestion, 
   findNextDisprovingPlayer, 
   resolveDisprove,
-  makeAccusation 
+  makeAccusation,
+  waitInHallway,
+  nextTurn,
 } from './engine';
 import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
 
@@ -343,13 +345,41 @@ describe('결정적 시드 RNG', () => {
     it('rngCounter는 롤마다 증가해 다음 롤 결과가 달라질 수 있다', () => {
       const a = initGame({ seed: 777 });
       const rolled1 = rollDice(a);
-      const rolled2 = rollDice({ ...rolled1 });
+      const rolled2 = rollDice({ ...rolled1, phase: 'PLAYING_ROLL' });
       expect(rolled1.rngCounter).toBe(1);
       expect(rolled2.rngCounter).toBe(2);
 
       // 같은 카운터를 재사용하면 같은 결과
-      const replay = rollDice({ ...rolled1 });
+      const replay = rollDice({ ...rolled1, phase: 'PLAYING_ROLL' });
       expect(replay.diceRolls).toEqual(rolled2.diceRolls);
     });
+  });
+});
+
+describe('단계(phase) 검증', () => {
+  it('주사위를 굴리기 전에는 이동하거나 복도에서 대기할 수 없다', () => {
+    const state = initGame();
+    expect(() => movePlayer(state, state.players[0].currentRoomId)).toThrow(/phase/i);
+    expect(() => waitInHallway(state)).toThrow(/phase/i);
+  });
+
+  it('이동 단계에서는 주사위를 다시 굴릴 수 없다', () => {
+    const rolled = rollDice(initGame());
+    expect(() => rollDice(rolled)).toThrow(/phase/i);
+  });
+
+  it('반증 대기·게임 종료 중에는 고발하거나 턴을 넘길 수 없다', () => {
+    const state = initGame();
+    const accusation = state.solution;
+    for (const phase of ['WAITING_DISPROVE', 'GAME_OVER', 'LOBBY'] as const) {
+      expect(() => makeAccusation({ ...state, phase }, accusation)).toThrow();
+      expect(() => nextTurn({ ...state, phase })).toThrow();
+    }
+  });
+
+  it('탈락한 플레이어는 고발할 수 없다', () => {
+    const state = initGame();
+    const eliminated = { ...state, players: state.players.map((p, i) => i === 0 ? { ...p, isEliminated: true } : p) };
+    expect(() => makeAccusation(eliminated, state.solution)).toThrow();
   });
 });

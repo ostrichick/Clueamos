@@ -447,6 +447,100 @@ export const useGameStore = create<GameStore>((set, get) => {
     }
   };
 
+  // 반증 차례인 플레이어를 호출한다. 질문 직후와 호스트 새로고침 복원 시 함께 사용한다.
+  const dispatchDisprove = (state: GameState) => {
+    const current = state.currentSuggestion;
+    if (state.phase !== 'WAITING_DISPROVE' || !current) return;
+    const { playMode } = get();
+    const asker = state.players[state.currentPlayerIndex];
+    const suggestion = { suspectId: current.suspectId, locationId: current.locationId, weaponId: current.weaponId };
+    const disprover = findNextDisprovingPlayer(state.players, state.currentPlayerIndex, current);
+
+    if (disprover) {
+      const player = state.players[disprover.playerIndex];
+
+      // Case 1: AI disproves (AI memories are updated once, inside performDisprove)
+      if (player.type.startsWith('ai_')) {
+        setTimeout(() => {
+          if (get().gameState !== state) return;
+          const shownCard = disprover.availableCards[0];
+          const disprovedVisual: HypothesisVisualState = {
+            askerId: asker.id,
+            askerName: asker.name,
+            askerAvatar: asker.avatar,
+            suggestion,
+            phase: 'disproved',
+            responderId: player.id,
+            responderName: player.name,
+            responderAvatar: player.avatar,
+            shownCardId: shownCard.id,
+          };
+
+          set({ activeHypothesisVisual: disprovedVisual });
+
+          if (playMode === 'host') {
+            const guestPlayer = state.players.find(p => p.roleType === 'p2');
+            const isGuestInvolved = guestPlayer && (guestPlayer.id === asker.id || guestPlayer.id === player.id);
+            peerManager.sendMessage({
+              type: 'HYPOTHESIS_VISUAL',
+              payload: {
+                visual: {
+                  ...disprovedVisual,
+                  shownCardId: isGuestInvolved ? disprovedVisual.shownCardId : undefined,
+                } as unknown as Record<string, unknown>,
+              },
+            });
+          }
+
+          get().performDisprove(shownCard.id);
+        }, 1500);
+      }
+      // Case 2: Guest (Player 2) must disprove
+      else if (playMode === 'host' && player.roleType === 'p2') {
+        peerManager.sendMessage({
+          type: 'DISPROVE_REQUEST',
+          payload: { availableCards: disprover.availableCards, askerId: asker.id },
+        });
+      }
+      // Case 3: Host (Player 1) or Local human player must disprove
+      else if (player.roleType === 'p1' || playMode === 'local') {
+        set({ pendingDisprovePrompt: { availableCards: disprover.availableCards, askerId: asker.id } });
+      }
+      return;
+    }
+
+    // Nobody could disprove
+    setTimeout(() => {
+      if (get().gameState !== state) return;
+      const undisprovenVisual: HypothesisVisualState = {
+        askerId: asker.id,
+        askerName: asker.name,
+        askerAvatar: asker.avatar,
+        suggestion,
+        phase: 'undisproven',
+      };
+
+      set({ activeHypothesisVisual: undisprovenVisual });
+
+      // 아무도 반증하지 못한 카드는 100% 정답 봉투 속 카드로 AI 메모리에 각인!
+      const { aiMemories } = get();
+      state.players.forEach(p => {
+        if (p.type.startsWith('ai_') && aiMemories[p.id]) {
+          recordUndisprovenSuggestion(aiMemories[p.id], current, p.hand, asker.type);
+        }
+      });
+
+      if (playMode === 'host') {
+        peerManager.sendMessage({
+          type: 'HYPOTHESIS_VISUAL',
+          payload: { visual: undisprovenVisual as unknown as Record<string, unknown> },
+        });
+      }
+
+      get().performDisprove(undefined);
+    }, 1500);
+  };
+
   return {
     gameState: initGame({ initialPhase: 'LOBBY' }),
     aiMemories: {},
@@ -723,7 +817,9 @@ export const useGameStore = create<GameStore>((set, get) => {
                   pastSuggestions: memory.pastSuggestions,
                 };
               }
-              set({ gameState: saved.gameState, aiMemories: memories, roomWeapons: saved.roomWeapons, turnReviewState: saved.turnReviewState });
+              set({ gameState: saved.gameState, aiMemories: memories, roomWeapons: saved.roomWeapons, turnReviewState: saved.turnReviewState, playMode: 'host', myPlayerRole: 'p1' });
+              // 반증 요청 창과 AI 반증 타이머는 저장되지 않으므로 다시 호출해야 게임이 멈추지 않는다.
+              dispatchDisprove(saved.gameState);
             }
             await get().createRoom(session.roomCode, session.roomSecret || undefined);
             return Boolean(get().roomCode);
@@ -893,6 +989,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       const { gameState } = get();
+      if (gameState.phase !== 'PLAYING_MOVE') return;
       const nextState = waitInHallway(gameState);
       set({ gameState: nextState, selectedRoomId: null });
 
@@ -920,7 +1017,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
-      const { gameState, aiMemories } = get();
+      const { gameState } = get();
       const nextState = makeSuggestion(gameState, suggestion);
 
       // Move weapon miniature to suggested room
@@ -963,115 +1060,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         });
       }
 
-      // Check disprover clockwise
-      const disprover = findNextDisprovingPlayer(
-        nextState.players,
-        nextState.currentPlayerIndex,
-        nextState.currentSuggestion!
-      );
-
-      if (disprover) {
-        const player = nextState.players[disprover.playerIndex];
-
-        // Case 1: AI disproves
-        if (player.type.startsWith('ai_')) {
-          setTimeout(() => {
-            if (get().gameState !== nextState) return;
-            const shownCard = disprover.availableCards[0];
-            if (aiMemories[asker.id]) {
-              recordShownCard(aiMemories[asker.id], player.id, shownCard.id);
-            }
-            nextState.players.forEach(p => {
-              if (p.type.startsWith('ai_') && p.id !== asker.id && p.id !== player.id && aiMemories[p.id]) {
-                recordObservedDisprove(aiMemories[p.id], { ...suggestion, askerId: asker.id }, player.id, p.hand);
-              }
-            });
-
-            const disprovedVisual: HypothesisVisualState = {
-              askerId: asker.id,
-              askerName: asker.name,
-              askerAvatar: asker.avatar,
-              suggestion,
-              phase: 'disproved',
-              responderId: player.id,
-              responderName: player.name,
-              responderAvatar: player.avatar,
-              shownCardId: shownCard.id,
-            };
-
-            set({ activeHypothesisVisual: disprovedVisual });
-
-            if (playMode === 'host') {
-              const guestPlayer = nextState.players.find(p => p.roleType === 'p2');
-              const isGuestInvolved = guestPlayer && (guestPlayer.id === asker.id || guestPlayer.id === player.id);
-              peerManager.sendMessage({
-                type: 'HYPOTHESIS_VISUAL',
-                payload: { 
-                  visual: {
-                    ...disprovedVisual,
-                    shownCardId: isGuestInvolved ? disprovedVisual.shownCardId : undefined,
-                  } as unknown as Record<string, unknown> 
-                },
-              });
-            }
-
-            // When activeHypothesisVisual is displayed, it already visualizes the revealed card
-            // and provides 1-click note recording. Do not set lastSecretClue which creates a redundant 2nd 5s modal.
-
-            get().performDisprove(shownCard.id);
-          }, 1500);
-        }
-        // Case 2: Guest (Player 2) must disprove
-        else if (playMode === 'host' && player.roleType === 'p2') {
-          peerManager.sendMessage({
-            type: 'DISPROVE_REQUEST',
-            payload: {
-              availableCards: disprover.availableCards,
-              askerId: asker.id,
-            },
-          });
-        }
-        // Case 3: Host (Player 1) or Local human player must disprove
-        else if (player.roleType === 'p1' || playMode === 'local') {
-          set({
-            pendingDisprovePrompt: {
-              availableCards: disprover.availableCards,
-              askerId: asker.id,
-            },
-          });
-        }
-      } else {
-        // Nobody could disprove
-        setTimeout(() => {
-          if (get().gameState !== nextState) return;
-          const undisprovenVisual: HypothesisVisualState = {
-            askerId: asker.id,
-            askerName: asker.name,
-            askerAvatar: asker.avatar,
-            suggestion,
-            phase: 'undisproven',
-          };
-
-          set({ activeHypothesisVisual: undisprovenVisual });
-
-          // 아무도 반증하지 못한 카드는 100% 정답 봉투 속 카드로 AI 메모리에 각인!
-          const { aiMemories: curMemories } = get();
-          nextState.players.forEach(p => {
-            if (p.type.startsWith('ai_') && curMemories[p.id]) {
-              recordUndisprovenSuggestion(curMemories[p.id], { ...suggestion, askerId: asker.id }, p.hand, asker.type);
-            }
-          });
-
-          if (playMode === 'host') {
-            peerManager.sendMessage({
-              type: 'HYPOTHESIS_VISUAL',
-              payload: { visual: undisprovenVisual as unknown as Record<string, unknown> },
-            });
-          }
-
-          get().performDisprove(undefined);
-        }, 1500);
-      }
+      dispatchDisprove(nextState);
     },
 
     performDisprove: (cardId) => {
@@ -1181,7 +1170,13 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       const { gameState } = get();
-      const { state: nextState, isCorrect } = makeAccusation(gameState, accusation);
+      let result: ReturnType<typeof makeAccusation>;
+      try {
+        result = makeAccusation(gameState, accusation);
+      } catch {
+        return false; // Not this player's turn phase (e.g. waiting for a disproof).
+      }
+      const { state: nextState, isCorrect } = result;
       set({ gameState: nextState });
 
       if (playMode === 'host') {
@@ -1309,6 +1304,13 @@ export const useGameStore = create<GameStore>((set, get) => {
       const { playMode, gameState } = get();
       if (playMode === 'guest') return;
 
+      let nextState: GameState;
+      try {
+        nextState = nextTurn(gameState);
+      } catch {
+        return; // Turn cannot end during a disproof, in the lobby, or after game over.
+      }
+
       set({ turnReviewState: null, selectedRoomId: null });
 
       if (playMode === 'host') {
@@ -1318,7 +1320,6 @@ export const useGameStore = create<GameStore>((set, get) => {
         });
       }
 
-      const nextState = nextTurn(gameState);
       set({ gameState: nextState });
 
       if (playMode === 'host') {
@@ -1362,7 +1363,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // If in PLAYING_ACTION_DONE phase: AI evaluates final accusation or ends turn
       if (gameState.phase === 'PLAYING_ACTION_DONE') {
-        const accusation = shouldAIAccuse(currentP, memory, gameState.turnCount);
+        const accusation = shouldAIAccuse(currentP, memory, gameState.turnCount, gameState.maxTurns);
         if (accusation) {
           get().performAccusation(accusation);
         } else {
@@ -1577,7 +1578,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           return;
         }
 
-        const accusation = shouldAIAccuse(currentP, memory, gameState.turnCount);
+        const accusation = shouldAIAccuse(currentP, memory, gameState.turnCount, gameState.maxTurns);
         if (accusation) {
           get().performAccusation(accusation);
         } else {

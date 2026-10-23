@@ -227,3 +227,64 @@ describe('게임 권한과 턴 전환 회귀', () => {
     expect(Object.keys(useGameStore.getState().aiMemories)).toEqual(oldMemoryIds);
   });
 });
+
+describe('반증 대기 중 호스트 새로고침 복구', () => {
+  type Game = ReturnType<typeof useGameStore.getState>['gameState'];
+  type Card = Game['allCards'][number];
+
+  // 지정한 카드 1장 + 아무도 갖지 않은 정답 카드로 질문을 구성해 반증자를 고정한다.
+  const waitingFor = (game: Game, askerIndex: number, card: Card): Game => {
+    const pick = (category: Card['category'], solutionId: string) => card.category === category ? card.id : solutionId;
+    return {
+      ...game,
+      phase: 'WAITING_DISPROVE',
+      currentPlayerIndex: askerIndex,
+      currentSuggestion: {
+        askerId: game.players[askerIndex].id,
+        suspectId: pick('suspect', game.solution.suspectId),
+        locationId: pick('location', game.solution.locationId),
+        weaponId: pick('weapon', game.solution.weaponId),
+      },
+    };
+  };
+
+  const refreshHost = async (makeState: (game: Game) => Game) => {
+    const data = new Map<string, string>();
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => { data.set(key, value); },
+      removeItem: (key: string) => { data.delete(key); },
+    });
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, roomCode: null, turnReviewState: null });
+    await useGameStore.getState().createRoom();
+    useGameStore.getState().startNewGame();
+    vi.runAllTimers();
+    const saved = makeState(useGameStore.getState().gameState);
+    useGameStore.setState({ gameState: saved });
+    // 새로고침: 메모리 상의 상태와 타이머는 모두 사라진다.
+    vi.clearAllTimers();
+    useGameStore.setState({
+      gameState: { ...saved, phase: 'LOBBY' }, aiMemories: {}, roomCode: null, roomSecret: null,
+      pendingDisprovePrompt: null, activeHypothesisVisual: null,
+    });
+    expect(await useGameStore.getState().restoreSessionIfNeeded()).toBe(true);
+    return saved;
+  };
+
+  it('P1이 반증할 차례면 반증 선택 창을 다시 띄운다', async () => {
+    const saved = await refreshHost(game => waitingFor(game, 1, game.players[0].hand[0]));
+    const prompt = useGameStore.getState().pendingDisprovePrompt;
+    expect(prompt?.availableCards.map(c => c.id)).toEqual([saved.players[0].hand[0].id]);
+    expect(prompt?.askerId).toBe(saved.players[1].id);
+  });
+
+  it('AI가 반증할 차례면 반증을 이어서 진행한다', async () => {
+    await refreshHost(game => waitingFor(game, 0, game.players[2].hand[0]));
+    expect(useGameStore.getState().gameState.phase).toBe('WAITING_DISPROVE');
+    vi.advanceTimersByTime(1500);
+    const s = useGameStore.getState();
+    expect(s.gameState.phase).toBe('PLAYING_ACTION_DONE');
+    expect(s.activeHypothesisVisual?.phase).toBe('disproved');
+  });
+});
