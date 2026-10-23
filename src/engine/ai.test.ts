@@ -270,28 +270,13 @@ describe('AI 행동 결정', () => {
     }
   });
 
-  it('블레이크: 남은 후보 총합이 5 이하이면 승부수 고발을 시도한다', () => {
+  it('블레이크: 정답 확률이 1/3 이상이면 초반에도 승부수 고발을 시도한다', () => {
     const state = makeState();
     const ai = state.players[2];
-    const { memory, solution } = memoryWithSingleCandidates(ai);
-    // 용의자 1 + 장소 2 + 흉기 2 = 5개
-    const handIds = new Set(ai.hand.map(c => c.id));
-    const s = pickCardNotInHand('suspect', handIds);
-    const l = pickCardNotInHand('location', handIds);
-    const w = pickCardNotInHand('weapon', handIds);
-    SUSPECTS.forEach(c => { if (c.id !== s.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
-    const l2 = LOCATION_CARDS.find(c => c.id !== l.id && !handIds.has(c.id))!;
-    LOCATION_CARDS.forEach(c => {
-      if (c.id !== l.id && c.id !== l2.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE');
-    });
-    const w2 = WEAPONS.find(c => c.id !== w.id && !handIds.has(c.id))!;
-    WEAPONS.forEach(c => {
-      if (c.id !== w.id && c.id !== w2.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE');
-    });
+    const memory = narrowedMemory(ai, 1, 1, 3); // 1 × 1 × 3 => 1/3
 
     const action = decideBlakeAction(state, memory);
     expect(action.type).toBe('ACCUSE');
-    void solution;
   });
 
   it('블레이크: 후보가 넉넉하면 MOVE_AND_SUGGEST를 반환한다', () => {
@@ -324,31 +309,52 @@ describe('shouldAIAccuse', () => {
     expect(result).toEqual(solution);
   });
 
-  it('아서: 2개 카테고리 확정 + 1개 2장 이하의 경우 4라운드 이후에만 고발한다', () => {
-    const state = makeState();
-    const ai = state.players[2]; // ai_logic
-    const memory = initAIMemory(ai);
-    const handIds = new Set(ai.hand.map(c => c.id));
+  it('아서: 정답 확률 1/2이면 막판(남은 라운드 4 이하)에만 고발한다', () => {
+    const ai = makeState().players[2]; // ai_logic
+    const memory = narrowedMemory(ai, 1, 2, 1);
 
-    const s = pickCardNotInHand('suspect', handIds);
-    const w = pickCardNotInHand('weapon', handIds);
-    SUSPECTS.forEach(c => { if (c.id !== s.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
-    WEAPONS.forEach(c => { if (c.id !== w.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
-    // 장소 후보를 2장으로만 축소 (용의자·흉기 확정 + 장소 2장 => 규칙 2a)
-    const remaining = LOCATION_CARDS.filter(c => !handIds.has(c.id)).slice(0, 2);
-    LOCATION_CARDS.forEach(c => { if (!remaining.includes(c)) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
-
-    // 4라운드 미만 -> 고발 보류
-    expect(shouldAIAccuse(ai, memory, 2)).toBeNull();
-    // 4라운드 이상 -> 고발 (후보 중 하나를 추리)
-    expect(shouldAIAccuse(ai, memory, 4)).not.toBeNull();
+    expect(shouldAIAccuse(ai, memory, 4, 16)).toBeNull();
+    expect(shouldAIAccuse(ai, memory, 11, 16)).toBeNull();
+    expect(shouldAIAccuse(ai, memory, 12, 16)).not.toBeNull();
   });
 
-  it('블레이크: 남은 후보 총합이 5 이하이면 고발, 아니면 null을 반환한다', () => {
-    const state = makeState();
-    const ai = state.players[3]; // ai_instinct
-    const memory = initAIMemory(ai);
+  it('아서: 정답 확률 1/3은 마지막 라운드에만 고발한다', () => {
+    const ai = makeState().players[2]; // ai_logic
+    const memory = narrowedMemory(ai, 1, 1, 3);
 
-    expect(shouldAIAccuse(ai, memory, 10)).toBeNull();
+    expect(shouldAIAccuse(ai, memory, 15, 16)).toBeNull();
+    expect(shouldAIAccuse(ai, memory, 16, 16)).not.toBeNull();
+  });
+
+  it('블레이크: 평소 1/3, 막판(남은 라운드 3 이하)에는 1/4 확률이면 고발한다', () => {
+    const ai = makeState().players[3]; // ai_instinct
+    expect(shouldAIAccuse(ai, initAIMemory(ai), 10, 16)).toBeNull();
+
+    const quarter = narrowedMemory(ai, 1, 2, 2);
+    expect(shouldAIAccuse(ai, quarter, 12, 16)).toBeNull();
+    expect(shouldAIAccuse(ai, quarter, 13, 16)).not.toBeNull();
+  });
+
+  it('후보가 여럿이면 아무도 반증하지 못한(POSSIBLE) 카드를 우선 고발한다', () => {
+    const ai = makeState().players[2];
+    const memory = narrowedMemory(ai, 1, 2, 1);
+    const locations = LOCATION_CARDS.filter(c => memory.cardStatus.get(c.id) !== 'IMPOSSIBLE');
+    memory.cardStatus.set(locations[1].id, 'POSSIBLE');
+
+    expect(shouldAIAccuse(ai, memory, 16, 16)?.locationId).toBe(locations[1].id);
   });
 });
+
+/** AI 손패에 없는 카드만 카테고리별로 지정한 수만큼 후보로 남긴 메모리 */
+function narrowedMemory(ai: ReturnType<typeof makeState>['players'][number], suspects: number, locations: number, weapons: number) {
+  const memory = initAIMemory(ai);
+  const handIds = new Set(ai.hand.map(c => c.id));
+  const keep = (cards: typeof SUSPECTS, count: number) => {
+    const kept = new Set(cards.filter(c => !handIds.has(c.id)).slice(0, count).map(c => c.id));
+    cards.forEach(c => { if (!kept.has(c.id)) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
+  };
+  keep(SUSPECTS, suspects);
+  keep(LOCATION_CARDS, locations);
+  keep(WEAPONS, weapons);
+  return memory;
+}

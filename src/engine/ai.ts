@@ -167,7 +167,7 @@ export type AIAction =
 /**
  * 1. 아서(Arthur) - 논리 소거형 AI 알고리즘
  * - 체계적으로 남은 후보군 중 하나를 선택해 질문
- * - 3개 카테고리 중 단 1개의 후보만 남았을 때(확신도 100%) 최종 고발 단행
+ * - 평소엔 확신도 100%일 때만, 막판에는 승산이 충분할 때 고발 (기준은 decideAccusation 참고)
  */
 export function decideArthurAction(state: GameState, memory: AIMemory): AIAction {
   const me = state.players[state.currentPlayerIndex];
@@ -175,21 +175,8 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
   const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
 
-  // 확신도 검사: 3개 카테고리 후보가 1개씩만 남았거나, 2개 카테고리가 확정되고 1개가 2개 이하로 좁혀진 경우 고발!
-  if (
-    (suspectCandidates.length === 1 && locationCandidates.length === 1 && weaponCandidates.length === 1) ||
-    (suspectCandidates.length === 1 && weaponCandidates.length === 1 && locationCandidates.length <= 2 && state.turnCount >= 4) ||
-    (suspectCandidates.length === 1 && locationCandidates.length === 1 && weaponCandidates.length <= 2 && state.turnCount >= 4)
-  ) {
-    return {
-      type: 'ACCUSE',
-      accusation: {
-        suspectId: suspectCandidates[0].id,
-        locationId: locationCandidates[0].id,
-        weaponId: weaponCandidates[0].id,
-      },
-    };
-  }
+  const accusation = decideAccusation('ai_logic', memory, state.turnCount, state.maxTurns);
+  if (accusation) return { type: 'ACCUSE', accusation };
 
   // 이미 방에 도착해 질문할 차례라면 반드시 현재 방으로 질문
   const accessible = state.phase === 'PLAYING_SUGGEST'
@@ -243,27 +230,16 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
 
 /**
  * 2. 블레이크(Blake) - 직감 & 블러핑형 AI 알고리즘
- * - 3개 카테고리 후보 수 합이 4 이하(거의 좁혀짐)면 과감하게 승부수 고발
+ * - 정답 확률이 1/3 이상이면 과감하게 승부수 고발 (기준은 decideAccusation 참고)
  * - 25% 확률로 자신이 가진 카드를 질문에 섞어 블러핑 시도
  */
 export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction {
   const me = state.players[state.currentPlayerIndex];
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
-  const locationCandidates = getRemainingCandidates(memory, 'location');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
 
-  // 과감한 승부수: 총 후보 수 합이 5 이하(거의 좁혀짐)면 바로 최종 고발 시도!
-  const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length;
-  if (totalCandidates <= 5) {
-    return {
-      type: 'ACCUSE',
-      accusation: {
-        suspectId: suspectCandidates[0]?.id || SUSPECTS[0].id,
-        locationId: locationCandidates[0]?.id || LOCATION_CARDS[0].id,
-        weaponId: weaponCandidates[0]?.id || WEAPONS[0].id,
-      },
-    };
-  }
+  const accusation = decideAccusation('ai_instinct', memory, state.turnCount, state.maxTurns);
+  if (accusation) return { type: 'ACCUSE', accusation };
 
   // 이미 이동을 마쳤다면 선택지는 현재 방 하나뿐
   const accessible = state.phase === 'PLAYING_SUGGEST'
@@ -302,58 +278,52 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
   };
 }
 
+const DEFAULT_MAX_TURNS = 16;
+
 /**
- * 행동 완료 후(PLAYING_ACTION_DONE) AI가 최종 고발을 단행해야 하는지 판단
- * - 아서(논리형): 3개 카테고리 후보가 1개씩 남았거나 2개 확정+1개 2개 이하
- * - 블레이크(직감형): 남은 후보 총합이 5개 이하인 경우
+ * 고발에 필요한 최소 정답 확률.
+ * 틀리면 탈락이지만 제한 턴이 지나면 아무도 이기지 못하므로, 남은 턴이 적을수록 기준을 낮춘다.
+ * - 아서(논리형): 평소 100%, 남은 라운드 4 이하 1/2, 마지막 라운드 1/3
+ * - 블레이크(직감형): 평소 1/3, 남은 라운드 3 이하 1/4
  */
-export function shouldAIAccuse(player: Player, memory: AIMemory, turnCount: number = 4): Solution | null {
-  const suspectCandidates = getRemainingCandidates(memory, 'suspect');
-  const locationCandidates = getRemainingCandidates(memory, 'location');
-  const weaponCandidates = getRemainingCandidates(memory, 'weapon');
+function requiredOdds(personality: Player['type'], turnCount: number, maxTurns: number): number {
+  const turnsLeft = maxTurns - turnCount;
+  if (personality === 'ai_instinct') return turnsLeft <= 3 ? 1 / 4 : 1 / 3;
+  if (turnsLeft <= 0) return 1 / 3;
+  if (turnsLeft <= 4) return 1 / 2;
+  return 1;
+}
 
-  // 1. 3개 카테고리 후보가 1개씩만 남은 경우 (100% 확신) -> 즉시 최종 고발!
-  if (
-    suspectCandidates.length === 1 &&
-    locationCandidates.length === 1 &&
-    weaponCandidates.length === 1
-  ) {
-    return {
-      suspectId: suspectCandidates[0].id,
-      locationId: locationCandidates[0].id,
-      weaponId: weaponCandidates[0].id,
-    };
-  }
+/**
+ * 남은 후보 조합의 정답 확률(1 / 후보 수의 곱)이 성향별 기준 이상이면 고발할 조합을 반환한다.
+ * 여러 후보가 남았다면 아무도 반증하지 못했던(POSSIBLE) 카드를 우선 고른다.
+ */
+function decideAccusation(
+  personality: Player['type'],
+  memory: AIMemory,
+  turnCount: number,
+  maxTurns: number = DEFAULT_MAX_TURNS
+): Solution | null {
+  const suspects = getRemainingCandidates(memory, 'suspect');
+  const locations = getRemainingCandidates(memory, 'location');
+  const weapons = getRemainingCandidates(memory, 'weapon');
+  if (!suspects.length || !locations.length || !weapons.length) return null;
 
-  // 2. 아서(논리형): 2개 카테고리 확정(1개) & 나머지 1개가 2개 이하로 압축되었을 때 (4라운드 이상 경과 시)
-  if (player.type === 'ai_logic' && turnCount >= 4) {
-    if (suspectCandidates.length === 1 && weaponCandidates.length === 1 && locationCandidates.length <= 2) {
-      return {
-        suspectId: suspectCandidates[0].id,
-        locationId: locationCandidates[0].id,
-        weaponId: weaponCandidates[0].id,
-      };
-    }
-    if (suspectCandidates.length === 1 && locationCandidates.length === 1 && weaponCandidates.length <= 2) {
-      return {
-        suspectId: suspectCandidates[0].id,
-        locationId: locationCandidates[0].id,
-        weaponId: weaponCandidates[0].id,
-      };
-    }
-  }
+  const odds = 1 / (suspects.length * locations.length * weapons.length);
+  if (odds < requiredOdds(personality, turnCount, maxTurns)) return null;
 
-  // 3. 블레이크(직감형): 남은 후보 총합이 5개 이하인 경우 승부수 고발
-  if (player.type === 'ai_instinct') {
-    const totalCandidates = suspectCandidates.length + locationCandidates.length + weaponCandidates.length;
-    if (totalCandidates <= 5) {
-      return {
-        suspectId: suspectCandidates[0]?.id || SUSPECTS[0].id,
-        locationId: locationCandidates[0]?.id || LOCATION_CARDS[0].id,
-        weaponId: weaponCandidates[0]?.id || WEAPONS[0].id,
-      };
-    }
-  }
+  const best = (cards: Card[]) => cards.find(c => memory.cardStatus.get(c.id) === 'POSSIBLE') ?? cards[0];
+  return { suspectId: best(suspects).id, locationId: best(locations).id, weaponId: best(weapons).id };
+}
 
-  return null;
+/**
+ * 행동 완료 후(PLAYING_ACTION_DONE) AI가 최종 고발을 단행해야 하는지 판단 (기준은 decideAccusation 참고)
+ */
+export function shouldAIAccuse(
+  player: Player,
+  memory: AIMemory,
+  turnCount: number = 1,
+  maxTurns: number = DEFAULT_MAX_TURNS
+): Solution | null {
+  return decideAccusation(player.type, memory, turnCount, maxTurns);
 }

@@ -281,7 +281,7 @@ function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCou
 
         // Phase: PLAYING_ACTION_DONE (AI evaluates final accusation or ends turn)
         if (state.phase === 'PLAYING_ACTION_DONE') {
-          const accusation = shouldAIAccuse(currentP, memory);
+          const accusation = shouldAIAccuse(currentP, memory, state.turnCount, state.maxTurns);
           if (accusation) {
             if (verbose) {
               console.log(`🎯 [AI POST-ACTION ACCUSATION!] ${pDisplayName} accuses!`);
