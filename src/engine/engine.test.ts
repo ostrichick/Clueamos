@@ -356,6 +356,17 @@ describe('결정적 시드 RNG', () => {
   });
 });
 
+describe('로그 ID', () => {
+  it('같은 순간에 생성된 로그도 ID가 겹치지 않는다', () => {
+    const rolled = rollDice(initGame());
+    const moved = movePlayer(rolled, rolled.accessibleRoomIds![0]);
+    const ids = moved.logs.map(l => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const again = rollDice(initGame());
+    expect(again.logs.at(-1)!.id).not.toBe(rolled.logs.at(-1)!.id);
+  });
+});
+
 describe('단계(phase) 검증', () => {
   it('주사위를 굴리기 전에는 이동하거나 복도에서 대기할 수 없다', () => {
     const state = initGame();

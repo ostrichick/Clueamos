@@ -22,6 +22,10 @@ export const SECRET_PASSAGES: Record<string, string> = {
   room_rooftop: 'room_ballroom',
 };
 
+// 로그 ID 고유성 보장 (같은 밀리초에 여러 로그가 생겨도 React key가 겹치지 않도록)
+let logSequence = 0;
+const nextLogSequence = () => ++logSequence;
+
 // Fisher-Yates 셔플 유틸리티 (rng 미지정 시 Math.random 사용)
 export function shuffle<T>(array: T[], rng?: RNG): T[] {
   const rand = rng || Math.random;
@@ -106,7 +110,7 @@ export function initGame(options?: InitGameOptions): GameState {
     weaponId: shuffledWeapons[0].id,
   };
 
-  // 나머지 카드 묶음 (18 - 3 = 15장)
+  // 나머지 카드 묶음 (20 - 3 = 17장)
   const remainingCards: Card[] = [
     ...shuffledSuspects.slice(1),
     ...shuffledLocations.slice(1),
@@ -213,7 +217,7 @@ export function initGame(options?: InitGameOptions): GameState {
     name: getPlayerDisplayName(p as Player, locale),
   }));
 
-  // 15장의 카드를 n명에게 골고루 분배
+  // 17장의 카드를 n명에게 골고루 분배
   shuffledDeck.forEach((card, index) => {
     const playerIndex = index % initialPlayers.length;
     initialPlayers[playerIndex].hand.push(card);
@@ -264,7 +268,7 @@ export function rollDice(state: GameState, maxVal: number = DIE_MAX_VALUE): Game
   const { reachableRoomIds } = calculateReachablePaths(currentPlayer.currentRoomId, diceValue);
 
   const newLog: LogEntry = {
-    id: `log_${Date.now()}_dice`,
+    id: `log_${Date.now()}_${nextLogSequence()}_dice`,
     turn: state.turnCount,
     message: `🎲 ${currentPlayer.name} rolled [${d1}, ${d2}] = ${diceValue}! (${reachableRoomIds.length} destinations reachable)`,
     type: 'event',
@@ -305,7 +309,7 @@ export function movePlayer(state: GameState, targetRoomId: string): GameState {
   );
 
   const newLog: LogEntry = {
-    id: `log_${Date.now()}_move`,
+    id: `log_${Date.now()}_${nextLogSequence()}_move`,
     turn: state.turnCount,
     message: `${currentPlayer.name} moved to [${targetRoom?.name}].`,
     type: 'move',
@@ -353,7 +357,7 @@ export function makeSuggestion(
   const weapon = weaponCard.name;
 
   const newLog: LogEntry = {
-    id: `log_${Date.now()}_sugg`,
+    id: `log_${Date.now()}_${nextLogSequence()}_sugg`,
     turn: state.turnCount,
     message: `${asker.name} suggests: "${suspect} in the ${location} with the ${weapon}."`,
     type: 'suggestion',
@@ -372,7 +376,7 @@ export function makeSuggestion(
   const updatedPlayers = state.players.map(p => {
     if (p.characterId === suggestion.suspectId && p.currentRoomId !== suggestion.locationId) {
       logs.push({
-        id: `log_${Date.now()}_summon_${p.id}`,
+        id: `log_${Date.now()}_${nextLogSequence()}_summon_${p.id}`,
         turn: state.turnCount,
         message: `🚨 [Summoned] ${p.name} was summoned to the ${location} for questioning!`,
         type: 'event',
@@ -438,7 +442,7 @@ export function waitInHallway(state: GameState): GameState {
   }
   const player = state.players[state.currentPlayerIndex];
   const waitLog: LogEntry = {
-    id: `log_${Date.now()}_wait`,
+    id: `log_${Date.now()}_${nextLogSequence()}_wait`,
     turn: state.turnCount,
     message: `🚶 ${player.name} waited in the hallway.`,
     type: 'event',
@@ -487,7 +491,7 @@ export function resolveDisprove(
 
   if (responder && shownCardId) {
     newLog = {
-      id: `log_${Date.now()}_disprove`,
+      id: `log_${Date.now()}_${nextLogSequence()}_disprove`,
       turn: state.turnCount,
       message: `${responder.name} secretly showed 1 clue to ${asker.name} to disprove the claim.`,
       type: 'disprove',
@@ -503,7 +507,7 @@ export function resolveDisprove(
     };
   } else {
     newLog = {
-      id: `log_${Date.now()}_disprove_none`,
+      id: `log_${Date.now()}_${nextLogSequence()}_disprove_none`,
       turn: state.turnCount,
       message: 'Nobody could disprove this hypothesis! (Very close to truth)',
       type: 'disprove',
@@ -549,7 +553,7 @@ export function makeAccusation(
 
   if (isCorrect) {
     const winLog: LogEntry = {
-      id: `log_${Date.now()}_win`,
+      id: `log_${Date.now()}_${nextLogSequence()}_win`,
       turn: state.turnCount,
       message: `🎉 [Case Solved!] ${player.name} revealed the truth and won!`,
       type: 'accusation',
@@ -571,7 +575,7 @@ export function makeAccusation(
     );
 
     const failLog: LogEntry = {
-      id: `log_${Date.now()}_fail`,
+      id: `log_${Date.now()}_${nextLogSequence()}_fail`,
       turn: state.turnCount,
       message: `❌ ${player.name} accusation was incorrect! Eliminated from investigation.`,
       type: 'accusation',
@@ -611,7 +615,7 @@ export function nextTurn(state: GameState): GameState {
       logs: [
         ...state.logs,
         {
-          id: `log_${Date.now()}_over`,
+          id: `log_${Date.now()}_${nextLogSequence()}_over`,
           turn: state.turnCount,
           message: 'All detectives failed their deductions. The culprit escaped.',
           type: 'event',
@@ -635,7 +639,7 @@ export function nextTurn(state: GameState): GameState {
       logs: [
         ...state.logs,
         {
-          id: `log_${Date.now()}_timeout`,
+          id: `log_${Date.now()}_${nextLogSequence()}_timeout`,
           turn: state.turnCount,
           message: 'Time out: The storm cleared and the murderer slipped away.',
           type: 'event',

@@ -228,6 +228,43 @@ describe('게임 권한과 턴 전환 회귀', () => {
   });
 });
 
+describe('AI 턴 진행', () => {
+  it('AI 턴은 주사위·이동·질문까지 진행되고, 질문은 실제로 도착한 방에서 한 번만 기록된다', () => {
+    useGameStore.setState({ playMode: 'solo', aiPlayerCount: 1, turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const initial = useGameStore.getState().gameState;
+    const ai = initial.players[1];
+    useGameStore.setState({ gameState: { ...initial, currentPlayerIndex: 1 } });
+
+    useGameStore.getState().runAITurnIfNeeded();
+    vi.advanceTimersByTime(600 + 1100 + 900);
+
+    const { gameState, aiMemories } = useGameStore.getState();
+    const suggestionLog = gameState.logs.find(l => l.type === 'suggestion' && l.metadata?.askerId === ai.id);
+    if (!suggestionLog) {
+      // 바로 고발했거나 갈 수 있는 방이 없어 복도에서 대기한 경우
+      expect(['PLAYING_ACTION_DONE', 'PLAYING_ROLL', 'GAME_OVER']).toContain(gameState.phase);
+      return;
+    }
+    const aiNow = gameState.players.find(p => p.id === ai.id)!;
+    expect(suggestionLog.metadata?.locationId).toBe(aiNow.currentRoomId);
+    expect(aiMemories[ai.id].pastSuggestions).toHaveLength(1);
+  });
+
+  it('게스트 연결이 끊기면 호스트 확인만으로 턴 리뷰를 넘긴다', () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, turnReviewState: null, isConnected: false });
+    useGameStore.getState().startNewGame();
+    const initial = useGameStore.getState().gameState;
+    useGameStore.setState({ gameState: { ...initial, phase: 'PLAYING_ACTION_DONE' } });
+    useGameStore.getState().performEndTurn();
+    expect(useGameStore.getState().turnReviewState?.active).toBe(true);
+
+    useGameStore.getState().confirmTurnReview();
+    expect(useGameStore.getState().turnReviewState).toBeNull();
+    expect(useGameStore.getState().gameState.currentPlayerIndex).toBe(1);
+  });
+});
+
 describe('게스트 메시지 위조 방지', () => {
   it('게스트가 보낸 AI 대사는 호스트 화면에 표시하지 않는다', () => {
     useGameStore.setState({ playMode: 'host', activeDialogue: null });

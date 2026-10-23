@@ -24,6 +24,7 @@ import {
   recordUndisprovenSuggestion,
   recordObservedDisprove,
   shouldAIAccuse,
+  recordOwnSuggestion,
   type AIMemory
 } from '../src/engine/ai';
 import { SUSPECTS, LOCATION_CARDS, WEAPONS } from '../src/engine/data';
@@ -251,6 +252,7 @@ function runSingleGame(gameNumber: number, verbose: boolean = false, aiPlayerCou
       } else {
         state = movePlayer(state, action.targetRoomId);
         state = makeSuggestion(state, action.suggestion);
+        recordOwnSuggestion(memory, state.currentSuggestion!);
 
         const disprover = findNextDisprovingPlayer(
           state.players,

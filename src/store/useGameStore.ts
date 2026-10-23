@@ -13,7 +13,9 @@ import {
 } from '@/engine/engine';
 import { 
   type AIMemory, 
+  type AIAction,
   initAIMemory, 
+  recordOwnSuggestion,
   decideArthurAction, 
   decideBlakeAction, 
   recordShownCard,
@@ -469,6 +471,47 @@ export const useGameStore = create<GameStore>((set, get) => {
     if (lines.length > 0) {
       const text = lines[Math.floor(Math.random() * lines.length)];
       get().showDialogue(player, text);
+    }
+  };
+
+  // 이동 단계에서 AI(또는 AFK 대리) 결정을 실행한다: 고발하거나, 이동한 뒤 900ms 후 질문한다.
+  const playMoveDecision = (
+    currentP: Player,
+    decide: (state: GameState) => AIAction,
+    stillValid: () => boolean,
+    withDialogue: boolean,
+  ) => {
+    const state = get().gameState;
+    if (state.phase !== 'PLAYING_MOVE') return;
+    try {
+      const action = decide(state);
+      if (action.type === 'ACCUSE') {
+        get().performAccusation(action.accusation);
+        return;
+      }
+      const accessible = state.accessibleRoomIds ?? [];
+      const targetRoomId = accessible.includes(action.targetRoomId) ? action.targetRoomId : accessible[0];
+      if (!targetRoomId) {
+        get().performWaitInHallway();
+        return;
+      }
+      get().performMove(targetRoomId);
+      if (withDialogue) triggerAIDialogue(currentP, 'move');
+
+      setTimeout(() => {
+        const moved = get().gameState;
+        if (!stillValid() || moved.phase !== 'PLAYING_SUGGEST') return;
+        try {
+          // 질문 장소는 항상 실제로 도착한 방 (대체 방으로 이동한 경우 포함)
+          get().performSuggestion({ ...action.suggestion, locationId: moved.players[moved.currentPlayerIndex].currentRoomId });
+          if (withDialogue) triggerAIDialogue(currentP, 'suggest');
+        } catch (err) {
+          console.error('AI suggestion error:', err);
+        }
+      }, 900);
+    } catch (err) {
+      console.error('AI move decision error:', err);
+      get().performWaitInHallway();
     }
   };
 
@@ -992,8 +1035,8 @@ export const useGameStore = create<GameStore>((set, get) => {
           sendGuestState('STATE_SYNC', nextState);
         }
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Cannot move to this room.';
-        alert(msg);
+        // The board only offers reachable rooms; a blocking alert() here would also freeze game timers.
+        console.warn('Move rejected:', e instanceof Error ? e.message : e);
       }
     },
 
@@ -1036,6 +1079,8 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       const { gameState } = get();
       const nextState = makeSuggestion(gameState, suggestion);
+      const askerMemory = get().aiMemories[nextState.currentSuggestion!.askerId];
+      if (askerMemory) recordOwnSuggestion(askerMemory, nextState.currentSuggestion!);
 
       // Move weapon miniature to suggested room
       const curWeapons = { ...get().roomWeapons };
@@ -1298,7 +1343,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (playMode === 'host') {
         const updatedRoles = Array.from(new Set([...turnReviewState.readyRoles, 'p1' as PlayerRole]));
         const hasGuest = gameState.players.some(p => p.roleType === 'p2');
-        if (!hasGuest || updatedRoles.includes('p2')) {
+        // A disconnected guest cannot confirm; let the host continue (the guest resyncs on rejoin).
+        if (!hasGuest || updatedRoles.includes('p2') || !get().isConnected) {
           get().proceedToNextTurn();
         } else {
           const updatedState = { ...turnReviewState, readyRoles: updatedRoles };
@@ -1391,19 +1437,19 @@ export const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
+      const decide = (state: GameState) => currentP.type === 'ai_logic'
+        ? decideArthurAction(state, memory)
+        : decideBlakeAction(state, memory);
+
       // If already in PLAYING_SUGGEST phase:
       if (gameState.phase === 'PLAYING_SUGGEST') {
         try {
-          const action = currentP.type === 'ai_logic'
-            ? decideArthurAction(gameState, memory)
-            : decideBlakeAction(gameState, memory);
+          const action = decide(gameState);
           if (action.type === 'MOVE_AND_SUGGEST') {
             get().performSuggestion(action.suggestion);
             triggerAIDialogue(currentP, 'suggest');
-          } else if (action.type === 'ACCUSE') {
-            get().performAccusation(action.accusation);
           } else {
-            get().performEndTurn();
+            get().performAccusation(action.accusation);
           }
         } catch (err) {
           console.error('AI suggest error:', err);
@@ -1414,44 +1460,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // If in PLAYING_MOVE phase (dice was rolled, need to decide move):
       if (gameState.phase === 'PLAYING_MOVE') {
-        try {
-          const action = currentP.type === 'ai_logic'
-            ? decideArthurAction(gameState, memory)
-            : decideBlakeAction(gameState, memory);
-
-          if (action.type === 'ACCUSE') {
-            get().performAccusation(action.accusation);
-          } else {
-            const accessible = gameState.accessibleRoomIds || [currentP.currentRoomId];
-            const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
-              ? action.targetRoomId
-              : accessible[0];
-
-            if (!targetRoomId) {
-              get().performWaitInHallway();
-              return;
-            }
-
-            get().performMove(targetRoomId);
-            triggerAIDialogue(currentP, 'move');
-
-            setTimeout(() => {
-              if (!sameTurn()) return;
-              try {
-                const stateAfterMove = get().gameState;
-                if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
-                  get().performSuggestion(action.suggestion);
-                  triggerAIDialogue(currentP, 'suggest');
-                }
-              } catch (err) {
-                console.error('AI suggestion error:', err);
-              }
-            }, 900);
-          }
-        } catch (err) {
-          console.error('AI turn move decision error:', err);
-          get().performWaitInHallway();
-        }
+        playMoveDecision(currentP, decide, sameTurn, true);
         return;
       }
 
@@ -1464,48 +1473,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // Wait for dice roll animation (600ms roll + 500ms result impact = 1100ms)
       setTimeout(() => {
-        if (!sameTurn()) return;
-        try {
-          const stateAfterRoll = get().gameState;
-          if (stateAfterRoll.phase !== 'PLAYING_MOVE') return;
-
-          const action = currentP.type === 'ai_logic' 
-            ? decideArthurAction(stateAfterRoll, memory)
-            : decideBlakeAction(stateAfterRoll, memory);
-
-          if (action.type === 'ACCUSE') {
-            get().performAccusation(action.accusation);
-          } else {
-            const accessible = stateAfterRoll.accessibleRoomIds || [currentP.currentRoomId];
-            const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
-              ? action.targetRoomId
-              : accessible[0];
-
-            if (!targetRoomId) {
-              get().performWaitInHallway();
-              return;
-            }
-
-            get().performMove(targetRoomId);
-            triggerAIDialogue(currentP, 'move');
-
-            setTimeout(() => {
-              if (!sameTurn()) return;
-              try {
-                const stateAfterMove = get().gameState;
-                if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
-                  get().performSuggestion(action.suggestion);
-                  triggerAIDialogue(currentP, 'suggest');
-                }
-              } catch (err) {
-                console.error('AI suggestion error:', err);
-              }
-            }, 900);
-          }
-        } catch (err) {
-          console.error('AI turn decision error:', err);
-          get().performWaitInHallway();
-        }
+        if (sameTurn()) playMoveDecision(currentP, decide, sameTurn, true);
       }, 1100);
     },
 
@@ -1604,14 +1572,17 @@ export const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
+      const decide = (state: GameState) => decideArthurAction(state, memory);
+      const stillAutoPlaying = () => get().isAutoPlaying;
+
       // 5. 가설 제기 단계
       if (gameState.phase === 'PLAYING_SUGGEST') {
         try {
-          const action = decideArthurAction(gameState, memory);
+          const action = decide(gameState);
           if (action.type === 'MOVE_AND_SUGGEST') {
             get().performSuggestion(action.suggestion);
           } else {
-            get().performEndTurn();
+            get().performAccusation(action.accusation);
           }
         } catch (err) {
           console.error('AutoPlay suggest error:', err);
@@ -1622,36 +1593,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // 6. 이동 단계
       if (gameState.phase === 'PLAYING_MOVE') {
-        try {
-          const action = decideArthurAction(gameState, memory);
-          if (action.type === 'ACCUSE') {
-            get().performAccusation(action.accusation);
-          } else {
-            const accessible = gameState.accessibleRoomIds || [currentP.currentRoomId];
-            const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
-              ? action.targetRoomId
-              : accessible[0];
-            if (!targetRoomId) {
-              get().performWaitInHallway();
-              return;
-            }
-            get().performMove(targetRoomId);
-            setTimeout(() => {
-              if (!get().isAutoPlaying) return;
-              try {
-                const stateAfterMove = get().gameState;
-                if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
-                  get().performSuggestion(action.suggestion);
-                }
-              } catch (e) {
-                console.error('AutoPlay after move suggest error:', e);
-              }
-            }, 900);
-          }
-        } catch (err) {
-          console.error('AutoPlay move error:', err);
-          get().performWaitInHallway();
-        }
+        playMoveDecision(currentP, decide, stillAutoPlaying, false);
         return;
       }
 
@@ -1662,41 +1604,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         get().performRollDice();
 
         setTimeout(() => {
-          if (!get().isAutoPlaying) return;
-          try {
-            const stateAfterRoll = get().gameState;
-            if (stateAfterRoll.phase !== 'PLAYING_MOVE') return;
-
-            const action = decideArthurAction(stateAfterRoll, memory);
-            if (action.type === 'ACCUSE') {
-              get().performAccusation(action.accusation);
-            } else {
-              const accessible = stateAfterRoll.accessibleRoomIds || [currentP.currentRoomId];
-              const targetRoomId = (action.targetRoomId && accessible.includes(action.targetRoomId))
-                ? action.targetRoomId
-                : accessible[0];
-              if (!targetRoomId) {
-                get().performWaitInHallway();
-                return;
-              }
-              get().performMove(targetRoomId);
-
-              setTimeout(() => {
-                if (!get().isAutoPlaying) return;
-                try {
-                  const stateAfterMove = get().gameState;
-                  if (stateAfterMove.phase === 'PLAYING_SUGGEST') {
-                    get().performSuggestion(action.suggestion);
-                  }
-                } catch (err) {
-                  console.error('AutoPlay suggestion error:', err);
-                }
-              }, 900);
-            }
-          } catch (err) {
-            console.error('AutoPlay turn decision error:', err);
-            get().performWaitInHallway();
-          }
+          if (stillAutoPlaying()) playMoveDecision(currentP, decide, stillAutoPlaying, false);
         }, 1100);
       }
     },

@@ -41,6 +41,11 @@ export function initAIMemory(player: Player): AIMemory {
   };
 }
 
+/** 자신이 실제로 던진 질문을 기록 (같은 조합 반복 질문 회피용) */
+export function recordOwnSuggestion(memory: AIMemory, suggestion: Suggestion): void {
+  memory.pastSuggestions.push(suggestion);
+}
+
 /**
  * AI 메모리 갱신: 다른 플레이어가 자신에게 카드를 보여주었을 때
  */
@@ -209,14 +214,7 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
     weapon = unusedWeapons[Math.floor(Math.random() * unusedWeapons.length)];
   }
 
-  // 질문 히스토리에 기록
-  memory.pastSuggestions.push({
-    askerId: me.id,
-    suspectId: suspect.id,
-    locationId: targetRoomId,
-    weaponId: weapon.id,
-  });
-
+  // 질문 히스토리는 실제로 질문했을 때만 recordOwnSuggestion으로 기록한다 (결정만 하고 버리는 경우 제외)
   return {
     type: 'MOVE_AND_SUGGEST',
     targetRoomId,
@@ -259,13 +257,6 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
   }
 
   const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
-
-  memory.pastSuggestions.push({
-    askerId: me.id,
-    suspectId: suspect.id,
-    locationId: targetRoomId,
-    weaponId: weapon.id,
-  });
 
   return {
     type: 'MOVE_AND_SUGGEST',

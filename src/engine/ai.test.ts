@@ -289,6 +289,16 @@ describe('AI 행동 결정', () => {
   });
 });
 
+describe('질문 기록', () => {
+  it('행동을 결정만 해서는 질문 기록이 쌓이지 않는다 (실제 질문 시에만 기록)', () => {
+    const state = makeState();
+    const memory = initAIMemory(state.players[2]);
+    decideArthurAction(state, memory);
+    decideBlakeAction(state, memory);
+    expect(memory.pastSuggestions).toHaveLength(0);
+  });
+});
+
 describe('shouldAIAccuse', () => {
   it('3개 카테고리가 모두 1장씩 남으면 어떤 AI든 즉시 고발한다', () => {
     const state = makeState();
