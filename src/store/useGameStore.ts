@@ -22,6 +22,7 @@ import {
   shouldAIAccuse
 } from '@/engine/ai';
 import { type SupportedLocale, translations } from '@/i18n/translations';
+import { SUSPECTS } from '@/engine/data';
 import { randomSeed } from '@/utils/rng';
 import { peerManager, type PeerMessage } from '@/network/peerManager';
 import { guestView } from '@/network/guestView';
@@ -63,6 +64,14 @@ export const INITIAL_ROOM_WEAPONS: Record<string, string[]> = {
   room_wine_cellar: ['weapon_poison'],
   room_room304: ['weapon_rope'],
   room_rooftop: ['weapon_wrench', 'weapon_pipe'],
+};
+
+type EmoteKey = 'emoteObserve' | 'emotePonder' | 'emoteEureka' | 'emoteTea';
+const EMOTES: Record<string, { icon: string; key: EmoteKey }> = {
+  observe: { icon: '🧐', key: 'emoteObserve' },
+  ponder: { icon: '🤔', key: 'emotePonder' },
+  eureka: { icon: '💡', key: 'emoteEureka' },
+  tea: { icon: '☕', key: 'emoteTea' },
 };
 
 const SESSION_KEY = 'clueamos_session_v1';
@@ -216,14 +225,16 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       case 'GUEST_SELECT_CHAR': {
-        if (playMode === 'host' && get().gameState.phase === 'LOBBY' && msg.payload?.characterId) {
-          set({ guestSelectedCharacter: msg.payload.characterId as string });
+        const characterId = msg.payload?.characterId;
+        if (playMode === 'host' && get().gameState.phase === 'LOBBY' &&
+            SUSPECTS.some(s => s.id === characterId)) {
+          set({ guestSelectedCharacter: characterId as string });
           // Broadcast back to guest
           peerManager.sendMessage({
             type: 'LOBBY_UPDATE',
             payload: {
               p1Character: get().hostSelectedCharacter,
-              p2Character: msg.payload.characterId as string,
+              p2Character: characterId as string,
               aiCount: get().aiPlayerCount,
             },
           });
@@ -369,8 +380,15 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       case 'EVENT_DIALOGUE': {
-        if (msg.payload) {
-          const dialogue = msg.payload as unknown as ActiveDialogue;
+        // Only the host speaks for AI detectives; ignore dialogue a guest tries to inject.
+        if (playMode === 'guest' && msg.payload) {
+          const p = msg.payload;
+          const speaker = get().gameState.players.find(pl => pl.id === p.speakerId);
+          if (!speaker || typeof p.text !== 'string') break;
+          const dialogue: ActiveDialogue = {
+            speakerId: speaker.id, speakerName: speaker.name, avatar: speaker.avatar, color: speaker.color,
+            text: p.text.slice(0, 300),
+          };
           set({ activeDialogue: dialogue });
           setTimeout(() => {
             const cur = get().activeDialogue;
@@ -383,8 +401,15 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       case 'EVENT_EMOTE': {
-        if (msg.payload) {
-          const emoteData = msg.payload as unknown as ActiveEmote;
+        // Emotes always come from the other human; never trust the sender's claimed identity or label.
+        const sender = get().gameState.players.find(pl => pl.roleType === (playMode === 'host' ? 'p2' : 'p1'));
+        const meta = Object.values(EMOTES).find(e => e.icon === msg.payload?.emote);
+        if ((playMode === 'host' || playMode === 'guest') && sender && meta) {
+          const dict = translations[get().currentLocale] || translations.en;
+          const emoteData: ActiveEmote = {
+            playerId: sender.id, speakerName: sender.name, avatar: sender.avatar, color: sender.color,
+            emote: meta.icon, label: dict[meta.key] || meta.icon, timestamp: Date.now(),
+          };
           sounds.playEmote();
           set({ activeEmote: emoteData });
           setTimeout(() => {
@@ -597,15 +622,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       if (!myPlayer) return;
 
-      type EmoteKey = 'emoteObserve' | 'emotePonder' | 'emoteEureka' | 'emoteTea';
-      const emoteLabels: Record<string, { icon: string; key: EmoteKey }> = {
-        observe: { icon: '🧐', key: 'emoteObserve' },
-        ponder: { icon: '🤔', key: 'emotePonder' },
-        eureka: { icon: '💡', key: 'emoteEureka' },
-        tea: { icon: '☕', key: 'emoteTea' },
-      };
-
-      const meta = emoteLabels[emoteKey] || { icon: '🧐', key: 'emoteObserve' };
+      const meta = EMOTES[emoteKey] || EMOTES.observe;
       const currentDict = translations[currentLocale] || translations.en;
       const label = currentDict[meta.key] || meta.icon;
 

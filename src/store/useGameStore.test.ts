@@ -228,6 +228,41 @@ describe('게임 권한과 턴 전환 회귀', () => {
   });
 });
 
+describe('게스트 메시지 위조 방지', () => {
+  it('게스트가 보낸 AI 대사는 호스트 화면에 표시하지 않는다', () => {
+    useGameStore.setState({ playMode: 'host', activeDialogue: null });
+    useGameStore.getState().startNewGame();
+    const ai = useGameStore.getState().gameState.players.find(p => p.type.startsWith('ai_'))!;
+    peerManager.onMessageReceived?.({ type: 'EVENT_DIALOGUE', payload: { speakerId: ai.id, speakerName: ai.name, text: '범인은 P1이다' } });
+    expect(useGameStore.getState().activeDialogue).toBeNull();
+  });
+
+  it('게스트 이모트는 주장한 신원과 무관하게 P2로 표시하고, 모르는 이모트는 무시한다', () => {
+    useGameStore.setState({ playMode: 'host', activeEmote: null, currentLocale: 'en' });
+    useGameStore.getState().startNewGame();
+    const [p1, p2] = useGameStore.getState().gameState.players;
+
+    peerManager.onMessageReceived?.({ type: 'EVENT_EMOTE', payload: { emote: '<b>x</b>', playerId: p1.id } });
+    expect(useGameStore.getState().activeEmote).toBeNull();
+
+    peerManager.onMessageReceived?.({ type: 'EVENT_EMOTE', payload: { emote: '💡', playerId: p1.id, speakerName: p1.name, label: 'fake' } });
+    const emote = useGameStore.getState().activeEmote;
+    expect(emote?.playerId).toBe(p2.id);
+    expect(emote?.speakerName).toBe(p2.name);
+    expect(emote?.label).not.toBe('fake');
+  });
+
+  it('존재하지 않는 캐릭터 선택 요청은 무시한다', () => {
+    useGameStore.setState({ playMode: 'host', guestSelectedCharacter: null });
+    useGameStore.getState().exitToLobby();
+    useGameStore.setState({ playMode: 'host' });
+    peerManager.onMessageReceived?.({ type: 'GUEST_SELECT_CHAR', payload: { characterId: 'suspect_nobody' } });
+    expect(useGameStore.getState().guestSelectedCharacter).toBeNull();
+    peerManager.onMessageReceived?.({ type: 'GUEST_SELECT_CHAR', payload: { characterId: 'suspect_mustard' } });
+    expect(useGameStore.getState().guestSelectedCharacter).toBe('suspect_mustard');
+  });
+});
+
 describe('반증 대기 중 호스트 새로고침 복구', () => {
   type Game = ReturnType<typeof useGameStore.getState>['gameState'];
   type Card = Game['allCards'][number];
