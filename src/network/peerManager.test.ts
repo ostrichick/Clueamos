@@ -234,4 +234,43 @@ describe('encrypted MQTT transport', () => {
     await vi.waitFor(() => expect(seen).toContain('GUEST_JOIN'));
     expect(guest.isConnected()).toBe(true);
   });
+
+  it('marks a silent guest offline and accepts the same guest after reconnect', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const host = await openHost();
+    const guest = await joinGuest(host);
+    const states: boolean[] = [];
+    host.onConnectionStateChange = connected => states.push(connected);
+
+    clients[1].close(); // Host's MQTT socket stays open and gets no close notification.
+    vi.advanceTimersByTime(35999);
+    expect(host.isConnected()).toBe(true);
+    // Host watch and guest join timers can have different start offsets.
+    vi.advanceTimersByTime(12001);
+    expect(host.isConnected()).toBe(false);
+    expect(host.wasGuestTimedOut()).toBe(true);
+    expect(states).toEqual([false]);
+
+    clients[1].open();
+    await vi.waitFor(() => expect(host.isConnected()).toBe(true));
+    expect(guest.isConnected()).toBe(true);
+    expect(host.wasGuestTimedOut()).toBe(false);
+    expect(states).toEqual([false, true]);
+  });
+
+  it('does not count host broker downtime toward guest timeout', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const host = await openHost();
+    await joinGuest(host);
+    clients[0].close();
+    clients[1].close();
+    vi.advanceTimersByTime(60000);
+    expect(host.wasGuestTimedOut()).toBe(false);
+
+    clients[0].open();
+    vi.advanceTimersByTime(24000);
+    expect(host.wasGuestTimedOut()).toBe(false);
+    vi.advanceTimersByTime(24000);
+    expect(host.wasGuestTimedOut()).toBe(true);
+  });
 });

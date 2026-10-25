@@ -7,6 +7,8 @@ vi.mock('@/network/peerManager', () => ({
     createRoom: vi.fn(async () => 'TEST01'),
     joinRoom: vi.fn(async () => undefined),
     getRoomSecret: vi.fn(() => 'mock-secret'),
+    isTransportConnected: vi.fn(() => true),
+    wasGuestTimedOut: vi.fn(() => false),
     cleanup: vi.fn(),
     sendMessage: vi.fn(),
   },
@@ -17,11 +19,14 @@ import { peerManager } from '@/network/peerManager';
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(peerManager.isTransportConnected).mockReturnValue(true);
+  vi.mocked(peerManager.wasGuestTimedOut).mockReturnValue(false);
   useGameStore.setState({
     playMode: 'solo',
     roomCode: null,
     roomSecret: null,
     isConnected: false,
+    guestDisconnected: false,
     isConnecting: false,
     connectionError: null,
     hostSelectedCharacter: null,
@@ -110,6 +115,33 @@ describe('useGameStore 로컬 게임 흐름', () => {
 });
 
 describe('useGameStore 방 생성/접속 (peerManager mock)', () => {
+  it('호스트 브로커 장애와 확인된 게스트 이탈을 구분하고 재접속 시 대행 상태를 지운다', async () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, turnReviewState: null });
+    await useGameStore.getState().createRoom();
+    useGameStore.getState().startNewGame();
+    const game = useGameStore.getState().gameState;
+    useGameStore.setState({ gameState: { ...game, currentPlayerIndex: 1, phase: 'PLAYING_ACTION_DONE' } });
+    const report = peerManager.onConnectionStateChange!;
+
+    report(true);
+    vi.mocked(peerManager.isTransportConnected).mockReturnValue(false);
+    report(false, 'Disconnected');
+    vi.advanceTimersByTime(700);
+    expect(useGameStore.getState().guestDisconnected).toBe(false);
+    expect(useGameStore.getState().turnReviewState).toBeNull();
+
+    vi.mocked(peerManager.isTransportConnected).mockReturnValue(true);
+    vi.mocked(peerManager.wasGuestTimedOut).mockReturnValue(true);
+    report(false, 'Guest disconnected');
+    expect(useGameStore.getState().guestDisconnected).toBe(true);
+    vi.advanceTimersByTime(700);
+    expect(useGameStore.getState().turnReviewState?.readyRoles).toContain('p2');
+
+    vi.mocked(peerManager.wasGuestTimedOut).mockReturnValue(false);
+    report(true);
+    expect(useGameStore.getState().guestDisconnected).toBe(false);
+  });
+
   it('createRoom: 호스트로 방을 만들면 코드와 비밀 키가 저장된다', async () => {
     const code = await useGameStore.getState().createRoom('TEST01', '1234');
 
@@ -205,6 +237,41 @@ describe('게임 권한과 턴 전환 회귀', () => {
     expect(visible.players[0].hand).toEqual([]);
   });
 
+  it('재접속 시 진행 중인 반증 연출은 재전송하되 무관한 비공개 카드는 숨긴다', () => {
+    useGameStore.setState({ playMode: 'host', turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const game = useGameStore.getState().gameState;
+    useGameStore.setState({ activeHypothesisVisual: {
+      askerId: game.players[0].id, askerName: game.players[0].name,
+      askerAvatar: game.players[0].avatar,
+      responderId: game.players[2].id, responderName: game.players[2].name,
+      responderAvatar: game.players[2].avatar,
+      suggestion: game.solution, phase: 'disproved', shownCardId: game.players[0].hand[0].id,
+    } });
+    vi.mocked(peerManager.sendMessage).mockClear();
+    peerManager.onMessageReceived?.({ type: 'GUEST_JOIN' });
+    const packets = vi.mocked(peerManager.sendMessage).mock.calls.map(([message]) => message);
+    expect(packets.map(packet => packet.type).slice(0, 2)).toEqual(['START_GAME', 'HYPOTHESIS_VISUAL']);
+    expect((packets[1].payload?.visual as { shownCardId?: string }).shownCardId).toBeUndefined();
+  });
+
+  it('재접속한 게스트의 이전 반증 팝업과 턴 리뷰를 현재 게임 상태로 초기화한다', () => {
+    useGameStore.setState({ playMode: 'host', turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const game = useGameStore.getState().gameState;
+    useGameStore.setState({
+      playMode: 'guest',
+      pendingDisprovePrompt: { askerId: game.players[0].id, availableCards: game.players[1].hand },
+      lastSecretClue: { card: game.players[1].hand[0], fromName: game.players[0].name },
+      turnReviewState: { active: true, turnNumber: 1, lastPlayerName: 'Old', summary: 'Old', readyRoles: [] },
+    });
+    peerManager.onMessageReceived?.({ type: 'START_GAME', payload: { gameState: game } });
+    const current = useGameStore.getState();
+    expect(current.pendingDisprovePrompt).toBeNull();
+    expect(current.lastSecretClue).toBeNull();
+    expect(current.turnReviewState).toBeNull();
+  });
+
   it('호스트의 새로고침 후 게임과 AI 메모리를 복구한다', async () => {
     const data = new Map<string, string>();
     vi.stubGlobal('window', {});
@@ -229,6 +296,89 @@ describe('게임 권한과 턴 전환 회귀', () => {
 });
 
 describe('AI 턴 진행', () => {
+  it('호스트 MQTT 연결 장애는 게스트 이탈로 판단해 대리 행동하지 않는다', async () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, isConnected: false, guestDisconnected: true, turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const initial = useGameStore.getState().gameState;
+    useGameStore.setState({ gameState: { ...initial, currentPlayerIndex: 1, phase: 'PLAYING_ACTION_DONE' } });
+    vi.mocked(peerManager.isTransportConnected).mockReturnValue(false);
+
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+    expect(useGameStore.getState().turnReviewState).toBeNull();
+
+    vi.mocked(peerManager.isTransportConnected).mockReturnValue(true);
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+    expect(useGameStore.getState().turnReviewState?.readyRoles).toContain('p2');
+  });
+
+  it('기존 P2 대리 주사위 타이머는 새 게임에서 동일 P2에게 영향을 주지 않는다', async () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, isConnected: false, guestDisconnected: true, turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const first = useGameStore.getState().gameState;
+    useGameStore.setState({ gameState: { ...first, currentPlayerIndex: 1 } });
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+    vi.advanceTimersByTime(650);
+
+    useGameStore.getState().startNewGame();
+    const nextGame = useGameStore.getState().gameState;
+    const newTurn = { ...nextGame, currentPlayerIndex: 1, phase: 'PLAYING_MOVE' as const };
+    useGameStore.setState({ gameState: newTurn });
+    vi.advanceTimersByTime(1100);
+    expect(useGameStore.getState().gameState).toBe(newTurn);
+  });
+
+  it('연결이 끊긴 P2의 주사위·이동·질문을 호스트에서 이어서 실행한다', async () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, isConnected: false, guestDisconnected: true, turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const game = useGameStore.getState().gameState;
+    useGameStore.setState({ gameState: { ...game, currentPlayerIndex: 1 } });
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+    vi.advanceTimersByTime(600 + 1100 + 900);
+
+    const result = useGameStore.getState().gameState;
+    const suggestion = result.logs.find(log => log.type === 'suggestion' && log.metadata?.askerId === game.players[1].id);
+    expect(result.currentDiceRoll).toBeGreaterThanOrEqual(2);
+    if (suggestion) {
+      expect(suggestion.metadata?.locationId).toBe(result.players[1].currentRoomId);
+    } else {
+      expect(['PLAYING_ACTION_DONE', 'WAITING_DISPROVE', 'GAME_OVER']).toContain(result.phase);
+    }
+  });
+
+  it('접속이 끊긴 게스트의 턴을 호스트가 대신 종료하고 재접속 시 위임을 거부한다', async () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, isConnected: false, guestDisconnected: true, turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const game = useGameStore.getState().gameState;
+    expect(game.players[1].roleType).toBe('p2');
+    useGameStore.setState({ gameState: { ...game, currentPlayerIndex: 1, phase: 'PLAYING_ACTION_DONE' } });
+
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+    expect(useGameStore.getState().turnReviewState?.readyRoles).toContain('p2');
+
+    useGameStore.setState({ isConnected: true, turnReviewState: null });
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+    expect(useGameStore.getState().turnReviewState).toBeNull();
+  });
+
+  it('게스트 연결이 끊긴 상태의 반증은 실제 P2 손패에서 처리한다', async () => {
+    useGameStore.setState({ playMode: 'host', aiPlayerCount: 2, isConnected: false, guestDisconnected: true, turnReviewState: null });
+    useGameStore.getState().startNewGame();
+    const game = useGameStore.getState().gameState;
+    const card = game.players[1].hand[0];
+    const currentSuggestion = {
+      askerId: game.players[0].id,
+      suspectId: card.category === 'suspect' ? card.id : game.solution.suspectId,
+      locationId: card.category === 'location' ? card.id : game.solution.locationId,
+      weaponId: card.category === 'weapon' ? card.id : game.solution.weaponId,
+    };
+    useGameStore.setState({ gameState: { ...game, phase: 'WAITING_DISPROVE', currentSuggestion } });
+    await useGameStore.getState().executeAutoPlayTurn('p2');
+
+    const after = useGameStore.getState().gameState;
+    expect(after.phase).toBe('PLAYING_ACTION_DONE');
+    expect(after.logs.at(-1)?.metadata?.shownCardId).toBe(card.id);
+  });
+
   it('AI 턴은 주사위·이동·질문까지 진행되고, 질문은 실제로 도착한 방에서 한 번만 기록된다', () => {
     useGameStore.setState({ playMode: 'solo', aiPlayerCount: 1, turnReviewState: null });
     useGameStore.getState().startNewGame();

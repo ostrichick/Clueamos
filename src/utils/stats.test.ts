@@ -3,8 +3,10 @@ import {
   loadCareerStats,
   recordGameResult,
   getDetectiveRank,
+  getTwoHumanMatchStats,
   generateShareReport
 } from './stats';
+import type { LogEntry, Player } from '@/engine/types';
 
 describe('Career Stats Utility', () => {
   let store: Record<string, string> = {};
@@ -107,5 +109,39 @@ describe('Career Stats Utility', () => {
     });
     expect(enReport).toContain('Clueamos Murder Investigation Report');
     expect(enReport).toContain('Culprit Escaped');
+  });
+
+  it('compares only two human players using structured logs from the match', () => {
+    const makePlayer = (id: string, type: Player['type'], isEliminated = false): Player => ({
+      id, type, isEliminated, roleType: id as Player['roleType'], characterId: id,
+      name: id, avatar: '🔎', color: '', currentRoomId: '', hand: [], score: 0,
+    });
+    const players = [makePlayer('p1', 'human'), makePlayer('p2', 'human', true), makePlayer('ai1', 'ai_logic')];
+    const log = (type: LogEntry['type'], metadata?: LogEntry['metadata']): LogEntry => ({
+      id: 'fixture', turn: 1, message: 'unreliable localized message',
+      type, metadata, timestamp: 0,
+    });
+    const logs = [
+      log('suggestion', { askerId: 'p1' }),
+      log('suggestion', { askerId: 'p1' }),
+      log('suggestion', { askerId: 'p2' }),
+      log('suggestion', { askerId: 'ai1' }),
+      log('suggestion'),
+      log('disprove', { askerId: 'p1', responderId: 'none' }),
+      log('disprove', { askerId: 'p1', responderId: 'p2' }),
+      log('disprove', { askerId: 'ai1', responderId: 'p1' }),
+      log('disprove', { askerId: 'p2', responderId: 'none' }),
+      log('disprove'),
+      log('accusation'),
+    ];
+
+    const result = getTwoHumanMatchStats(players, logs, 'p1');
+    expect(result).toHaveLength(2);
+    expect(result.map(({ player, ...stats }) => ({ id: player.id, ...stats }))).toEqual([
+      { id: 'p1', result: 'winner', suggestions: 2, cardsShown: 1, unrefutedSuggestions: 1 },
+      { id: 'p2', result: 'eliminated', suggestions: 1, cardsShown: 1, unrefutedSuggestions: 1 },
+    ]);
+    expect(getTwoHumanMatchStats(players.slice(0, 1), logs, 'p1')).toEqual([]);
+    expect(getTwoHumanMatchStats(players, [], undefined)[0].result).toBe('participated');
   });
 });

@@ -53,6 +53,8 @@ const SESSION_PATTERN = /^[a-f0-9]{32}$/;
 const IV_PATTERN = /^[a-f0-9]{24}$/;
 const HEX_DATA_PATTERN = /^(?:[a-f0-9]{2})+$/;
 const JOIN_INTERVAL_MS = 12000;
+// Three missed guest check-ins allow for brief packet loss and background tab throttling.
+const GUEST_TIMEOUT_MS = JOIN_INTERVAL_MS * 3;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -138,6 +140,10 @@ export class PeerManager {
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
   private joinInterval: ReturnType<typeof setInterval> | null = null;
+  private guestWatchInterval: ReturnType<typeof setInterval> | null = null;
+  private lastGuestSeenAt = 0;
+  private guestTimedOut = false;
+  private transportInterrupted = false;
   private guestChallenge: string | null = null;
   private hostSession: string | null = null;
   private activeGuestSession: string | null = null;
@@ -151,6 +157,8 @@ export class PeerManager {
   public getRoomSecret(): string | null { return this.roomSecret; }
   public getIsHost(): boolean { return this.isHost; }
   public isConnected(): boolean { return this.connected; }
+  public isTransportConnected(): boolean { return Boolean(this.client?.connected); }
+  public wasGuestTimedOut(): boolean { return this.guestTimedOut; }
 
   private makeTopic(direction: Direction): string {
     return `${TOPIC_PREFIX}${this.keys!.topicId}/${direction}`;
@@ -203,11 +211,25 @@ export class PeerManager {
         this.client = client;
         client.on('connect', () => {
           if (this.generation !== generation) return;
+          // Count guest absence only while the host can actually observe the broker.
+          if (this.transportInterrupted && this.lastGuestSeenAt) this.lastGuestSeenAt = Date.now();
+          this.transportInterrupted = false;
           client.subscribe(this.makeTopic('to_host'), { qos: 1 }, err => {
             if (err) { fail(err); return; }
             if (!settled) {
               settled = true;
               clearTimeout(timeout);
+              this.guestWatchInterval = setInterval(() => {
+                // Broker outages do not prove the guest left; wait until transport is restored.
+                if (this.client !== client || !client.connected || !this.lastGuestSeenAt) return;
+                if (Date.now() - this.lastGuestSeenAt >= GUEST_TIMEOUT_MS) {
+                  this.activeGuestSession = null;
+                  this.pendingGuest = null;
+                  this.lastGuestSeenAt = 0;
+                  this.guestTimedOut = true;
+                  this.reportConnected(false, 'Guest disconnected');
+                }
+              }, JOIN_INTERVAL_MS);
               resolve(code);
             }
           });
@@ -218,7 +240,10 @@ export class PeerManager {
           else if (this.client === client) this.reportConnected(false, err.message);
         });
         client.on('close', () => {
-          if (this.client === client) this.reportConnected(false, 'Disconnected');
+          if (this.client === client) {
+            this.transportInterrupted = true;
+            this.reportConnected(false, 'Disconnected');
+          }
         });
       } catch (error) {
         fail(error instanceof Error ? error : new Error('Room connection failed.'));
@@ -332,11 +357,15 @@ export class PeerManager {
         if (this.pendingGuest?.session !== sender || message.payload?.response !== this.pendingGuest.response) return;
         const notifyJoin = this.activeGuestSession !== sender || !this.connected || this.pendingGuest.resync;
         this.activeGuestSession = sender;
+        this.lastGuestSeenAt = Date.now();
+        this.guestTimedOut = false;
         this.reportConnected(true);
         if (notifyJoin) this.onMessageReceived?.({ type: 'GUEST_JOIN' });
         return;
       }
       if (!this.connected || sender !== this.activeGuestSession) return;
+      // Any authenticated guest action is evidence of presence, even if its tab timers are throttled.
+      this.lastGuestSeenAt = Date.now();
       this.onMessageReceived?.(message);
       return;
     }
@@ -392,6 +421,11 @@ export class PeerManager {
     this.generation++;
     if (this.joinInterval) clearInterval(this.joinInterval);
     this.joinInterval = null;
+    if (this.guestWatchInterval) clearInterval(this.guestWatchInterval);
+    this.guestWatchInterval = null;
+    this.lastGuestSeenAt = 0;
+    this.guestTimedOut = false;
+    this.transportInterrupted = false;
     const oldClient = this.client;
     this.client = null;
     if (oldClient) {

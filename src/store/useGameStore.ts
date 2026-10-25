@@ -128,6 +128,7 @@ interface GameStore {
   roomCode: string | null;
   roomSecret: string | null;
   isConnected: boolean;
+  guestDisconnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
   peerOnline: boolean;
@@ -185,7 +186,7 @@ interface GameStore {
   // AFK 자동 대리 플레이 상태
   isAutoPlaying: boolean;
   setIsAutoPlaying: (active: boolean) => void;
-  executeAutoPlayTurn: () => Promise<void>;
+  executeAutoPlayTurn: (actingRole?: PlayerRole) => Promise<void>;
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
@@ -194,10 +195,11 @@ export const useGameStore = create<GameStore>((set, get) => {
   };
 
   const guestTurn = (phase?: GameState['phase']) => {
-    const { gameState, turnReviewState } = get();
+    const { gameState, turnReviewState, activeHypothesisVisual, lastSecretClue } = get();
     const actor = gameState.players[gameState.currentPlayerIndex];
     return actor?.roleType === 'p2' && actor.type === 'human' && !actor.isEliminated &&
-      !turnReviewState?.active && (phase === undefined || gameState.phase === phase);
+      !turnReviewState?.active && !activeHypothesisVisual && !lastSecretClue &&
+      (phase === undefined || gameState.phase === phase);
   };
 
   const guestDisprover = () => {
@@ -246,9 +248,21 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       case 'GUEST_JOIN': {
         if (playMode === 'host') {
-          const { gameState, roomWeapons, turnReviewState } = get();
+          const { gameState, roomWeapons, turnReviewState, activeHypothesisVisual } = get();
           if (gameState.phase !== 'LOBBY') {
             sendGuestState('START_GAME', gameState, roomWeapons);
+            if (activeHypothesisVisual) {
+              const guest = gameState.players.find(p => p.roleType === 'p2');
+              const guestIsInvolved = guest && (guest.id === activeHypothesisVisual.askerId ||
+                guest.id === activeHypothesisVisual.responderId);
+              peerManager.sendMessage({
+                type: 'HYPOTHESIS_VISUAL',
+                payload: { visual: {
+                  ...activeHypothesisVisual,
+                  shownCardId: guestIsInvolved ? activeHypothesisVisual.shownCardId : undefined,
+                } as unknown as Record<string, unknown> },
+              });
+            }
             if (turnReviewState?.active) {
               peerManager.sendMessage({ type: 'TURN_REVIEW_UPDATE', payload: { turnReview: turnReviewState as unknown as Record<string, unknown> } });
             }
@@ -275,6 +289,11 @@ export const useGameStore = create<GameStore>((set, get) => {
             roomWeapons: (msg.payload.roomWeapons as Record<string, string[]>) || INITIAL_ROOM_WEAPONS,
             selectedRoomId: null,
             isRollingDice: false,
+            // A full resync replaces the previous turn's private modals and review state.
+            pendingDisprovePrompt: null,
+            lastSecretClue: null,
+            activeHypothesisVisual: null,
+            turnReviewState: null,
           });
         }
         break;
@@ -565,10 +584,16 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
       // Case 2: Guest (Player 2) must disprove
       else if (playMode === 'host' && player.roleType === 'p2') {
-        peerManager.sendMessage({
-          type: 'DISPROVE_REQUEST',
-          payload: { availableCards: disprover.availableCards, askerId: asker.id },
-        });
+        if (get().isConnected) {
+          peerManager.sendMessage({
+            type: 'DISPROVE_REQUEST',
+            payload: { availableCards: disprover.availableCards, askerId: asker.id },
+          });
+        } else {
+          setTimeout(() => {
+            if (get().gameState === state && !get().isConnected) get().executeAutoPlayTurn('p2');
+          }, 700);
+        }
       }
       // Case 3: Host (Player 1) or Local human player must disprove
       else if (player.roleType === 'p1' || playMode === 'local') {
@@ -621,6 +646,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     roomCode: null,
     roomSecret: null,
     isConnected: false,
+    guestDisconnected: false,
     isConnecting: false,
     connectionError: null,
     peerOnline: false,
@@ -759,10 +785,12 @@ export const useGameStore = create<GameStore>((set, get) => {
     createRoom: async (desiredCode?: string, desiredPassword?: string) => {
       const codeParam = typeof desiredCode === 'string' ? desiredCode : undefined;
       const passwordParam = typeof desiredPassword === 'string' ? desiredPassword : undefined;
-      set({ isConnecting: true, connectionError: null, playMode: 'host', myPlayerRole: 'p1' });
+      set({ isConnecting: true, connectionError: null, playMode: 'host', myPlayerRole: 'p1', guestDisconnected: false });
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
           isConnected: connected, 
+          guestDisconnected: !connected && peerManager.wasGuestTimedOut(),
+          peerOnline: connected,
           isConnecting: false,
           connectionError: error || null 
         });
@@ -777,6 +805,11 @@ export const useGameStore = create<GameStore>((set, get) => {
               aiCount: get().aiPlayerCount,
             },
           });
+        } else if (get().gameState.phase !== 'LOBBY') {
+          // The host remains authoritative and can cover the absent guest's turn.
+          setTimeout(() => {
+            if (get().playMode === 'host' && !get().isConnected) get().executeAutoPlayTurn('p2');
+          }, 700);
         }
       };
 
@@ -807,6 +840,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       peerManager.onConnectionStateChange = (connected, error) => {
         set({ 
           isConnected: connected, 
+          guestDisconnected: false,
+          peerOnline: connected,
           isConnecting: false,
           connectionError: error || null 
         });
@@ -823,6 +858,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           myPlayerRole: 'p2',
           isConnecting: false,
           isConnected: true,
+          peerOnline: true,
         });
 
         // A reconnecting player keeps the host's existing character selection.
@@ -846,6 +882,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         roomCode: null,
         roomSecret: null,
         isConnected: false,
+        guestDisconnected: false,
         isConnecting: false,
         connectionError: null,
         peerOnline: false,
@@ -978,6 +1015,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         roomCode: null,
         roomSecret: null,
         isConnected: false,
+        guestDisconnected: false,
         isConnecting: false,
         connectionError: null,
         peerOnline: false,
@@ -1411,6 +1449,10 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       // If current player is human: if in AutoPlay (AFK), let AI take over
       if (currentP.type === 'human') {
+        if (playMode === 'host' && get().guestDisconnected && currentP.roleType === 'p2') {
+          get().executeAutoPlayTurn('p2');
+          return;
+        }
         if (isAutoPlaying) {
           get().executeAutoPlayTurn();
         }
@@ -1509,9 +1551,22 @@ export const useGameStore = create<GameStore>((set, get) => {
       }, 400);
     },
 
-    executeAutoPlayTurn: async () => {
+    executeAutoPlayTurn: async (actingRole) => {
       const { playMode, gameState, myPlayerRole, isRollingDice, pendingDisprovePrompt, lastSecretClue, activeHypothesisVisual, turnReviewState } = get();
       if (gameState.phase === 'GAME_OVER') return;
+      const coveringGuest = actingRole === 'p2' && playMode === 'host' &&
+        get().guestDisconnected && !get().isConnected && peerManager.isTransportConnected();
+      if (actingRole && !coveringGuest) return;
+
+      if (coveringGuest && gameState.phase === 'WAITING_DISPROVE' && gameState.currentSuggestion) {
+        const next = findNextDisprovingPlayer(gameState.players, gameState.currentPlayerIndex, gameState.currentSuggestion);
+        if (next && gameState.players[next.playerIndex].roleType === 'p2') {
+          get().performDisprove(next.availableCards[0].id);
+        }
+        return;
+      }
+      // The host decides when to finish turn review; only the absent guest's actions are covered.
+      if (coveringGuest && (turnReviewState?.active || lastSecretClue || activeHypothesisVisual)) return;
 
       // 0. 턴 검토 대기 중인 경우 자동 확인
       if (turnReviewState && turnReviewState.active) {
@@ -1538,10 +1593,11 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (!currentP) return;
 
       const isHuman = currentP.type === 'human';
+      const role = coveringGuest ? 'p2' : myPlayerRole;
       const isMyTurn = (playMode === 'solo' || playMode === 'local')
         ? isHuman
-        : (myPlayerRole === 'p1' && currentP.roleType === 'p1') ||
-          (myPlayerRole === 'p2' && currentP.roleType === 'p2');
+        : (role === 'p1' && currentP.roleType === 'p1') ||
+          (role === 'p2' && currentP.roleType === 'p2');
 
       if (!isMyTurn) return;
 
@@ -1573,14 +1629,20 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       const decide = (state: GameState) => decideArthurAction(state, memory);
-      const stillAutoPlaying = () => get().isAutoPlaying;
+      const stillAutoPlaying = () => coveringGuest
+        ? get().playMode === 'host' && get().guestDisconnected &&
+          !get().isConnected && peerManager.isTransportConnected() &&
+          get().gameState.seed === gameState.seed &&
+          get().gameState.turnCount === gameState.turnCount &&
+          get().gameState.players[get().gameState.currentPlayerIndex]?.id === currentP.id
+        : get().isAutoPlaying;
 
       // 5. 가설 제기 단계
       if (gameState.phase === 'PLAYING_SUGGEST') {
         try {
           const action = decide(gameState);
           if (action.type === 'MOVE_AND_SUGGEST') {
-            get().performSuggestion(action.suggestion);
+            get().performSuggestion({ ...action.suggestion, locationId: currentP.currentRoomId });
           } else {
             get().performAccusation(action.accusation);
           }

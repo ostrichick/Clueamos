@@ -56,6 +56,7 @@ export default function Home() {
 roomCode,
     roomSecret,
     isConnected,
+    guestDisconnected,
     isConnecting,
     connectionError,
     peerOnline,
@@ -104,20 +105,19 @@ roomCode,
   const [p1Character, setP1Character] = useState<string>('suspect_scarlett');
   const [p2Character, setP2Character] = useState<string>('suspect_mustard');
 
-  // 멀티플레이어 로컬 입력 상태 (URL 쿼리스트링 파라미터가 있으면 초기값으로 사용)
-  const [inputRoomCode, setInputRoomCode] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('room')?.trim().replace(/\D/g, '').slice(0, 4) || '';
-    }
-    return '';
-  });
+  // URL은 마운트 후 읽어 SSR/클라이언트 첫 렌더의 disabled 상태가 달라지지 않게 한다.
+  const [inputRoomCode, setInputRoomCode] = useState('');
   const [copySuccessToast, setCopySuccessToast] = useState(false);
-  const [inputRoomPassword, setInputRoomPassword] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    const key = new URLSearchParams(window.location.hash.slice(1)).get('key');
-    return key && /^[a-f0-9]{32}$/i.test(key) ? key.toLowerCase() : '';
-  });
+  const [inputRoomPassword, setInputRoomPassword] = useState('');
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const code = new URLSearchParams(window.location.search).get('room')?.trim().replace(/\D/g, '').slice(0, 4);
+      const key = new URLSearchParams(window.location.hash.slice(1)).get('key');
+      if (code) setInputRoomCode(code);
+      if (key && /^[a-f0-9]{32}$/i.test(key)) setInputRoomPassword(key.toLowerCase());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
   const [selectedDisproveCard, setSelectedDisproveCard] = useState<string | null>(null);
   const [isPassingCard, setIsPassingCard] = useState(false);
   const [passingToPlayerName, setPassingToPlayerName] = useState<string>('');
@@ -265,6 +265,21 @@ roomCode,
     }, delay);
     return () => clearTimeout(timer);
   }, [isGameStarted, gameState.phase, isAutoPlaying, isMyTurn, executeAutoPlayTurn]);
+
+  // If the guest disconnects, the host covers only Player 2's actions until rejoin.
+  useEffect(() => {
+    if (!isGameStarted || playMode !== 'host' || !guestDisconnected || isConnected || gameState.phase === 'GAME_OVER') return;
+    const actor = gameState.players[gameState.currentPlayerIndex];
+    const guestTurn = actor?.type === 'human' && actor.roleType === 'p2';
+    const guestDisprove = gameState.phase === 'WAITING_DISPROVE' && gameState.currentSuggestion &&
+      gameState.players.some(player => player.roleType === 'p2' &&
+        player.hand.some(card => [gameState.currentSuggestion!.suspectId,
+          gameState.currentSuggestion!.locationId, gameState.currentSuggestion!.weaponId].includes(card.id)));
+    if (!guestTurn && !guestDisprove) return;
+    if (turnReviewState?.active || isRollingDice) return;
+    const timer = setTimeout(() => executeAutoPlayTurn('p2'), 1200);
+    return () => clearTimeout(timer);
+  }, [isGameStarted, playMode, guestDisconnected, isConnected, gameState, turnReviewState, isRollingDice, executeAutoPlayTurn]);
 
   // 대리 플레이 중 반증 요청 발생 시 자동 처리
   useEffect(() => {
@@ -604,6 +619,14 @@ roomCode,
         }}
         onExitToLobby={() => setIsExitModalOpen(true)}
       />
+
+      {playMode === 'host' && guestDisconnected && gameState.players.some(p => p.roleType === 'p2') && (
+        <div role="status" className="border-b border-amber-500/30 bg-amber-950/30 px-4 py-2 text-center text-xs text-amber-200">
+          {locale === 'ko' ? '상대방 연결이 끊어졌습니다. 재접속 전까지 2번 플레이어의 행동을 AI가 대신합니다.' :
+            locale === 'es' ? 'El invitado está desconectado. La IA jugará sus turnos hasta que vuelva.' :
+              'Guest disconnected. AI will cover Player 2 until they reconnect.'}
+        </div>
+      )}
 
       {/* AI 대리 플레이 중 플로팅 배너 */}
       <AutoPlayBanner

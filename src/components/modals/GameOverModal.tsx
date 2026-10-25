@@ -9,6 +9,7 @@ import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
 import {
   generateShareReport,
   getDetectiveRank,
+  getTwoHumanMatchStats,
   loadCareerStats,
   recordGameResult,
 } from '@/utils/stats';
@@ -74,6 +75,17 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   if (phase !== 'GAME_OVER') return null;
 
   const winner = players.find(p => p.id === winnerId);
+  const matchStats = getTwoHumanMatchStats(players, logs, winnerId);
+  const matchLabels = {
+    title: locale === 'ko' ? '이번 경기 · 2인 수사 기록' : locale === 'es' ? 'Esta partida · Comparación de detectives' : 'This Match · Detective Comparison',
+    suggestions: locale === 'ko' ? '질문' : locale === 'es' ? 'Hipótesis' : 'Suggestions',
+    cardsShown: locale === 'ko' ? '반증 카드 제시' : locale === 'es' ? 'Cartas mostradas' : 'Cards shown',
+    unrefutedSuggestions: locale === 'ko' ? '반증되지 않은 질문' : locale === 'es' ? 'Hipótesis sin refutar' : 'Unrefuted suggestions',
+    winner: locale === 'ko' ? '사건 해결' : locale === 'es' ? 'Caso resuelto' : 'Solved the case',
+    eliminated: locale === 'ko' ? '오답으로 탈락' : locale === 'es' ? 'Eliminado' : 'Eliminated',
+    participated: locale === 'ko' ? '수사 종료' : locale === 'es' ? 'Investigación terminada' : 'Investigation ended',
+    note: locale === 'ko' ? '이번 경기의 행동 기록 기준' : locale === 'es' ? 'Según las acciones registradas en esta partida' : 'Based on logged actions in this match',
+  };
   const rank = getDetectiveRank(careerStats.totalWins);
   const rankLabel = {
     ROOKIE: locale === 'ko' ? '신입 탐정' : locale === 'es' ? 'Detective Novato' : 'Rookie Detective',
@@ -139,6 +151,40 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             </div>
           </div>
         </div>
+
+        {matchStats.length === 2 && (
+          <section className="w-full bg-slate-800/60 border border-slate-700/70 rounded-2xl p-3.5 text-left shadow-inner" aria-label={matchLabels.title}>
+            <div className="mb-2.5 text-xs font-bold text-amber-300">{matchLabels.title}</div>
+            <div className="grid grid-cols-2 gap-2">
+              {matchStats.map(({ player, result, suggestions, cardsShown, unrefutedSuggestions }) => (
+                <div key={player.id} className="min-w-0 rounded-xl bg-slate-900/75 border border-slate-700/80 p-3">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="text-lg" aria-hidden="true">{player.avatar}</span>
+                    <span className="text-xs font-bold text-slate-100 break-words min-w-0">{getPlayerDisplayName(player, locale)}</span>
+                  </div>
+                  <div className={`text-[10px] font-bold mb-3 ${result === 'winner' ? 'text-emerald-300' : result === 'eliminated' ? 'text-rose-300' : 'text-slate-400'}`}>
+                    {matchLabels[result]}
+                  </div>
+                  <dl className="space-y-2 text-[11px]">
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-slate-400">{matchLabels.suggestions}</dt>
+                      <dd className="font-bold text-slate-100 tabular-nums">{suggestions}</dd>
+                    </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-slate-400">{matchLabels.cardsShown}</dt>
+                      <dd className="font-bold text-slate-100 tabular-nums">{cardsShown}</dd>
+                    </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-slate-400">{matchLabels.unrefutedSuggestions}</dt>
+                      <dd className="font-bold text-slate-100 tabular-nums">{unrefutedSuggestions}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2">{matchLabels.note}</p>
+          </section>
+        )}
 
         {trackedPlayerId && (
           <div className="w-full bg-slate-800/50 border border-slate-700/70 rounded-2xl p-3.5 text-left shadow-inner">

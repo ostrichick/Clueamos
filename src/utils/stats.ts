@@ -1,3 +1,5 @@
+import type { LogEntry, Player } from '@/engine/types';
+
 export interface CareerStats {
   totalGames: number;
   totalWins: number;
@@ -23,6 +25,42 @@ export const DEFAULT_CAREER_STATS: CareerStats = {
   characterWins: {},
   lastPlayedTimestamp: 0,
 };
+
+export interface HumanMatchStats {
+  player: Player;
+  result: 'winner' | 'eliminated' | 'participated';
+  suggestions: number;
+  cardsShown: number;
+  unrefutedSuggestions: number;
+}
+
+/** Counts only actions attributable to a human in this match's structured logs. */
+export function getTwoHumanMatchStats(
+  players: Player[],
+  logs: LogEntry[],
+  winnerId?: string
+): HumanMatchStats[] {
+  const humans = players.filter(player => player.type === 'human');
+  if (humans.length !== 2) return [];
+
+  return humans.map(player => ({
+    player,
+    result: winnerId === player.id
+      ? 'winner'
+      : player.isEliminated ? 'eliminated' : 'participated',
+    suggestions: logs.filter(log =>
+      log.type === 'suggestion' && log.metadata?.askerId === player.id
+    ).length,
+    cardsShown: logs.filter(log =>
+      log.type === 'disprove' && log.metadata?.responderId === player.id
+    ).length,
+    unrefutedSuggestions: logs.filter(log =>
+      log.type === 'disprove' &&
+      log.metadata?.askerId === player.id &&
+      log.metadata.responderId === 'none'
+    ).length,
+  }));
+}
 
 export function loadCareerStats(): CareerStats {
   if (typeof window === 'undefined') return DEFAULT_CAREER_STATS;
