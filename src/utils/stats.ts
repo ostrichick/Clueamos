@@ -173,7 +173,7 @@ export function generateShareReport({
     accolade = locale === 'ko' ? '🌧️ 미결 사건' : locale === 'es' ? '🌧️ Caso No Resuelto' : '🌧️ Unsolved Cold Case';
   }
 
-  const url = 'https://clueamos.vercel.app';
+  const url = 'https://clueamos-seven.vercel.app';
 
   if (locale === 'ko') {
     return [
