@@ -70,8 +70,8 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
           {t.round} {turnCount} / {maxTurns}
         </div>
 
-        {/* 멀티플레이 룸 뱃지 및 온라인 상태 */}
-        {playMode !== 'local' && (
+        {/* 멀티플레이 룸 뱃지 및 온라인 상태 (host/guest 전용: solo/local에는 피어가 없음) */}
+        {(playMode === 'host' || playMode === 'guest') && (
           <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-mono">
             {roomCode && <span className="text-slate-200 font-bold">{roomCode}</span>}
             {peerOnline ? (
