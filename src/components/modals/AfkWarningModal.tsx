@@ -3,7 +3,7 @@
 import React from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { type TranslationStrings } from '@/i18n/translations';
-import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
+import { DraggableModalShell } from '@/components/modals/DraggableModalShell';
 
 interface AfkWarningModalProps {
   isOpen: boolean;
@@ -18,25 +18,18 @@ export const AfkWarningModal: React.FC<AfkWarningModalProps> = ({
   onDismiss,
   t,
 }) => {
-  const { handlePointerDown, modalStyle } = useDraggableModal({
-    isOpen,
-  });
-
   if (!isOpen) return null;
 
   // 30초 기준 프로그레스 백분율 (30초 -> 100%, 0초 -> 0%)
   const percentage = Math.max(0, Math.min(100, (secondsRemaining / 30) * 100));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div 
-        onPointerDown={handlePointerDown}
-        style={modalStyle}
-        className="relative w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/70 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-amber-500/20 text-center flex flex-col items-center gap-3.5 animate-in zoom-in-95 duration-200"
-        role="alertdialog"
-        aria-modal="true"
-      >
-        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+    <DraggableModalShell
+      isOpen={isOpen}
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none"
+      cardClassName="relative w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/70 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-amber-500/20 text-center flex flex-col items-center gap-3.5 animate-in zoom-in-95 duration-200"
+      cardRole="alertdialog"
+    >
         {/* 경고 아이콘 */}
         <div className="relative">
           <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-inner">
@@ -83,7 +76,6 @@ export const AfkWarningModal: React.FC<AfkWarningModalProps> = ({
         >
           {t.afkImHere}
         </button>
-      </div>
-    </div>
+    </DraggableModalShell>
   );
 };

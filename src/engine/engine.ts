@@ -15,6 +15,8 @@ import { type RNG, mulberry32 } from '../utils/rng';
 
 // 비밀 통로 (Clue의 대표 요소: 모서리 방 간 직통 통로!)
 // 서재 <-> 주방, 연회장 <-> 옥상 정원
+// 주의: 이동 가능 판정은 boardGrid.ts BOARD_ROOMS.secretPassage가 담당하고,
+// 이 맵은 GameBoard의 비밀통로 표시/클릭용이다. 방 추가 시 양쪽을 함께 갱신할 것.
 export const SECRET_PASSAGES: Record<string, string> = {
   room_library: 'room_kitchen',
   room_kitchen: 'room_library',

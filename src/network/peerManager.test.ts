@@ -1,6 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { PeerManager } from './peerManager';
+import { PeerManager, resolveBrokerUrl } from './peerManager';
 
 const { clients, createClient } = vi.hoisted(() => {
   class FakeMqttClient {
@@ -272,5 +272,21 @@ describe('encrypted MQTT transport', () => {
     expect(host.wasGuestTimedOut()).toBe(false);
     vi.advanceTimersByTime(24000);
     expect(host.wasGuestTimedOut()).toBe(true);
+  });
+});
+
+describe('resolveBrokerUrl', () => {
+  it('설정이 없으면 기본 공개 브로커로 폴백한다', () => {
+    expect(resolveBrokerUrl('')).toBe('wss://broker.emqx.io:8084/mqtt');
+    expect(resolveBrokerUrl(undefined)).toBe('wss://broker.emqx.io:8084/mqtt');
+  });
+
+  it('유효한 wss URL은 그대로 사용한다', () => {
+    expect(resolveBrokerUrl('wss://example.com:8084/mqtt')).toBe('wss://example.com:8084/mqtt');
+  });
+
+  it('잘못된 URL이나 비-ws 프로토콜은 기본값으로 폴백한다', () => {
+    expect(resolveBrokerUrl('not-a-url')).toBe('wss://broker.emqx.io:8084/mqtt');
+    expect(resolveBrokerUrl('https://example.com/mqtt')).toBe('wss://broker.emqx.io:8084/mqtt');
   });
 });

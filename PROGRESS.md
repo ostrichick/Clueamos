@@ -1,7 +1,7 @@
 # 📋 작업 인수인계 및 진행 현황 (PROGRESS.md)
 
 > **문서 역할:** AI 인수인계용 진행 기록 (완료 목록 + 다음 할 일).
-> **마지막 업데이트 일시:** 2026-10-25
+> **마지막 업데이트 일시:** 2026-11-04
 > **다음 작업자에게:** 작업을 이어받기 전에 이 파일과 [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md)를 먼저 확인해 주세요.
 
 ---
@@ -57,7 +57,19 @@
   - [ ] 비주얼 사운드 효과 및 애니메이션 디테일 보강
   - [x] 게임오버 후 2인 플레이어의 경기별 질문·반증·결과 비교 스코어보드
   - [ ] 멀티플레이어 서버 기반 게임 상태 검증 (정적 배포 구조 변경 필요)
-  - [ ] `page.tsx` 모듈 분해 (현재 약 900줄 단일 컴포넌트)
+  - [x] `page.tsx` 모듈 분해 (902줄 → 537줄, 훅/컴포넌트 6개 추출)
+  - [x] 코드 리뷰 12개 이슈 해소 (2026-11-04, 어드바이저 조건부 승인 하 진행)
+
+### 4. 코드 리뷰 후속 수정 (2026-11-04)
+* 어드바이저(Web) 사전 검토: 순서 조정 권고 수용 — CSP 강제 제외(Report-Only), 침묵catch 일괄 토스트 금지(등급별 처리), AutoPlay 분리 검증, page.tsx 작은 추출부터.
+* **AI 결정성:** `decideArthur/BlakeAction`에 `rng` 주입(기본 Math.random) + store에서 시드 유도 RNG 전달. 호출 단위 유도라 비동기 순서 영향 없음. 결정성 테스트 3개 추가 (총 104개 PASS).
+* **브로커 환경변수화:** `NEXT_PUBLIC_MQTT_BROKER` + 무효 시 기본값 폴백 + `ws://` 혼합콘텐츠 차단. `resolveBrokerUrl` 테스트 3개, `.env.example` 추가. 비밀키는 NEXT_PUBLIC_에 넣지 말 것.
+* **주석/정리:** SECRET_PASSAGES는 사망코드 아님(GameBoard 사용 중) — BOARD_ROOMS와 동기화 주석만 추가. boardGrid `roomDistances` 오독 주의 주석.
+* **오류 처리 등급화:** 세션 저장/삭제/손상 스냅샷은 의도적 침묵(주석), 복원 실패는 `console.warn`, 클립보드 복사 실패는 사용자 피드백(`inviteLinkCopyFailed` ko/en/es) + GameOver 보고서 복사 실패 warn.
+* **page.tsx 분해:** `useLobbyQueryParams` / `ExitConfirmModal` / `InGameDashboard` / `useNotebookState`(+resetNotes 통합) / `DraggableModalShell`(8곳 통합, role/장식 지원) / `useGameOrchestration` 순 추출. AutoPlay Arthur 고정은 검증 결과 인간 턴 전용이라 의도적 유지로 문서화.
+* **보안헤더:** `X-Content-Type-Options`/`Referrer-Policy`/`X-Frame-Options` 강제 + CSP Report-Only. 외부 리소스 없음(MQTT wss만) 확인.
+* 검증: Vitest 104 PASS, ESLint PASS, `next build` PASS. tsc의 `.next/types/validator` 오류는 삭제된 `/api/game/validate` 잔재로 기존부터 존재 (소스와 무관).
+* 독립 Sonnet 검수는 사용량 게이트 조회 불가(paseo CLI 없음)로 HOLD — 다음 세션에서 `paseo usage ls` 후 의뢰.
 
 ---
 

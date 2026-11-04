@@ -18,7 +18,7 @@ import { haptics } from '@/utils/haptics';
 import { OnBoardDiceOverlay } from './OnBoardDiceOverlay';
 import { OnBoardActionOverlay } from './OnBoardActionOverlay';
 import { type TurnReviewState, type PlayerRole, type PlayMode } from '@/store/useGameStore';
-import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
+import { DraggableModalShell } from '@/components/modals/DraggableModalShell';
 
 const WEAPON_ICONS: Record<string, string> = {
   weapon_candlestick: '🕯️',
@@ -95,9 +95,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // Center Confidential Case File Inspection Modal
   const [showCaseFileModal, setShowCaseFileModal] = useState(false);
-  const caseFileDraggable = useDraggableModal({
-    isOpen: showCaseFileModal,
-  });
 
   // Touch swipe detection for dice roll
   const touchStartY = useRef<number | null>(null);
@@ -669,13 +666,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 비밀 사건 봉투 검사 모달 (Confidential Case File Wax Seal Modal) */}
       {showCaseFileModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none">
-          <div 
-            onPointerDown={caseFileDraggable.handlePointerDown}
-            style={caseFileDraggable.modalStyle}
-            className="bg-gradient-to-b from-stone-900 via-stone-950 to-amber-950/90 border-2 border-amber-600/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center text-center animate-in zoom-in-95 duration-200"
-          >
-            <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+        <DraggableModalShell
+          isOpen={showCaseFileModal}
+          overlayClassName="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none"
+          cardClassName="bg-gradient-to-b from-stone-900 via-stone-950 to-amber-950/90 border-2 border-amber-600/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center text-center animate-in zoom-in-95 duration-200"
+        >
 
             <button
               onClick={() => setShowCaseFileModal(false)}
@@ -708,8 +703,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             >
               {t.close}
             </button>
-          </div>
-        </div>
+        </DraggableModalShell>
       )}
     </div>
   );

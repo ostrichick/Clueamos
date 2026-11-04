@@ -39,6 +39,7 @@ interface LobbyScreenProps {
   disconnectRoom: () => void;
   handleCopyInviteLink: () => void;
   copySuccessToast: boolean;
+  copyFailToast: boolean;
   handleStartGame: () => void;
   getCardName: (id: string) => string;
   aiPlayerCount: number;
@@ -69,6 +70,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   disconnectRoom,
   handleCopyInviteLink,
   copySuccessToast,
+  copyFailToast,
   handleStartGame,
   getCardName,
   aiPlayerCount,
@@ -255,7 +257,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow transition-colors"
                     >
                       {copySuccessToast ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copySuccessToast ? t.inviteLinkCopied : t.copyInviteLink}</span>
+                      <span>{copyFailToast ? t.inviteLinkCopyFailed : copySuccessToast ? t.inviteLinkCopied : t.copyInviteLink}</span>
                     </button>
                     <button
                       onClick={disconnectRoom}

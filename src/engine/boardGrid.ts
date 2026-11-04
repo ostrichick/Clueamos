@@ -229,6 +229,10 @@ export function calculateReachablePaths(
   const reachableRoomIds: string[] = [currentRoomId];
   const reachableTileSteps = new Map<string, number>();
 
+  // 주의: roomDistances는 최단 거리 기록용이라 주사위를 초과하는 방도 포함될 수 있다.
+  // 실제 이동 가능 여부는 반드시 reachableRoomIds(<= diceRoll)로 판단할 것.
+  // diceRoll은 rollDice가 2~6 범위로 보장한다. 직접 호출 시 음수/NaN을 넘기지 말 것.
+
   if (!currentRoom) {
     return { reachableRoomIds, roomDistances, reachableTileSteps };
   }

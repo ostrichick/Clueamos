@@ -6,7 +6,7 @@ import { type TranslationStrings } from '@/i18n/translations';
 import { ClueCard } from '@/components/cards/ClueCard';
 import { sounds } from '@/utils/sounds';
 import { ShieldCheck, HelpCircle, AlertTriangle, ArrowRight, BookMarked, X } from 'lucide-react';
-import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
+import { DraggableModalShell } from '@/components/modals/DraggableModalShell';
 
 export interface HypothesisVisualizerModalProps {
   visual: HypothesisVisualState | null;
@@ -30,9 +30,6 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
   const [secondsLeft, setSecondsLeft] = useState<number>(5.0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const soundPlayedRef = useRef<string>('');
-  const { handlePointerDown, modalStyle } = useDraggableModal({
-    isOpen: !!visual,
-  });
 
   // Sounds & Timers based on phase
   useEffect(() => {
@@ -98,25 +95,22 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
   const progressPercent = Math.max(0, Math.min(100, (secondsLeft / 5.0) * 100));
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      {/* Background ambient lighting */}
-      <div 
-        className={`absolute w-80 sm:w-96 h-80 sm:h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
-          isDisproved 
-            ? 'bg-indigo-500/20' 
-            : isUndisproven 
-              ? 'bg-rose-500/20' 
-              : 'bg-amber-500/15'
-        }`} 
-      />
-
-      <div
-        onPointerDown={handlePointerDown}
-        style={modalStyle}
-        className="relative max-w-lg w-full bg-slate-900/95 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-3 text-center overflow-hidden"
-      >
-        {/* 상단 드래그 핸들 */}
-        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+    <DraggableModalShell
+      isOpen={!!visual}
+      overlayClassName="fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 select-none"
+      cardClassName="relative max-w-lg w-full bg-slate-900/95 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-3 text-center overflow-hidden"
+      beforeCard={
+        <div
+          className={`absolute w-80 sm:w-96 h-80 sm:h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
+            isDisproved
+              ? 'bg-indigo-500/20'
+              : isUndisproven
+                ? 'bg-rose-500/20'
+                : 'bg-amber-500/15'
+          }`}
+        />
+      }
+    >
 
         {/* Top Close Button (for user override anytime) */}
         {!isAsking && (
@@ -305,7 +299,6 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
           </div>
         )}
 
-      </div>
-    </div>
+    </DraggableModalShell>
   );
 };

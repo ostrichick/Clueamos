@@ -53,6 +53,7 @@ export interface TranslationStrings {
   enterRoomCodePlaceholder: string;
   copyInviteLink: string;
   inviteLinkCopied: string;
+  inviteLinkCopyFailed: string;
   waitingForPlayer2: string;
   player2Connected: string;
   connectedToRoom: string;
@@ -297,6 +298,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     enterRoomCodePlaceholder: 'Enter 4-digit code (e.g. 1042)',
     copyInviteLink: 'Copy Invite Link',
     inviteLinkCopied: 'Invite link copied to clipboard!',
+    inviteLinkCopyFailed: 'Copy failed. Please copy the link manually.',
     waitingForPlayer2: 'Waiting for Player 2 to join...',
     player2Connected: 'Player 2 connected!',
     connectedToRoom: 'Connected to room',
@@ -592,6 +594,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     enterRoomCodePlaceholder: 'Ingresa código de 4 dígitos (ej. 1042)',
     copyInviteLink: 'Copiar Enlace de Invitación',
     inviteLinkCopied: '¡Enlace de invitación copiado!',
+    inviteLinkCopyFailed: 'No se pudo copiar. Copia el enlace manualmente.',
     waitingForPlayer2: 'Esperando a que se una el Jugador 2...',
     player2Connected: '¡Jugador 2 conectado!',
     connectedToRoom: 'Conectado a la sala',
@@ -887,6 +890,7 @@ export const translations: Record<SupportedLocale, TranslationStrings> = {
     enterRoomCodePlaceholder: '4자리 코드 입력 (예: 1042)',
     copyInviteLink: '초대 링크 복사',
     inviteLinkCopied: '초대 링크가 복사되었습니다! 상대방에게 전달해주세요.',
+    inviteLinkCopyFailed: '복사에 실패했습니다. 링크를 직접 복사해주세요.',
     waitingForPlayer2: '플레이어 2의 접속을 기다리는 중...',
     player2Connected: '플레이어 2가 접속했습니다!',
     connectedToRoom: '방에 연결되었습니다',

@@ -1,5 +1,6 @@
 import { type Card, type GameState, type Player, type Suggestion, type Solution } from './types';
 import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
+import { type RNG } from '../utils/rng';
 
 export type DeductionMark = 'UNKNOWN' | 'POSSIBLE' | 'IMPOSSIBLE' | 'CONFIRMED';
 
@@ -174,7 +175,7 @@ export type AIAction =
  * - 체계적으로 남은 후보군 중 하나를 선택해 질문
  * - 평소엔 확신도 100%일 때만, 막판에는 승산이 충분할 때 고발 (기준은 decideAccusation 참고)
  */
-export function decideArthurAction(state: GameState, memory: AIMemory): AIAction {
+export function decideArthurAction(state: GameState, memory: AIMemory, rng: RNG = Math.random): AIAction {
   const me = state.players[state.currentPlayerIndex];
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
   const locationCandidates = getRemainingCandidates(memory, 'location');
@@ -193,25 +194,25 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
   // 도달 가능한 방 중 아직 용의선상에 있는 방 우선 선택
   const targetRoomId = accessible.find(roomId => 
     locationCandidates.some(c => c.id === roomId)
-  ) || accessible[Math.floor(Math.random() * accessible.length)] || me.currentRoomId;
+  ) || accessible[Math.floor(rng() * accessible.length)] || me.currentRoomId;
 
   // 질문할 카드 조합: 과거에 이미 질문했던 동일한 조합 회피
-  let suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
-  let weapon = weaponCandidates[Math.floor(Math.random() * weaponCandidates.length)] || WEAPONS[0];
+  let suspect = suspectCandidates[Math.floor(rng() * suspectCandidates.length)] || SUSPECTS[0];
+  let weapon = weaponCandidates[Math.floor(rng() * weaponCandidates.length)] || WEAPONS[0];
 
   // 과거 동일 질문 회피 필터링
   const unusedSuspects = suspectCandidates.filter(s => 
     !memory.pastSuggestions.some(p => p.suspectId === s.id && p.locationId === targetRoomId)
   );
   if (unusedSuspects.length > 0) {
-    suspect = unusedSuspects[Math.floor(Math.random() * unusedSuspects.length)];
+    suspect = unusedSuspects[Math.floor(rng() * unusedSuspects.length)];
   }
 
   const unusedWeapons = weaponCandidates.filter(w =>
     !memory.pastSuggestions.some(p => p.weaponId === w.id && p.locationId === targetRoomId)
   );
   if (unusedWeapons.length > 0) {
-    weapon = unusedWeapons[Math.floor(Math.random() * unusedWeapons.length)];
+    weapon = unusedWeapons[Math.floor(rng() * unusedWeapons.length)];
   }
 
   // 질문 히스토리는 실제로 질문했을 때만 recordOwnSuggestion으로 기록한다 (결정만 하고 버리는 경우 제외)
@@ -231,7 +232,7 @@ export function decideArthurAction(state: GameState, memory: AIMemory): AIAction
  * - 정답 확률이 1/3 이상이면 과감하게 승부수 고발 (기준은 decideAccusation 참고)
  * - 25% 확률로 자신이 가진 카드를 질문에 섞어 블러핑 시도
  */
-export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction {
+export function decideBlakeAction(state: GameState, memory: AIMemory, rng: RNG = Math.random): AIAction {
   const me = state.players[state.currentPlayerIndex];
   const suspectCandidates = getRemainingCandidates(memory, 'suspect');
   const weaponCandidates = getRemainingCandidates(memory, 'weapon');
@@ -245,18 +246,18 @@ export function decideBlakeAction(state: GameState, memory: AIMemory): AIAction 
     : state.accessibleRoomIds?.length
       ? state.accessibleRoomIds
       : [me.currentRoomId];
-  const targetRoomId = accessible[Math.floor(Math.random() * accessible.length)] || me.currentRoomId;
+  const targetRoomId = accessible[Math.floor(rng() * accessible.length)] || me.currentRoomId;
 
   // 블러핑 기법: 25% 확률로 자신의 손패에 있는 카드를 질문에 섞음
-  const isBluffing = Math.random() < 0.25 && me.hand.length > 0;
-  let weapon = weaponCandidates[Math.floor(Math.random() * weaponCandidates.length)] || WEAPONS[0];
+  const isBluffing = rng() < 0.25 && me.hand.length > 0;
+  let weapon = weaponCandidates[Math.floor(rng() * weaponCandidates.length)] || WEAPONS[0];
   
   if (isBluffing) {
     const myWeapon = me.hand.find(c => c.category === 'weapon');
     if (myWeapon) weapon = myWeapon;
   }
 
-  const suspect = suspectCandidates[Math.floor(Math.random() * suspectCandidates.length)] || SUSPECTS[0];
+  const suspect = suspectCandidates[Math.floor(rng() * suspectCandidates.length)] || SUSPECTS[0];
 
   return {
     type: 'MOVE_AND_SUGGEST',

@@ -46,7 +46,32 @@ interface RoomKeys {
   to_guest: CryptoKey;
 }
 
-const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+const DEFAULT_MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+
+/**
+ * 브로커 URL 결정: NEXT_PUBLIC_MQTT_BROKER가 있으면 검증 후 사용하고,
+ * 없거나 유효하지 않으면 기본 공개 브로커로 폴백한다.
+ * (NEXT_PUBLIC_ 값은 빌드 시점에 번들에 포함되므로 비밀키를 넣으면 안 된다.
+ *  방 비밀번호 등 비밀은 기존처럼 URL 프래그먼트/세션에만 둔다.)
+ */
+export function resolveBrokerUrl(envValue?: string): string {
+  const configured = (envValue ?? process.env.NEXT_PUBLIC_MQTT_BROKER ?? '').trim();
+  if (!configured) return DEFAULT_MQTT_BROKER;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== 'wss:' && url.protocol !== 'ws:') throw new Error('protocol must be ws(s)');
+    // HTTPS 페이지에서 ws://는 Mixed Content로 차단되므로 wss만 허용
+    if (url.protocol === 'ws:' && typeof location !== 'undefined' && location.protocol === 'https:') {
+      throw new Error('ws:// is blocked on https pages');
+    }
+    return configured;
+  } catch {
+    if (typeof console !== 'undefined') console.warn('Invalid NEXT_PUBLIC_MQTT_BROKER, falling back to default broker.');
+    return DEFAULT_MQTT_BROKER;
+  }
+}
+
+const MQTT_BROKER = resolveBrokerUrl();
 const TOPIC_PREFIX = 'clueamos/v5/';
 const SECRET_PATTERN = /^[a-f0-9]{32}$/i;
 const SESSION_PATTERN = /^[a-f0-9]{32}$/;

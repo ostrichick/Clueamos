@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { initGame, rollDice } from './engine';
+import { mulberry32 } from '../utils/rng';
 import { ALL_CARDS, SUSPECTS, LOCATION_CARDS, WEAPONS } from './data';
 import {
   initAIMemory,
@@ -296,6 +297,44 @@ describe('질문 기록', () => {
     decideArthurAction(state, memory);
     decideBlakeAction(state, memory);
     expect(memory.pastSuggestions).toHaveLength(0);
+  });
+});
+
+describe('RNG 주입 결정성', () => {
+  it('같은 시드 RNG로는 같은 결정을 재현한다 (아서/블레이크)', () => {
+    const state = initGame({ seed: 777 });
+    const rolled = rollDice({ ...state, currentPlayerIndex: 2 });
+    const ai = rolled.players[2];
+
+    const first = decideArthurAction(rolled, initAIMemory(ai), mulberry32(1234));
+    const second = decideArthurAction(rolled, initAIMemory(ai), mulberry32(1234));
+    expect(second).toEqual(first);
+
+    const blakeFirst = decideBlakeAction(rolled, initAIMemory(ai), mulberry32(1234));
+    const blakeSecond = decideBlakeAction(rolled, initAIMemory(ai), mulberry32(1234));
+    expect(blakeSecond).toEqual(blakeFirst);
+  });
+
+  it('서로 다른 시드에서도 유효한 질문 조합을 반환한다', () => {
+    const state = initGame({ seed: 777 });
+    const rolled = rollDice({ ...state, currentPlayerIndex: 2 });
+    const ai = rolled.players[2];
+
+    for (const seed of [1, 42, 99999]) {
+      const action = decideArthurAction(rolled, initAIMemory(ai), mulberry32(seed));
+      expect(action.type).toBe('MOVE_AND_SUGGEST');
+      if (action.type === 'MOVE_AND_SUGGEST') {
+        expect(action.suggestion.suspectId).toBeTruthy();
+        expect(action.suggestion.weaponId).toBeTruthy();
+      }
+    }
+  });
+
+  it('rng 미지정 시 기본 Math.random으로 동작한다', () => {
+    const state = makeState();
+    const memory = initAIMemory(state.players[2]);
+    const action = decideArthurAction(state, memory);
+    expect(action.type).toBe('MOVE_AND_SUGGEST');
   });
 });
 

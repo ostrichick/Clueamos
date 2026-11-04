@@ -5,7 +5,7 @@ import { Sparkles, ScrollText, ChevronUp, ChevronDown, Copy, Check } from 'lucid
 import { type Solution, type Player, type LogEntry, type GamePhase } from '@/engine/types';
 import { type SupportedLocale, type TranslationStrings } from '@/i18n/translations';
 import { getPlayerDisplayName } from '@/engine/engine';
-import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
+import { DraggableModalShell } from '@/components/modals/DraggableModalShell';
 import {
   generateShareReport,
   getDetectiveRank,
@@ -49,9 +49,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const [careerStats, setCareerStats] = useState(loadCareerStats);
   const [reportCopied, setReportCopied] = useState(false);
   const recordedGameRef = useRef(false);
-  const { handlePointerDown, modalStyle } = useDraggableModal({
-    isOpen: phase === 'GAME_OVER',
-  });
 
   useEffect(() => {
     if (phase !== 'GAME_OVER') {
@@ -107,19 +104,19 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       locale,
     });
 
-    await navigator.clipboard.writeText(report);
+    await navigator.clipboard.writeText(report).catch((err) => {
+      console.warn('Share report copy failed:', err);
+    });
     setReportCopied(true);
     window.setTimeout(() => setReportCopied(false), 1800);
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in select-none">
-      <div 
-        onPointerDown={handlePointerDown}
-        style={modalStyle}
-        className="max-w-lg w-full bg-slate-900 border border-amber-500/50 p-6 rounded-3xl text-center flex flex-col items-center gap-3 shadow-2xl my-auto"
-      >
-        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+    <DraggableModalShell
+      isOpen={phase === 'GAME_OVER'}
+      overlayClassName="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in select-none"
+      cardClassName="max-w-lg w-full bg-slate-900 border border-amber-500/50 p-6 rounded-3xl text-center flex flex-col items-center gap-3 shadow-2xl my-auto"
+    >
         <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/10">
           🏆
         </div>
@@ -287,7 +284,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </DraggableModalShell>
   );
 };

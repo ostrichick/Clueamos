@@ -6,7 +6,7 @@ import { ClueCard } from './ClueCard';
 import { Sparkles, CheckCheck, X } from 'lucide-react';
 import { sounds } from '@/utils/sounds';
 import { type TranslationStrings } from '@/i18n/translations';
-import { useDraggableModal, ModalDragHandle } from '@/hooks/useDraggableModal';
+import { DraggableModalShell } from '@/components/modals/DraggableModalShell';
 
 export interface CardPassModalProps {
   secretClue?: {
@@ -29,16 +29,11 @@ const PassingCardView: React.FC<{
   getCardName: (id: string) => string;
   t: TranslationStrings;
 }> = ({ passingToName, passingCardId, getCardName, t }) => {
-  const { handlePointerDown, modalStyle } = useDraggableModal();
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-      <div 
-        onPointerDown={handlePointerDown}
-        style={modalStyle}
-        className="flex flex-col items-center gap-6 text-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-300"
-      >
-        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+    <DraggableModalShell
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md"
+      cardClassName="flex flex-col items-center gap-6 text-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-300"
+    >
         <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 text-xs font-bold animate-pulse">
           <Sparkles className="w-4 h-4" />
           <span>{t.cardPassingTo} {passingToName || '...'}</span>
@@ -57,8 +52,7 @@ const PassingCardView: React.FC<{
         <p className="text-xs text-slate-400 font-mono">
           Secretly sliding across the table...
         </p>
-      </div>
-    </div>
+    </DraggableModalShell>
   );
 };
 
@@ -124,19 +118,14 @@ const SecretClueRevealView: React.FC<{
     }
   };
 
-  const { handlePointerDown, modalStyle } = useDraggableModal();
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md select-none">
-      {/* Background glow effects */}
-      <div className="absolute w-96 h-96 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
-
-      <div 
-        onPointerDown={handlePointerDown}
-        style={modalStyle}
-        className="relative flex flex-col items-center gap-4 max-w-md w-full text-center"
-      >
-        <ModalDragHandle label="드래그하여 이동 (Drag to move)" />
+    <DraggableModalShell
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md select-none"
+      cardClassName="relative flex flex-col items-center gap-4 max-w-md w-full text-center"
+      beforeCard={
+        <div className="absolute w-96 h-96 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+      }
+    >
 
         {/* Close Button Top Right */}
         <button
@@ -232,8 +221,7 @@ const SecretClueRevealView: React.FC<{
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </DraggableModalShell>
   );
 };
 

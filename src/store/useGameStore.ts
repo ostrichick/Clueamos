@@ -25,7 +25,7 @@ import {
 } from '@/engine/ai';
 import { type SupportedLocale, translations } from '@/i18n/translations';
 import { SUSPECTS } from '@/engine/data';
-import { randomSeed } from '@/utils/rng';
+import { randomSeed, mulberry32, type RNG } from '@/utils/rng';
 import { peerManager, type PeerMessage } from '@/network/peerManager';
 import { guestView } from '@/network/guestView';
 import { sounds } from '@/utils/sounds';
@@ -83,7 +83,9 @@ function saveSession(data: { roomCode: string; roomSecret: string; playMode: Pla
   if (typeof window !== 'undefined') {
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
-    } catch {}
+    } catch {
+      // 저장 실패(사설 모드/용량 부족)는 복원 불가로만 이어지므로 조용히 무시한다.
+    }
   }
 }
 
@@ -92,7 +94,9 @@ function clearSession() {
     try {
       sessionStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(HOST_STATE_KEY);
-    } catch {}
+    } catch {
+      // 정리 실패는 다음 세션 덮어쓰기로 해소되므로 조용히 무시한다.
+    }
   }
 }
 
@@ -112,7 +116,10 @@ function readHostSnapshot(): {
   try {
     const raw = sessionStorage.getItem(HOST_STATE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    // 손상된 스냅샷은 복원 건너뛰기로 처리한다 (호출자가 null로 분기).
+    return null;
+  }
 }
 
 interface GameStore {
@@ -491,6 +498,13 @@ export const useGameStore = create<GameStore>((set, get) => {
       const text = lines[Math.floor(Math.random() * lines.length)];
       get().showDialogue(player, text);
     }
+  };
+
+  // AI 결정용 RNG: 시드가 있으면 호출마다 같은 결정을 재현하고,
+  // 없으면 Math.random으로 동작한다. 호출 단위로 유도하므로 비동기 순서에 영향받지 않는다.
+  const aiDecisionRng = (state: GameState): RNG => {
+    if (state.seed === undefined) return Math.random;
+    return mulberry32((state.seed + state.turnCount * 7919 + state.currentPlayerIndex * 131) >>> 0);
   };
 
   // 이동 단계에서 AI(또는 AFK 대리) 결정을 실행한다: 고발하거나, 이동한 뒤 900ms 후 질문한다.
@@ -922,7 +936,9 @@ export const useGameStore = create<GameStore>((set, get) => {
             return Boolean(get().roomCode);
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Session restore failed:', err);
+      }
       return false;
     },
 
@@ -1480,8 +1496,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
 
       const decide = (state: GameState) => currentP.type === 'ai_logic'
-        ? decideArthurAction(state, memory)
-        : decideBlakeAction(state, memory);
+        ? decideArthurAction(state, memory, aiDecisionRng(state))
+        : decideBlakeAction(state, memory, aiDecisionRng(state));
 
       // If already in PLAYING_SUGGEST phase:
       if (gameState.phase === 'PLAYING_SUGGEST') {
@@ -1628,7 +1644,11 @@ export const useGameStore = create<GameStore>((set, get) => {
         return;
       }
 
-      const decide = (state: GameState) => decideArthurAction(state, memory);
+      // 대리 플레이는 항상 인간 플레이어의 턴에만 동작한다 (위 isMyTurn 가드:
+      // solo/local은 인간 턴, host/guest는 p1/p2 역할 — AI 타입은 runAITurnIfNeeded가 담당).
+      // 인간에게 성향이 없으므로 보수적인 논리형(Arthur)으로 고정한다. Blake 분기를 추가하면
+      // 도달 불가 코드가 되므로, AI 턴 대행이 필요해지면 isMyTurn 가드부터 재설계할 것.
+      const decide = (state: GameState) => decideArthurAction(state, memory, aiDecisionRng(state));
       const stillAutoPlaying = () => coveringGuest
         ? get().playMode === 'host' && get().guestDisconnected &&
           !get().isConnected && peerManager.isTransportConnected() &&
