@@ -70,6 +70,8 @@
 * **보안헤더:** `X-Content-Type-Options`/`Referrer-Policy`/`X-Frame-Options` 강제 + CSP Report-Only. 외부 리소스 없음(MQTT wss만) 확인.
 * 검증: Vitest 104 PASS, ESLint PASS, `next build` PASS. tsc의 `.next/types/validator` 오류는 삭제된 `/api/game/validate` 잔재로 기존부터 존재 (소스와 무관).
 * 독립 Sonnet 검수는 사용량 게이트 조회 불가(paseo CLI 없음)로 HOLD — 다음 세션에서 `paseo usage ls` 후 의뢰.
+* **멀티플레이 실측 테스트 (2026-11-05, 로컬 aedes 브로커):** 공개 브로커가 샌드박스에서 막혀 로컬 MQTT 브로커로 호스트/게스트 2탭 실플레이. 참가→시작→이동/질문→양방향 반증→턴리뷰 동기화→턴패스 전 구간 PASS. 손패/정답 격리(게스트 0장·solution 빈값) 유지, 범위 외 게스트 액션 호스트가 무시함도 확인.
+* **멀티 테스트 발견·수정:** 로케일 hydration mismatch(SSR ko vs 저장 en) → 기본 로케일 첫 렌더+rAF 적용; 카운트다운 updater 내 부수효과(StrictMode 중복 실행 위험) → 완료 effect 분리+1회 가드 (HypothesisVisualizer/CardPass 공통); AI 인원 버튼의 `명` 하드코딩 → en/es에서 숫자만; 호스트 로비 대기/접속 중복 문구 → 상태별 전환; 초상화 `sizes` 추가. Vitest 104 PASS, ESLint PASS, dev 로그에서 hydration/setState 경고 소멸 확인.
 
 ---
 
