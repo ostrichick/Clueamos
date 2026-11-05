@@ -229,7 +229,7 @@ export function decideArthurAction(state: GameState, memory: AIMemory, rng: RNG 
 
 /**
  * 2. 블레이크(Blake) - 직감 & 블러핑형 AI 알고리즘
- * - 정답 확률이 1/3 이상이면 과감하게 승부수 고발 (기준은 decideAccusation 참고)
+ * - 정답 확률이 1/2 이상이면 과감하게 승부수 고발 (기준은 decideAccusation 참고)
  * - 25% 확률로 자신이 가진 카드를 질문에 섞어 블러핑 시도
  */
 export function decideBlakeAction(state: GameState, memory: AIMemory, rng: RNG = Math.random): AIAction {
@@ -276,11 +276,11 @@ const DEFAULT_MAX_TURNS = 16;
  * 고발에 필요한 최소 정답 확률.
  * 틀리면 탈락이지만 제한 턴이 지나면 아무도 이기지 못하므로, 남은 턴이 적을수록 기준을 낮춘다.
  * - 아서(논리형): 평소 100%, 남은 라운드 4 이하 1/2, 마지막 라운드 1/3
- * - 블레이크(직감형): 평소 1/3, 남은 라운드 3 이하 1/4
+ * - 블레이크(직감형): 평소 1/2, 남은 라운드 3 이하 1/4 (초반 자살 고발 방지)
  */
 function requiredOdds(personality: Player['type'], turnCount: number, maxTurns: number): number {
   const turnsLeft = maxTurns - turnCount;
-  if (personality === 'ai_instinct') return turnsLeft <= 3 ? 1 / 4 : 1 / 3;
+  if (personality === 'ai_instinct') return turnsLeft <= 3 ? 1 / 4 : 1 / 2;
   if (turnsLeft <= 0) return 1 / 3;
   if (turnsLeft <= 4) return 1 / 2;
   return 1;
@@ -303,6 +303,18 @@ function decideAccusation(
 
   const odds = 1 / (suspects.length * locations.length * weapons.length);
   if (odds < requiredOdds(personality, turnCount, maxTurns)) return null;
+
+  // 블레이크는 초반(기준 완화 전)에는 단서 없이 확률만 믿고 고발하지 않는다.
+  // 최소 1장의 확정(CONFIRMED)이나 2장 이상의 유력(POSSIBLE) 단서를 요구한다.
+  if (personality === 'ai_instinct' && maxTurns - turnCount > 3) {
+    let confirmed = 0;
+    let possible = 0;
+    for (const mark of memory.cardStatus.values()) {
+      if (mark === 'CONFIRMED') confirmed++;
+      else if (mark === 'POSSIBLE') possible++;
+    }
+    if (confirmed < 1 && possible < 2) return null;
+  }
 
   const best = (cards: Card[]) => cards.find(c => memory.cardStatus.get(c.id) === 'POSSIBLE') ?? cards[0];
   return { suspectId: best(suspects).id, locationId: best(locations).id, weaponId: best(weapons).id };

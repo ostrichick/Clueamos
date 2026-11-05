@@ -271,13 +271,39 @@ describe('AI 행동 결정', () => {
     }
   });
 
-  it('블레이크: 정답 확률이 1/3 이상이면 초반에도 승부수 고발을 시도한다', () => {
+  it('블레이크: 정답 확률이 1/2 이상이고 단서가 있으면 초반에도 승부수 고발을 시도한다', () => {
+    const state = makeState();
+    const ai = state.players[2];
+    const memory = narrowedMemory(ai, 1, 1, 2); // 1 × 1 × 2 => 1/2
+    // 유력 단서 2장 표시 (아무도 반증하지 못한 카드)
+    let marked = 0;
+    for (const [id, mark] of memory.cardStatus) {
+      if (mark !== 'IMPOSSIBLE' && marked < 2) {
+        memory.cardStatus.set(id, 'POSSIBLE');
+        marked++;
+      }
+    }
+
+    const action = decideBlakeAction(state, memory);
+    expect(action.type).toBe('ACCUSE');
+  });
+
+  it('블레이크: 확률이 돼도 단서 없이는 초반 자살 고발을 하지 않는다', () => {
+    const state = makeState();
+    const ai = state.players[2];
+    const memory = narrowedMemory(ai, 1, 1, 2); // 1 × 1 × 2 => 1/2, 단서 없음
+
+    const action = decideBlakeAction(state, memory);
+    expect(action.type).toBe('MOVE_AND_SUGGEST');
+  });
+
+  it('블레이크: 정답 확률이 1/2 미만이면 초반 자살 고발을 하지 않는다', () => {
     const state = makeState();
     const ai = state.players[2];
     const memory = narrowedMemory(ai, 1, 1, 3); // 1 × 1 × 3 => 1/3
 
     const action = decideBlakeAction(state, memory);
-    expect(action.type).toBe('ACCUSE');
+    expect(action.type).toBe('MOVE_AND_SUGGEST');
   });
 
   it('블레이크: 후보가 넉넉하면 MOVE_AND_SUGGEST를 반환한다', () => {
@@ -351,6 +377,7 @@ describe('shouldAIAccuse', () => {
       SUSPECTS.forEach(c => { if (c.id !== s.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
       LOCATION_CARDS.forEach(c => { if (c.id !== l.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
       WEAPONS.forEach(c => { if (c.id !== w.id) memory.cardStatus.set(c.id, 'IMPOSSIBLE'); });
+      memory.cardStatus.set(s.id, 'CONFIRMED'); // 확정 단서 1장
       return { memory, solution: { suspectId: s.id, locationId: l.id, weaponId: w.id } };
     })();
 
