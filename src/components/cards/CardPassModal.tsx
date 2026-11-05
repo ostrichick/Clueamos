@@ -78,6 +78,8 @@ const SecretClueRevealView: React.FC<{
   }, []);
 
   // 5.0초 카운트다운 타이머: 뒤집은 후 시간이 다 되면 자동으로 수첩에 마크하고 닫기
+  // updater는 순수하게 유지하고 완료 부수효과는 아래 별도 effect에서 1회만 실행한다
+  // (StrictMode 이중호출 시 중복 기록/닫기 방지).
   useEffect(() => {
     if (!isFlipped) return;
 
@@ -87,12 +89,6 @@ const SecretClueRevealView: React.FC<{
         const next = prev - 0.1;
         if (next <= 0) {
           if (timerRef.current) clearInterval(timerRef.current);
-          if (onMarkNotebookAndDismiss) {
-            sounds.playDisprove();
-            onMarkNotebookAndDismiss(secretClue.card.id);
-          } else {
-            onDismiss();
-          }
           return 0;
         }
         return next;
@@ -105,7 +101,20 @@ const SecretClueRevealView: React.FC<{
         timerRef.current = null;
       }
     };
-  }, [isFlipped, onMarkNotebookAndDismiss, onDismiss, secretClue.card.id]);
+  }, [isFlipped]);
+
+  const autoDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isFlipped || secondsLeft > 0) return;
+    if (autoDoneRef.current) return;
+    autoDoneRef.current = true;
+    if (onMarkNotebookAndDismiss) {
+      sounds.playDisprove();
+      onMarkNotebookAndDismiss(secretClue.card.id);
+    } else {
+      onDismiss();
+    }
+  });
 
   const handleCardFlip = () => {
     if (!isFlipped) {

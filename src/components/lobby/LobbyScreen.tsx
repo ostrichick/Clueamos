@@ -229,7 +229,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-200">
-                          {playMode === 'host' ? t.waitingForPlayer2 : t.connectedToRoom}
+                          {playMode === 'host'
+                            ? (isConnected ? t.player2Connected : t.waitingForPlayer2)
+                            : t.connectedToRoom}
                         </span>
                         {isConnected ? (
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold text-emerald-400 flex items-center gap-1">
@@ -356,6 +358,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       src={profile.portraitUrl}
                       alt={getCardName(s.id)}
                       fill
+                      sizes="(max-width: 640px) 50vw, 200px"
                       className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
                     />
 
@@ -459,7 +462,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                           : 'bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600 active:scale-95 cursor-pointer'
                     }`}
                   >
-                    <span className="text-xs font-black">{count === 0 ? '⚔️ 0명' : `🤖 ${count}명`}</span>
+                    <span className="text-xs font-black">{count === 0 ? '⚔️ 0' : `🤖 ${count}`}{locale === 'ko' ? '명' : ''}</span>
                     <span className={`text-[10px] truncate max-w-full ${isSelected ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
                       {subLabel}
                     </span>

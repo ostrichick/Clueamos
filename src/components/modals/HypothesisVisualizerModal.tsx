@@ -53,6 +53,8 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
   const isObserver = Boolean(myPlayerId && visual && visual.askerId !== myPlayerId && visual.responderId !== myPlayerId);
 
   // Countdown timer for completed phases: default action is auto-mark if card is shown!
+  // updater는 순수하게 유지하고 완료 부수효과는 아래 별도 effect에서 1회만 실행한다
+  // (StrictMode 이중호출 시 중복 기록/닫기 방지).
   useEffect(() => {
     if (!visual) return;
     if (visual.phase === 'asking') return; // Don't auto-dismiss while still waiting for disprove response
@@ -63,11 +65,6 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         const next = prev - 0.1;
         if (next <= 0) {
           if (timerRef.current) clearInterval(timerRef.current);
-          if (!isObserver && visual.shownCardId && onMarkNotebookAndDismiss && visual.askerId === myPlayerId) {
-            onMarkNotebookAndDismiss(visual.shownCardId);
-          } else {
-            onDismiss();
-          }
           return 0;
         }
         return next;
@@ -80,7 +77,20 @@ export const HypothesisVisualizerModal: React.FC<HypothesisVisualizerModalProps>
         timerRef.current = null;
       }
     };
-  }, [visual, onDismiss, onMarkNotebookAndDismiss, isObserver, myPlayerId]);
+  }, [visual]);
+
+  const visualKey = visual ? `${visual.askerId}:${visual.phase}:${visual.shownCardId ?? ''}` : '';
+  const autoDoneRef = useRef<string>('');
+  useEffect(() => {
+    if (!visual || visual.phase === 'asking' || secondsLeft > 0) return;
+    if (autoDoneRef.current === visualKey) return;
+    autoDoneRef.current = visualKey;
+    if (!isObserver && visual.shownCardId && onMarkNotebookAndDismiss && visual.askerId === myPlayerId) {
+      onMarkNotebookAndDismiss(visual.shownCardId);
+    } else {
+      onDismiss();
+    }
+  });
 
   if (!visual) return null;
 

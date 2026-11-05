@@ -18,7 +18,7 @@ import { ExitConfirmModal } from '@/components/game/ExitConfirmModal';
 import { InGameDashboard } from '@/components/game/InGameDashboard';
 import { sounds } from '@/utils/sounds';
 import { translations, type SupportedLocale } from '@/i18n/translations';
-import { getInitialLocale, persistLocale } from '@/i18n/locales';
+import { getInitialLocale, persistLocale, DEFAULT_LOCALE } from '@/i18n/locales';
 import { getPlayerDisplayName } from '@/engine/engine';
 import confetti from 'canvas-confetti';
 import { useLobbyQueryParams } from '@/hooks/useLobbyQueryParams';
@@ -78,15 +78,25 @@ roomCode,
     setLocale: setStoreLocale,
   } = useGameStore();
 
-  // 언어 선택 상태: 브라우저/저장된 로케일을 초기값으로 사용
-  const [locale, setLocaleState] = useState<SupportedLocale>(getInitialLocale);
+  // 언어 선택 상태: SSR과 첫 렌더는 기본 로케일로 일치시키고,
+  // 저장된 로케일은 마운트 후 적용한다 (hydration mismatch 방지).
+  const [locale, setLocaleState] = useState<SupportedLocale>(DEFAULT_LOCALE);
   const t = translations[locale];
 
+  // 초대 링크 입력칸과 같은 방식(rAF 마운트 후 적용)으로 hydration mismatch 없이 반영한다.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as unknown as { __gameStore: typeof useGameStore }).__gameStore = useGameStore;
     }
-  }, []);
+    const frame = window.requestAnimationFrame(() => {
+      const stored = getInitialLocale();
+      setLocaleState(stored);
+      persistLocale(stored);
+      // zustand는 같은 값에도 구독자를 깨우므로 변경 시에만 동기화한다.
+      if (useGameStore.getState().currentLocale !== stored) setStoreLocale(stored);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [setStoreLocale]);
 
   const setLocale = (newLoc: SupportedLocale) => {
     setLocaleState(newLoc);
